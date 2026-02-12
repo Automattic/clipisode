@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clipisode</title>
+    <style>
+        :root {
+            --bg: #0a0a0b;
+            --surface: #141416;
+            --surface-2: #1c1c1f;
+            --border: #2a2a2e;
+            --text: #e4e4e7;
+            --text-muted: #71717a;
+            --accent: #22c55e;
+            --accent-dim: #166534;
+            --error: #ef4444;
+            --font: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+        }
+        
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 500;
+            letter-spacing: -0.02em;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--error);
+        }
+        
+        .status-dot.connected {
+            background: var(--accent);
+        }
+        
+        /* States */
+        .state { display: none; }
+        .state.active { display: block; }
+        
+        /* Disconnected state */
+        #disconnected-state {
+            text-align: center;
+            padding: 4rem 2rem;
+        }
+        
+        #disconnected-state h2 {
+            font-size: 1rem;
+            font-weight: 400;
+            margin-bottom: 0.5rem;
+        }
+        
+        #disconnected-state p {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+        
+        /* Form */
+        .segment-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .segment {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        
+        .segment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        
+        .segment-number {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .segment-remove {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1.25rem;
+            line-height: 1;
+            padding: 0.25rem;
+        }
+        
+        .segment-remove:hover {
+            color: var(--error);
+        }
+        
+        .field {
+            margin-bottom: 0.75rem;
+        }
+        
+        .field:last-child {
+            margin-bottom: 0;
+        }
+        
+        .field label {
+            display: block;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .field input {
+            width: 100%;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.5rem 0.75rem;
+            color: var(--text);
+            font-family: var(--font);
+            font-size: 0.85rem;
+        }
+        
+        .field input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        
+        .field input::placeholder {
+            color: var(--text-muted);
+        }
+        
+        .time-fields {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 0.75rem;
+        }
+        
+        button {
+            font-family: var(--font);
+            font-size: 0.8rem;
+            padding: 0.6rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        
+        .btn-secondary {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--surface-2);
+        }
+        
+        .btn-primary {
+            background: var(--accent);
+            border: 1px solid var(--accent);
+            color: #000;
+            font-weight: 500;
+        }
+        
+        .btn-primary:hover {
+            background: #16a34a;
+        }
+        
+        .btn-primary:disabled {
+            background: var(--accent-dim);
+            border-color: var(--accent-dim);
+            cursor: not-allowed;
+        }
+        
+        .btn-danger {
+            background: transparent;
+            border: 1px solid var(--error);
+            color: var(--error);
+        }
+        
+        .btn-danger:hover {
+            background: var(--error);
+            color: #fff;
+        }
+        
+        /* Progress state */
+        #progress-state {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+        }
+        
+        .progress-phase {
+            font-size: 0.7rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+        
+        .progress-message {
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .progress-bar-container {
+            background: var(--surface-2);
+            border-radius: 4px;
+            height: 6px;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+        
+        .progress-bar {
+            background: var(--accent);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .cancel-row {
+            text-align: center;
+        }
+        
+        /* Done state */
+        #done-state {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .video-container {
+            background: #000;
+            aspect-ratio: 16/9;
+        }
+        
+        .video-container video {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .done-actions {
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .done-message {
+            font-size: 0.8rem;
+            color: var(--accent);
+        }
+        
+        /* Error state */
+        #error-state {
+            background: var(--surface);
+            border: 1px solid var(--error);
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .error-code {
+            font-size: 0.7rem;
+            color: var(--error);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+        
+        .error-message {
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Clipisode</h1>
+            <div class="status-indicator">
+                <span class="status-dot" id="status-dot"></span>
+                <span id="status-text">Disconnected</span>
+            </div>
+        </header>
+        
+        <!-- Disconnected State -->
+        <div id="disconnected-state" class="state active">
+            <h2>Waiting for Clipisode app...</h2>
+            <p>Make sure the Clipisode menu bar app is running.</p>
+        </div>
+        
+        <!-- Form State -->
+        <div id="form-state" class="state">
+            <div class="segment-list" id="segment-list">
+                <!-- Segments will be added here -->
+            </div>
+            <div class="actions">
+                <button type="button" class="btn-secondary" id="add-segment-btn">+ Add Segment</button>
+                <button type="button" class="btn-primary" id="submit-btn">Build Video</button>
+            </div>
+        </div>
+        
+        <!-- Progress State -->
+        <div id="progress-state" class="state">
+            <div class="progress-phase" id="progress-phase">Initializing</div>
+            <div class="progress-message" id="progress-message">Starting job...</div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <div class="cancel-row">
+                <button type="button" class="btn-danger" id="cancel-btn">Cancel</button>
+            </div>
+        </div>
+        
+        <!-- Done State -->
+        <div id="done-state" class="state">
+            <div class="video-container">
+                <video id="output-video" controls></video>
+            </div>
+            <div class="done-actions">
+                <span class="done-message">✓ Video ready</span>
+                <button type="button" class="btn-secondary" id="new-job-btn">New Job</button>
+            </div>
+        </div>
+        
+        <!-- Error State -->
+        <div id="error-state" class="state">
+            <div class="error-code" id="error-code">Error</div>
+            <div class="error-message" id="error-message">Something went wrong.</div>
+            <button type="button" class="btn-secondary" id="retry-btn">Try Again</button>
+        </div>
+    </div>
+    
+    <script>
+        // Configuration
+        const WS_URL = 'ws://127.0.0.1:63481';
+        const STORAGE_KEY = 'clipisode_active_job';
+        
+        // State
+        let ws = null;
+        let segments = [];
+        let currentJobId = null;
+        
+        // DOM Elements
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const segmentList = document.getElementById('segment-list');
+        const addSegmentBtn = document.getElementById('add-segment-btn');
+        const submitBtn = document.getElementById('submit-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const newJobBtn = document.getElementById('new-job-btn');
+        const retryBtn = document.getElementById('retry-btn');
+        const progressPhase = document.getElementById('progress-phase');
+        const progressMessage = document.getElementById('progress-message');
+        const progressBar = document.getElementById('progress-bar');
+        const outputVideo = document.getElementById('output-video');
+        const errorCode = document.getElementById('error-code');
+        const errorMessage = document.getElementById('error-message');
+        
+        // State Management
+        function showState(stateId) {
+            document.querySelectorAll('.state').forEach(el => el.classList.remove('active'));
+            document.getElementById(stateId).classList.add('active');
+        }
+        
+        function setConnected(connected) {
+            statusDot.classList.toggle('connected', connected);
+            statusText.textContent = connected ? 'Connected' : 'Disconnected';
+        }
+        
+        // localStorage
+        function saveJob(job) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(job));
+        }
+        
+        function loadJob() {
+            const data = localStorage.getItem(STORAGE_KEY);
+            return data ? JSON.parse(data) : null;
+        }
+        
+        function clearJob() {
+            localStorage.removeItem(STORAGE_KEY);
+        }
+        
+        // Generate Job ID (UTC timestamp)
+        function generateJobId() {
+            const now = new Date();
+            const y = now.getUTCFullYear();
+            const m = String(now.getUTCMonth() + 1).padStart(2, '0');
+            const d = String(now.getUTCDate()).padStart(2, '0');
+            const h = String(now.getUTCHours()).padStart(2, '0');
+            const min = String(now.getUTCMinutes()).padStart(2, '0');
+            const s = String(now.getUTCSeconds()).padStart(2, '0');
+            return `${y}${m}${d}T${h}${min}${s}Z`;
+        }
+        
+        // Segment Management
+        function addSegment(url = '', start = '', end = '') {
+            const index = segments.length;
+            segments.push({ url, start, end, order: index + 1 });
+            renderSegments();
+        }
+        
+        function removeSegment(index) {
+            segments.splice(index, 1);
+            // Re-order
+            segments.forEach((seg, i) => seg.order = i + 1);
+            renderSegments();
+        }
+        
+        function updateSegment(index, field, value) {
+            segments[index][field] = value;
+        }
+        
+        function renderSegments() {
+            segmentList.innerHTML = segments.map((seg, i) => `
+                <div class="segment" data-index="${i}">
+                    <div class="segment-header">
+                        <span class="segment-number">Segment ${i + 1}</span>
+                        <button type="button" class="segment-remove" onclick="removeSegment(${i})">×</button>
+                    </div>
+                    <div class="field">
+                        <label>Video URL</label>
+                        <input type="url" placeholder="http://example.com/video.mp4" 
+                               value="${seg.url}" 
+                               onchange="updateSegment(${i}, 'url', this.value)">
+                    </div>
+                    <div class="time-fields">
+                        <div class="field">
+                            <label>Start (seconds)</label>
+                            <input type="number" step="0.1" min="0" placeholder="(start)"
+                                   value="${seg.start}"
+                                   onchange="updateSegment(${i}, 'start', this.value)">
+                        </div>
+                        <div class="field">
+                            <label>End (seconds)</label>
+                            <input type="number" step="0.1" min="0" placeholder="(end)"
+                                   value="${seg.end}"
+                                   onchange="updateSegment(${i}, 'end', this.value)">
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function getSegmentsData() {
+            return segments.map((seg, i) => ({
+                url: seg.url,
+                start: seg.start !== '' ? parseFloat(seg.start) : null,
+                end: seg.end !== '' ? parseFloat(seg.end) : null,
+                order: i + 1
+            }));
+        }
+        
+        function validateSegments() {
+            for (const seg of segments) {
+                if (!seg.url || (!seg.url.startsWith('http://') && !seg.url.startsWith('https://'))) {
+                    alert('All URLs must be HTTP or HTTPS');
+                    return false;
+                }
+                // Times are optional - empty means use full video
+                const start = seg.start !== '' ? parseFloat(seg.start) : null;
+                const end = seg.end !== '' ? parseFloat(seg.end) : null;
+                if (start !== null && end !== null && end <= start) {
+                    alert('Invalid time range: end must be greater than start');
+                    return false;
+                }
+                if ((start !== null && start < 0) || (end !== null && end < 0)) {
+                    alert('Times cannot be negative');
+                    return false;
+                }
+            }
+            return true;
+        }
+        
+        // WebSocket
+        function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) return;
+            
+            ws = new WebSocket(WS_URL);
+            
+            ws.onopen = () => {
+                ws.send(JSON.stringify({
+                    type: 'hello',
+                    client: 'clipisode-web',
+                    version: 1
+                }));
+            };
+            
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                handleMessage(msg);
+            };
+            
+            ws.onclose = () => {
+                setConnected(false);
+                showState('disconnected-state');
+                // Reconnect after delay
+                setTimeout(connect, 2000);
+            };
+            
+            ws.onerror = () => {
+                ws.close();
+            };
+        }
+        
+        function send(msg) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(msg));
+            }
+        }
+        
+        function handleMessage(msg) {
+            switch (msg.type) {
+                case 'hello_ack':
+                    setConnected(true);
+                    // Check for pending job
+                    const savedJob = loadJob();
+                    if (savedJob && savedJob.state === 'processing') {
+                        currentJobId = savedJob.job_id;
+                        send({ type: 'job_status_request', job_id: currentJobId });
+                        showState('progress-state');
+                    } else {
+                        showState('form-state');
+                    }
+                    break;
+                    
+                case 'connection_rejected':
+                    alert(msg.reason);
+                    break;
+                    
+                case 'job_status':
+                    updateProgress(msg);
+                    break;
+                    
+                case 'job_done':
+                    clearJob();
+                    outputVideo.src = msg.output_url;
+                    showState('done-state');
+                    break;
+                    
+                case 'job_error':
+                    clearJob();
+                    errorCode.textContent = msg.code;
+                    errorMessage.textContent = msg.message;
+                    showState('error-state');
+                    break;
+                    
+                case 'job_cancelled':
+                    clearJob();
+                    showState('form-state');
+                    break;
+                    
+                case 'job_not_found':
+                    clearJob();
+                    showState('form-state');
+                    break;
+            }
+        }
+        
+        function updateProgress(msg) {
+            const phaseLabels = {
+                'downloading': 'Downloading',
+                'trimming': 'Trimming',
+                'joining': 'Joining',
+                'done': 'Complete',
+                'error': 'Error',
+                'cancelled': 'Cancelled'
+            };
+            
+            progressPhase.textContent = phaseLabels[msg.phase] || msg.phase;
+            progressMessage.textContent = msg.message;
+            
+            const percent = msg.total > 0 ? (msg.current / msg.total) * 100 : 0;
+            progressBar.style.width = percent + '%';
+            
+            // Save state
+            saveJob({
+                job_id: msg.job_id,
+                state: 'processing',
+                phase: msg.phase,
+                current: msg.current,
+                total: msg.total
+            });
+        }
+        
+        // Actions
+        function submitJob() {
+            if (segments.length === 0) {
+                alert('Add at least one segment');
+                return;
+            }
+            
+            if (!validateSegments()) return;
+            
+            currentJobId = generateJobId();
+            const segmentsData = getSegmentsData();
+            
+            // Save to localStorage
+            saveJob({
+                job_id: currentJobId,
+                segments: segmentsData,
+                state: 'processing',
+                submitted_at: new Date().toISOString()
+            });
+            
+            // Send to app
+            send({
+                type: 'start_job',
+                job_id: currentJobId,
+                segments: segmentsData
+            });
+            
+            showState('progress-state');
+            progressPhase.textContent = 'Starting';
+            progressMessage.textContent = 'Initializing job...';
+            progressBar.style.width = '0%';
+        }
+        
+        function cancelJob() {
+            if (currentJobId) {
+                send({ type: 'cancel_job', job_id: currentJobId });
+            }
+        }
+        
+        function newJob() {
+            segments = [];
+            addSegment();
+            showState('form-state');
+        }
+        
+        // Event Listeners
+        addSegmentBtn.addEventListener('click', () => addSegment());
+        submitBtn.addEventListener('click', submitJob);
+        cancelBtn.addEventListener('click', cancelJob);
+        newJobBtn.addEventListener('click', newJob);
+        retryBtn.addEventListener('click', () => {
+            showState('form-state');
+        });
+        
+        // Initialize
+        addSegment(); // Start with one segment
+        connect();
+    </script>
+</body>
+</html>

@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clipisode WASM</title>
+    <style>
+        :root {
+            --bg: #0a0a0b;
+            --surface: #141416;
+            --surface-2: #1c1c1f;
+            --border: #2a2a2e;
+            --text: #e4e4e7;
+            --text-muted: #71717a;
+            --accent: #22c55e;
+            --accent-dim: #166534;
+            --error: #ef4444;
+            --font: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .container { max-width: 720px; margin: 0 auto; }
+        
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        h1 { font-size: 1.25rem; font-weight: 500; }
+        
+        .status {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--error);
+        }
+        .status-dot.ready { background: var(--accent); }
+        .status-dot.loading { background: #eab308; animation: pulse 1s infinite; }
+        
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        
+        .segment-list { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem; }
+        
+        .segment {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        
+        .segment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        
+        .segment-number {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        
+        .segment-remove {
+            background: none; border: none;
+            color: var(--text-muted);
+            cursor: pointer; font-size: 1.25rem;
+        }
+        .segment-remove:hover { color: var(--error); }
+        
+        .field { margin-bottom: 0.75rem; }
+        .field:last-child { margin-bottom: 0; }
+        
+        .field label {
+            display: block;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+            text-transform: uppercase;
+        }
+        
+        .field input {
+            width: 100%;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.5rem 0.75rem;
+            color: var(--text);
+            font-family: var(--font);
+            font-size: 0.85rem;
+        }
+        .field input:focus { outline: none; border-color: var(--accent); }
+        
+        .time-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+        .actions { display: flex; gap: 0.75rem; }
+        
+        button {
+            font-family: var(--font);
+            font-size: 0.8rem;
+            padding: 0.6rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        
+        .btn-secondary {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+        .btn-secondary:hover { background: var(--surface-2); }
+        
+        .btn-primary {
+            background: var(--accent);
+            border: 1px solid var(--accent);
+            color: #000;
+            font-weight: 500;
+        }
+        .btn-primary:hover { background: #16a34a; }
+        .btn-primary:disabled {
+            background: var(--accent-dim);
+            border-color: var(--accent-dim);
+            cursor: not-allowed;
+        }
+        
+        .progress-container {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            display: none;
+        }
+        .progress-container.active { display: block; }
+        
+        .progress-phase {
+            font-size: 0.7rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+        
+        .progress-message { font-size: 1rem; margin-bottom: 1rem; }
+        
+        .progress-bar-bg {
+            background: var(--surface-2);
+            border-radius: 4px;
+            height: 6px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            background: var(--accent);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .output-container {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+            display: none;
+        }
+        .output-container.active { display: block; }
+        
+        .video-container { background: #000; aspect-ratio: 16/9; }
+        .video-container video { width: 100%; height: 100%; }
+        
+        .output-actions {
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .done-message { font-size: 0.8rem; color: var(--accent); }
+        
+        .logs {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 1.5rem;
+        }
+        .logs:empty { display: none; }
+        .log-line { margin-bottom: 0.25rem; font-family: monospace; }
+        .log-line.error { color: var(--error); }
+        .log-line.progress { color: var(--accent); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Clipisode <span style="color: var(--text-muted); font-weight: 300;">WASM</span></h1>
+            <div class="status">
+                <span class="status-dot" id="status-dot"></span>
+                <span id="status-text">Loading...</span>
+            </div>
+        </header>
+        
+        <div class="progress-container" id="progress">
+            <div class="progress-phase" id="progress-phase">Initializing</div>
+            <div class="progress-message" id="progress-message">Loading...</div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+        </div>
+        
+        <div class="output-container" id="output">
+            <div class="video-container">
+                <video id="output-video" controls></video>
+            </div>
+            <div class="output-actions">
+                <span class="done-message">✓ Video ready</span>
+                <div>
+                    <button class="btn-secondary" id="download-btn">Download</button>
+                    <button class="btn-secondary" id="new-btn">New</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="form">
+            <div class="segment-list" id="segment-list"></div>
+            <div class="actions">
+                <button class="btn-secondary" id="add-btn">+ Add Segment</button>
+                <button class="btn-primary" id="build-btn" disabled>Build Video</button>
+            </div>
+        </div>
+        
+        <div class="logs" id="logs"></div>
+    </div>
+    
+    <!-- FFmpeg.wasm 0.11.x (simpler API) -->
+    <script src="./lib/ffmpeg.min.js"></script>
+    
+    <script>
+        const { createFFmpeg, fetchFile } = FFmpeg;
+        
+        // State
+        let ffmpeg = null;
+        let segments = [];
+        let outputBlob = null;
+        
+        // DOM
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const segmentList = document.getElementById('segment-list');
+        const addBtn = document.getElementById('add-btn');
+        const buildBtn = document.getElementById('build-btn');
+        const progressEl = document.getElementById('progress');
+        const progressPhase = document.getElementById('progress-phase');
+        const progressMessage = document.getElementById('progress-message');
+        const progressBar = document.getElementById('progress-bar');
+        const outputEl = document.getElementById('output');
+        const outputVideo = document.getElementById('output-video');
+        const downloadBtn = document.getElementById('download-btn');
+        const newBtn = document.getElementById('new-btn');
+        const formEl = document.getElementById('form');
+        const logsEl = document.getElementById('logs');
+        
+        // Logging
+        function log(msg, type = 'normal') {
+            const line = document.createElement('div');
+            line.className = 'log-line' + (type === 'error' ? ' error' : type === 'progress' ? ' progress' : '');
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logsEl.appendChild(line);
+            logsEl.scrollTop = logsEl.scrollHeight;
+            console.log(msg);
+        }
+        
+        // Initialize FFmpeg
+        async function initFFmpeg() {
+            statusDot.className = 'status-dot loading';
+            statusText.textContent = 'Loading FFmpeg...';
+            log('Creating FFmpeg instance...');
+            
+            try {
+                ffmpeg = createFFmpeg({
+                    log: true,
+                    corePath: new URL('./lib/ffmpeg-core.js', location.href).href,
+                    progress: ({ ratio }) => {
+                        // THIS IS THE REAL-TIME PROGRESS!
+                        const pct = (ratio * 100).toFixed(1);
+                        progressBar.style.width = pct + '%';
+                        progressMessage.textContent = `Encoding: ${pct}%`;
+                        log(`Progress: ${pct}%`, 'progress');
+                    }
+                });
+                
+                // Override console.log to capture FFmpeg output
+                ffmpeg.setLogger(({ type, message }) => {
+                    if (type === 'fferr' || type === 'ffout') {
+                        log(`FFmpeg: ${message}`);
+                    }
+                });
+                
+                log('Loading FFmpeg WASM core (~23MB)...');
+                await ffmpeg.load();
+                
+                statusDot.className = 'status-dot ready';
+                statusText.textContent = 'Ready';
+                buildBtn.disabled = false;
+                log('✓ FFmpeg loaded successfully!');
+            } catch (e) {
+                log('Error loading FFmpeg: ' + e.message, 'error');
+                console.error(e);
+                statusText.textContent = 'Load failed';
+            }
+        }
+        
+        // Segment management
+        function addSegment(url = '', start = '', end = '') {
+            segments.push({ url, start, end });
+            renderSegments();
+        }
+        
+        function removeSegment(index) {
+            segments.splice(index, 1);
+            renderSegments();
+        }
+        
+        function updateSegment(index, field, value) {
+            segments[index][field] = value;
+        }
+        
+        function renderSegments() {
+            segmentList.innerHTML = segments.map((seg, i) => `
+                <div class="segment">
+                    <div class="segment-header">
+                        <span class="segment-number">Segment ${i + 1}</span>
+                        <button class="segment-remove" onclick="removeSegment(${i})">×</button>
+                    </div>
+                    <div class="field">
+                        <label>Video URL</label>
+                        <input type="url" placeholder="http://example.com/video.mp4" 
+                               value="${seg.url}" 
+                               onchange="updateSegment(${i}, 'url', this.value)">
+                    </div>
+                    <div class="time-fields">
+                        <div class="field">
+                            <label>Start (seconds)</label>
+                            <input type="number" step="0.1" min="0" placeholder="(start)"
+                                   value="${seg.start}"
+                                   onchange="updateSegment(${i}, 'start', this.value)">
+                        </div>
+                        <div class="field">
+                            <label>End (seconds)</label>
+                            <input type="number" step="0.1" min="0" placeholder="(end)"
+                                   value="${seg.end}"
+                                   onchange="updateSegment(${i}, 'end', this.value)">
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        window.removeSegment = removeSegment;
+        window.updateSegment = updateSegment;
+        
+        // Build video
+        async function buildVideo() {
+            if (segments.length === 0 || !segments.some(s => s.url)) {
+                alert('Add at least one segment with a URL');
+                return;
+            }
+            
+            formEl.style.display = 'none';
+            outputEl.classList.remove('active');
+            progressEl.classList.add('active');
+            progressPhase.textContent = 'Downloading';
+            progressMessage.textContent = 'Fetching source files...';
+            progressBar.style.width = '0%';
+            
+            try {
+                const segmentFiles = [];
+                
+                for (let i = 0; i < segments.length; i++) {
+                    const seg = segments[i];
+                    if (!seg.url) continue;
+                    
+                    log(`Downloading segment ${i + 1}: ${seg.url}`);
+                    progressMessage.textContent = `Downloading ${i + 1} of ${segments.length}...`;
+                    
+                    const inputName = `input_${i}.mp4`;
+                    const outputName = `segment_${i}.mp4`;
+                    
+                    // Write input file to WASM filesystem
+                    ffmpeg.FS('writeFile', inputName, await fetchFile(seg.url));
+                    
+                    // Build ffmpeg args
+                    let args = ['-i', inputName];
+                    
+                    if (seg.start) args = ['-ss', seg.start, ...args];
+                    if (seg.end) {
+                        if (seg.start) {
+                            args.push('-t', String(parseFloat(seg.end) - parseFloat(seg.start)));
+                        } else {
+                            args.push('-to', seg.end);
+                        }
+                    }
+                    
+                    // Normalize: 480p, 30fps, x264 ultrafast, AAC
+                    args.push(
+                        '-vf', 'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2',
+                        '-r', '30',
+                        '-c:v', 'libx264',
+                        '-preset', 'ultrafast',
+                        '-crf', '28',
+                        '-pix_fmt', 'yuv420p',
+                        '-ar', '44100',
+                        '-ac', '2',
+                        '-c:a', 'aac',
+                        '-b:a', '96k',
+                        outputName
+                    );
+                    
+                    progressPhase.textContent = 'Transcoding';
+                    progressMessage.textContent = `Processing segment ${i + 1}...`;
+                    progressBar.style.width = '0%';
+                    log(`Transcoding segment ${i + 1}...`);
+                    log(`Args: ${args.join(' ')}`);
+                    
+                    await ffmpeg.run(...args);
+                    
+                    log(`✓ Segment ${i + 1} complete`);
+                    segmentFiles.push(outputName);
+                    
+                    // Cleanup input
+                    ffmpeg.FS('unlink', inputName);
+                }
+                
+                // Concatenate
+                progressPhase.textContent = 'Joining';
+                progressMessage.textContent = 'Concatenating segments...';
+                progressBar.style.width = '0%';
+                log('Concatenating segments...');
+                
+                const concatList = segmentFiles.map(f => `file '${f}'`).join('\n');
+                ffmpeg.FS('writeFile', 'concat.txt', concatList);
+                
+                await ffmpeg.run(
+                    '-f', 'concat',
+                    '-safe', '0',
+                    '-i', 'concat.txt',
+                    '-c', 'copy',
+                    '-movflags', '+faststart',
+                    'output.mp4'
+                );
+                
+                // Read output
+                const data = ffmpeg.FS('readFile', 'output.mp4');
+                outputBlob = new Blob([data.buffer], { type: 'video/mp4' });
+                
+                // Cleanup
+                for (const f of segmentFiles) {
+                    ffmpeg.FS('unlink', f);
+                }
+                ffmpeg.FS('unlink', 'concat.txt');
+                ffmpeg.FS('unlink', 'output.mp4');
+                
+                // Show output
+                outputVideo.src = URL.createObjectURL(outputBlob);
+                progressEl.classList.remove('active');
+                outputEl.classList.add('active');
+                log('✓ Video built successfully!');
+                
+            } catch (e) {
+                log('Error: ' + e.message, 'error');
+                console.error(e);
+                progressPhase.textContent = 'Error';
+                progressMessage.textContent = e.message;
+            }
+        }
+        
+        function downloadOutput() {
+            if (!outputBlob) return;
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(outputBlob);
+            a.download = `clipisode_${Date.now()}.mp4`;
+            a.click();
+        }
+        
+        function reset() {
+            outputEl.classList.remove('active');
+            formEl.style.display = 'block';
+            outputVideo.src = '';
+            outputBlob = null;
+        }
+        
+        // Event listeners
+        addBtn.addEventListener('click', () => addSegment());
+        buildBtn.addEventListener('click', buildVideo);
+        downloadBtn.addEventListener('click', downloadOutput);
+        newBtn.addEventListener('click', reset);
+        
+        // Init
+        addSegment();
+        initFFmpeg();
+    </script>
+</body>
+</html>
