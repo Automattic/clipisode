@@ -1,9 +1,5 @@
 import './view.css';
 
-// ---------------------------------------------------------------------------
-// Controller: manages step visibility, file upload, and clip submission.
-// ---------------------------------------------------------------------------
-
 function initFlow( root: HTMLElement ): void {
 	const slug = root.dataset.slug || '';
 	const restUrl = root.dataset.restUrl || '';
@@ -13,19 +9,11 @@ function initFlow( root: HTMLElement ): void {
 	let attachmentId: number | null = null;
 	let uploadComplete = false;
 
-	// ------------------------------------------------------------------
-	// Step visibility
-	// ------------------------------------------------------------------
-
 	function showStep( step: string ): void {
 		stages.forEach( ( el ) => {
 			el.style.display = el.dataset.step === step ? '' : 'none';
 		} );
 	}
-
-	// ------------------------------------------------------------------
-	// Navigation via data-goto buttons
-	// ------------------------------------------------------------------
 
 	root.addEventListener( 'click', ( e: Event ) => {
 		const btn = ( e.target as HTMLElement ).closest< HTMLElement >(
@@ -37,7 +25,6 @@ function initFlow( root: HTMLElement ): void {
 		const step = btn.dataset.goto!;
 		showStep( step );
 
-		// Auto-trigger file picker when entering record step.
 		if ( step === 'record' ) {
 			setTimeout( () => {
 				const fileInput =
@@ -46,10 +33,6 @@ function initFlow( root: HTMLElement ): void {
 			}, 150 );
 		}
 	} );
-
-	// ------------------------------------------------------------------
-	// File upload (record stage)
-	// ------------------------------------------------------------------
 
 	const fileInput = root.querySelector< HTMLInputElement >( '.ci-file-input' );
 	const chooseBtn = root.querySelector< HTMLElement >( '.ci-choose-btn' );
@@ -121,14 +104,10 @@ function initFlow( root: HTMLElement ): void {
 			if ( progressBar ) progressBar.classList.add( 'ci-error-bar' );
 		} );
 
-		xhr.open( 'POST', `${ restUrl }clipisode-invitation/v1/upload` );
+		xhr.open( 'POST', `${ restUrl }clipisode/v1/invitation/upload` );
 		xhr.setRequestHeader( 'X-WP-Nonce', nonce );
 		xhr.send( formData );
 	}
-
-	// ------------------------------------------------------------------
-	// Clip submission
-	// ------------------------------------------------------------------
 
 	submitBtn?.addEventListener( 'click', async () => {
 		const name = nameInput?.value.trim();
@@ -144,7 +123,7 @@ function initFlow( root: HTMLElement ): void {
 
 		try {
 			const res = await fetch(
-				`${ restUrl }clipisode-invitation/v1/submit`,
+				`${ restUrl }clipisode/v1/invitation/submit`,
 				{
 					method: 'POST',
 					headers: {
@@ -178,16 +157,8 @@ function initFlow( root: HTMLElement ): void {
 		}
 	} );
 
-	// ------------------------------------------------------------------
-	// Init: show landing
-	// ------------------------------------------------------------------
-
 	showStep( 'landing' );
 }
-
-// ---------------------------------------------------------------------------
-// Bootstrap
-// ---------------------------------------------------------------------------
 
 document.addEventListener( 'DOMContentLoaded', () => {
 	document

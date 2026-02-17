@@ -54,11 +54,11 @@ $rest_url         = esc_url_raw( rest_url() );
 $nonce            = wp_create_nonce( 'wp_rest' );
 
 // Enqueue the flow controller script + styles.
-$asset_file = CIB_DIR . 'build/flow/view.asset.php';
-$asset      = file_exists( $asset_file ) ? include $asset_file : [ 'dependencies' => [], 'version' => '0.1.0' ];
+$asset_file = CLIPISODE_PLUGIN_DIR . 'build/flow/view.asset.php';
+$asset      = file_exists( $asset_file ) ? include $asset_file : [ 'dependencies' => [], 'version' => CLIPISODE_VERSION ];
 
-wp_enqueue_script( 'cib-flow-view', CIB_URL . 'build/flow/view.js', $asset['dependencies'], $asset['version'], true );
-wp_enqueue_style( 'cib-flow-view', CIB_URL . 'build/flow/view.css', [], $asset['version'] );
+wp_enqueue_script( 'clipisode-flow-view', CLIPISODE_PLUGIN_URL . 'build/flow/view.js', $asset['dependencies'], $asset['version'], true );
+wp_enqueue_style( 'clipisode-flow-view', CLIPISODE_PLUGIN_URL . 'build/flow/view.css', [], $asset['version'] );
 
 ?>
 <!DOCTYPE html>

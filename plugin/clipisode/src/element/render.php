@@ -11,7 +11,6 @@ defined( 'ABSPATH' ) || exit;
 $type = $attributes['type'] ?? '';
 $slug = $block->context['clipisode/slug'] ?? '';
 
-// Resolve topic data once.
 $topic = null;
 if ( $slug ) {
 	global $wpdb;
