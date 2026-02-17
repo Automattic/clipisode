@@ -1,0 +1,196 @@
+import './view.css';
+
+// ---------------------------------------------------------------------------
+// Controller: manages step visibility, file upload, and clip submission.
+// ---------------------------------------------------------------------------
+
+function initFlow( root: HTMLElement ): void {
+	const slug = root.dataset.slug || '';
+	const restUrl = root.dataset.restUrl || '';
+	const nonce = root.dataset.nonce || '';
+
+	const stages = root.querySelectorAll< HTMLElement >( '[data-step]' );
+	let attachmentId: number | null = null;
+	let uploadComplete = false;
+
+	// ------------------------------------------------------------------
+	// Step visibility
+	// ------------------------------------------------------------------
+
+	function showStep( step: string ): void {
+		stages.forEach( ( el ) => {
+			el.style.display = el.dataset.step === step ? '' : 'none';
+		} );
+	}
+
+	// ------------------------------------------------------------------
+	// Navigation via data-goto buttons
+	// ------------------------------------------------------------------
+
+	root.addEventListener( 'click', ( e: Event ) => {
+		const btn = ( e.target as HTMLElement ).closest< HTMLElement >(
+			'[data-goto]'
+		);
+		if ( ! btn ) return;
+		e.preventDefault();
+
+		const step = btn.dataset.goto!;
+		showStep( step );
+
+		// Auto-trigger file picker when entering record step.
+		if ( step === 'record' ) {
+			setTimeout( () => {
+				const fileInput =
+					root.querySelector< HTMLInputElement >( '.ci-file-input' );
+				fileInput?.click();
+			}, 150 );
+		}
+	} );
+
+	// ------------------------------------------------------------------
+	// File upload (record stage)
+	// ------------------------------------------------------------------
+
+	const fileInput = root.querySelector< HTMLInputElement >( '.ci-file-input' );
+	const chooseBtn = root.querySelector< HTMLElement >( '.ci-choose-btn' );
+	const statusText = root.querySelector< HTMLElement >( '.ci-status-text' );
+	const progressFill = root.querySelector< HTMLElement >( '.ci-progress-fill' );
+	const progressBar = root.querySelector< HTMLElement >( '.ci-progress-bar' );
+	const formSection = root.querySelector< HTMLElement >( '.ci-form-section' );
+	const submitBtn = root.querySelector< HTMLButtonElement >( '.ci-submit' );
+	const nameInput = root.querySelector< HTMLInputElement >( '.ci-name-input' );
+	const handleInput = root.querySelector< HTMLInputElement >( '.ci-handle-input' );
+	const errorBox = root.querySelector< HTMLElement >( '.ci-error' );
+
+	chooseBtn?.addEventListener( 'click', () => fileInput?.click() );
+
+	function checkSubmitReady(): void {
+		if ( submitBtn ) {
+			submitBtn.disabled =
+				! uploadComplete || ! nameInput?.value.trim();
+		}
+	}
+
+	nameInput?.addEventListener( 'input', checkSubmitReady );
+
+	fileInput?.addEventListener( 'change', () => {
+		const file = fileInput.files?.[ 0 ];
+		if ( ! file ) return;
+
+		if ( chooseBtn ) chooseBtn.style.display = 'none';
+		if ( formSection ) formSection.style.display = '';
+
+		startUpload( file );
+	} );
+
+	function startUpload( file: File ): void {
+		if ( statusText ) statusText.textContent = 'Uploading 0%';
+
+		const formData = new FormData();
+		formData.append( 'video', file );
+
+		const xhr = new XMLHttpRequest();
+
+		xhr.upload.addEventListener( 'progress', ( e: ProgressEvent ) => {
+			if ( e.lengthComputable ) {
+				const pct = Math.round( ( e.loaded / e.total ) * 100 );
+				if ( statusText ) statusText.textContent = `Uploading ${ pct }%`;
+				if ( progressFill ) progressFill.style.width = `${ pct }%`;
+			}
+		} );
+
+		xhr.addEventListener( 'load', () => {
+			if ( xhr.status >= 200 && xhr.status < 300 ) {
+				const result = JSON.parse( xhr.responseText );
+				attachmentId = result.attachment_id;
+				uploadComplete = true;
+				if ( statusText ) statusText.textContent = 'Upload complete ✓';
+				if ( progressFill ) progressFill.style.width = '100%';
+				if ( progressBar ) progressBar.classList.add( 'ci-complete' );
+				checkSubmitReady();
+			} else {
+				if ( statusText )
+					statusText.textContent = 'Upload failed — please try again.';
+				if ( progressBar ) progressBar.classList.add( 'ci-error-bar' );
+			}
+		} );
+
+		xhr.addEventListener( 'error', () => {
+			if ( statusText )
+				statusText.textContent = 'Upload failed — please try again.';
+			if ( progressBar ) progressBar.classList.add( 'ci-error-bar' );
+		} );
+
+		xhr.open( 'POST', `${ restUrl }clipisode-invitation/v1/upload` );
+		xhr.setRequestHeader( 'X-WP-Nonce', nonce );
+		xhr.send( formData );
+	}
+
+	// ------------------------------------------------------------------
+	// Clip submission
+	// ------------------------------------------------------------------
+
+	submitBtn?.addEventListener( 'click', async () => {
+		const name = nameInput?.value.trim();
+		if ( ! name ) return;
+
+		submitBtn.disabled = true;
+		submitBtn.textContent = 'Saving…';
+
+		if ( errorBox ) {
+			errorBox.style.display = 'none';
+			errorBox.textContent = '';
+		}
+
+		try {
+			const res = await fetch(
+				`${ restUrl }clipisode-invitation/v1/submit`,
+				{
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'X-WP-Nonce': nonce,
+					},
+					body: JSON.stringify( {
+						slug,
+						name,
+						social_handle: handleInput?.value.trim() || null,
+						attachment_id: attachmentId,
+					} ),
+				}
+			);
+
+			if ( ! res.ok ) {
+				const err = await res.json();
+				throw new Error( err.message || 'Submission failed.' );
+			}
+
+			showStep( 'thanks' );
+		} catch ( err: unknown ) {
+			const message =
+				err instanceof Error ? err.message : 'Submission failed.';
+			if ( errorBox ) {
+				errorBox.textContent = message;
+				errorBox.style.display = '';
+			}
+			submitBtn.disabled = false;
+			submitBtn.textContent = 'Save My Reply';
+		}
+	} );
+
+	// ------------------------------------------------------------------
+	// Init: show landing
+	// ------------------------------------------------------------------
+
+	showStep( 'landing' );
+}
+
+// ---------------------------------------------------------------------------
+// Bootstrap
+// ---------------------------------------------------------------------------
+
+document.addEventListener( 'DOMContentLoaded', () => {
+	document
+		.querySelectorAll< HTMLElement >( '.ci-flow-root' )
+		.forEach( initFlow );
+} );

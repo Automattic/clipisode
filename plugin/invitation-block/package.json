@@ -1,0 +1,12 @@
+{
+	"name": "clipisode-invitation-block-b",
+	"version": "0.1.0",
+	"private": true,
+	"scripts": {
+		"build": "wp-scripts build",
+		"dev": "wp-scripts start"
+	},
+	"devDependencies": {
+		"@wordpress/scripts": "^31.4.0"
+	}
+}

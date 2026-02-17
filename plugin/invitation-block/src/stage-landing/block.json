@@ -1,0 +1,31 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "clipisode/invitation-landing",
+	"title": "Invitation: Landing",
+	"category": "widgets",
+	"icon": "visibility",
+	"description": "Landing stage — intro video, topic title, host, and CTA. Content is pulled from the database; styles are editable.",
+	"parent": [ "clipisode/invitation-flow" ],
+	"usesContext": [ "clipisode/slug" ],
+	"supports": {
+		"html": false,
+		"reusable": false,
+		"color": {
+			"text": true,
+			"background": true,
+			"gradients": true
+		},
+		"typography": {
+			"fontSize": true,
+			"fontFamily": true,
+			"lineHeight": true
+		},
+		"spacing": {
+			"padding": true,
+			"margin": true
+		}
+	},
+	"editorScript": "file:./index.js",
+	"render": "file:./render.php"
+}

@@ -1,0 +1,31 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "clipisode/invitation-thanks",
+	"title": "Invitation: Thanks",
+	"category": "widgets",
+	"icon": "smiley",
+	"description": "Thank-you stage — shown after submission. Content is fixed; styles are editable.",
+	"parent": [ "clipisode/invitation-flow" ],
+	"usesContext": [ "clipisode/slug" ],
+	"supports": {
+		"html": false,
+		"reusable": false,
+		"color": {
+			"text": true,
+			"background": true,
+			"gradients": true
+		},
+		"typography": {
+			"fontSize": true,
+			"fontFamily": true,
+			"lineHeight": true
+		},
+		"spacing": {
+			"padding": true,
+			"margin": true
+		}
+	},
+	"editorScript": "file:./index.js",
+	"render": "file:./render.php"
+}
