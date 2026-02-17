@@ -74,6 +74,12 @@ export interface CustomTermsItem {
 	preview_url: string;
 }
 
+export interface Host {
+	id: number;
+	name: string;
+	created_at: string;
+}
+
 declare global {
 	interface Window {
 		clipisodeAdmin?: {

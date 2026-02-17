@@ -1,8 +1,8 @@
-import { useState, useEffect } from '@wordpress/element';
+import { useState, useEffect, useRef } from '@wordpress/element';
 import { Button, TextControl, SelectControl, Spinner, Notice } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import VideoUploader from '../components/VideoUploader';
-import type { Topic, VideoValue, CustomTermsItem } from '../types';
+import type { Topic, VideoValue, CustomTermsItem, Host } from '../types';
 
 interface TopicFormProps {
 	id?: string;
@@ -18,6 +18,9 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 	} );
 	const [ video, setVideo ] = useState< VideoValue | null >( null );
 	const [ customTerms, setCustomTerms ] = useState< CustomTermsItem[] >( [] );
+	const [ hostNames, setHostNames ] = useState< string[] >( [] );
+	const [ hostFocused, setHostFocused ] = useState( false );
+	const hostRef = useRef< HTMLDivElement >( null );
 	const [ loading, setLoading ] = useState< boolean >( true );
 	const [ saving, setSaving ] = useState< boolean >( false );
 	const [ error, setError ] = useState< string | null >( null );
@@ -25,6 +28,7 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 	useEffect( () => {
 		const promises: Promise< any >[] = [
 			apiFetch< CustomTermsItem[] >( { path: '/clipisode/v1/terms/custom' } ),
+			apiFetch< Host[] >( { path: '/clipisode/v1/hosts' } ),
 		];
 
 		if ( isEdit ) {
@@ -32,8 +36,9 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 		}
 
 		Promise.all( promises )
-			.then( ( [ terms, topic ]: [ CustomTermsItem[], Topic? ] ) => {
+			.then( ( [ terms, hosts, topic ]: [ CustomTermsItem[], Host[], Topic? ] ) => {
 				setCustomTerms( terms );
+				setHostNames( hosts.map( ( h ) => h.name ) );
 
 				if ( topic ) {
 					setForm( {
@@ -112,13 +117,37 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 					onChange={ updateField( 'title' ) }
 					__nextHasNoMarginBottom
 				/>
-				<div style={ { marginTop: 16 } }>
+				<div style={ { marginTop: 16, position: 'relative' } } ref={ hostRef }>
 					<TextControl
 						label="Hosted By"
 						value={ form.hosted_by }
 						onChange={ updateField( 'hosted_by' ) }
+						onFocus={ () => setHostFocused( true ) }
+						onBlur={ () => setTimeout( () => setHostFocused( false ), 150 ) }
+						autoComplete="off"
 						__nextHasNoMarginBottom
 					/>
+					{ hostFocused && form.hosted_by.length > 0 && ( () => {
+						const filtered = hostNames.filter(
+							( n ) => n.toLowerCase().includes( form.hosted_by.toLowerCase() ) && n !== form.hosted_by
+						);
+						if ( ! filtered.length ) return null;
+						return (
+							<ul className="clipisode-host-suggestions">
+								{ filtered.map( ( name ) => (
+									<li
+										key={ name }
+										onMouseDown={ () => {
+											setForm( ( prev ) => ( { ...prev, hosted_by: name } ) );
+											setHostFocused( false );
+										} }
+									>
+										{ name }
+									</li>
+								) ) }
+							</ul>
+						);
+					} )() }
 				</div>
 				<div style={ { marginTop: 16 } }>
 					<VideoUploader value={ video } onChange={ setVideo } />

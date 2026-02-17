@@ -123,7 +123,7 @@ function deleteAttachment( id: number ): void {
 }
 
 export default function VideoUploader( { value, onChange }: VideoUploaderProps ) {
-	const [ mode, setMode ] = useState< 'upload' | 'url' >( 'upload' );
+	const [ mode, setMode ] = useState< 'none' | 'upload' | 'url' >( value ? 'upload' : 'none' );
 	const [ url, setUrl ] = useState( '' );
 	const [ uploading, setUploading ] = useState( false );
 	const [ importing, setImporting ] = useState( false );
@@ -246,24 +246,12 @@ export default function VideoUploader( { value, onChange }: VideoUploaderProps )
 		onChange( null );
 	}, [ value, onChange ] );
 
-	if ( value ) {
-		return (
-			<div className="clipisode-video-uploader">
-				<label className="components-base-control__label">Intro Video</label>
-				<div className="clipisode-video-preview">
-					<video src={ value.url } controls playsInline />
-				</div>
-				<Button
-					variant="secondary"
-					isDestructive
-					onClick={ handleRemove }
-					style={ { marginTop: 8 } }
-				>
-					Remove Video
-				</Button>
-			</div>
-		);
-	}
+	const handleModeChange = ( newMode: 'none' | 'upload' | 'url' ) => {
+		if ( newMode === 'none' && value ) {
+			handleRemove();
+		}
+		setMode( newMode );
+	};
 
 	const busy = uploading || importing;
 
@@ -276,8 +264,18 @@ export default function VideoUploader( { value, onChange }: VideoUploaderProps )
 					<input
 						type="radio"
 						name="clipisode-video-mode"
+						checked={ mode === 'none' }
+						onChange={ () => handleModeChange( 'none' ) }
+						disabled={ busy }
+					/>
+					No Video
+				</label>
+				<label>
+					<input
+						type="radio"
+						name="clipisode-video-mode"
 						checked={ mode === 'upload' }
-						onChange={ () => setMode( 'upload' ) }
+						onChange={ () => handleModeChange( 'upload' ) }
 						disabled={ busy }
 					/>
 					Upload File
@@ -287,18 +285,24 @@ export default function VideoUploader( { value, onChange }: VideoUploaderProps )
 						type="radio"
 						name="clipisode-video-mode"
 						checked={ mode === 'url' }
-						onChange={ () => setMode( 'url' ) }
+						onChange={ () => handleModeChange( 'url' ) }
 						disabled={ busy }
 					/>
 					Import from URL
 				</label>
 			</div>
 
+			{ value && (
+				<div className="clipisode-video-preview">
+					<video src={ value.url } controls playsInline />
+				</div>
+			) }
+
 			{ error && (
 				<div className="clipisode-video-error">{ error }</div>
 			) }
 
-			{ mode === 'upload' && (
+			{ ! value && mode === 'upload' && (
 				<>
 					<div
 						className={ `clipisode-video-dropzone${ dragOver ? ' drag-over' : '' }${ busy ? ' busy' : '' }` }
@@ -346,7 +350,7 @@ export default function VideoUploader( { value, onChange }: VideoUploaderProps )
 				</>
 			) }
 
-			{ mode === 'url' && (
+			{ ! value && mode === 'url' && (
 				<div className="clipisode-video-url-input">
 					<input
 						type="url"

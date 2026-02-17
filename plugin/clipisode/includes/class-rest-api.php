@@ -24,6 +24,28 @@ class Clipisode_REST_API {
 			],
 		] );
 
+		// Hosts.
+		register_rest_route( self::NAMESPACE, '/hosts', [
+			[
+				'methods'             => 'GET',
+				'callback'            => [ $this, 'list_hosts' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+			[
+				'methods'             => 'POST',
+				'callback'            => [ $this, 'create_host' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+		] );
+
+		register_rest_route( self::NAMESPACE, '/hosts/(?P<id>\d+)', [
+			[
+				'methods'             => 'DELETE',
+				'callback'            => [ $this, 'delete_host' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+		] );
+
 		// Topics.
 		register_rest_route( self::NAMESPACE, '/topics', [
 			[
@@ -176,6 +198,50 @@ class Clipisode_REST_API {
 		return new WP_REST_Response( $terms );
 	}
 
+	// --- Hosts ---
+
+	public function list_hosts( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
+		$table = $wpdb->prefix . 'clipisode_hosts';
+		$hosts = $wpdb->get_results( "SELECT * FROM $table ORDER BY name ASC" );
+		return new WP_REST_Response( $hosts );
+	}
+
+	public function create_host( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
+		$table = $wpdb->prefix . 'clipisode_hosts';
+		$name  = sanitize_text_field( $request->get_param( 'name' ) );
+
+		if ( ! $name ) {
+			return new WP_REST_Response( [ 'message' => 'Name is required.' ], 400 );
+		}
+
+		$existing = $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM $table WHERE name = %s",
+			$name
+		) );
+
+		if ( $existing ) {
+			return new WP_REST_Response( [
+				'id'   => (int) $existing,
+				'name' => $name,
+			] );
+		}
+
+		$wpdb->insert( $table, [ 'name' => $name ] );
+
+		return new WP_REST_Response( [
+			'id'   => $wpdb->insert_id,
+			'name' => $name,
+		], 201 );
+	}
+
+	public function delete_host( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
+		$wpdb->delete( $wpdb->prefix . 'clipisode_hosts', [ 'id' => (int) $request['id'] ] );
+		return new WP_REST_Response( null, 204 );
+	}
+
 	// --- Topics ---
 
 	private function enrich_topic( object $topic ): object {
@@ -268,6 +334,8 @@ class Clipisode_REST_API {
 
 		$wpdb->insert( $table, $data );
 
+		$this->ensure_host( $data['hosted_by'] );
+
 		$get_request = new WP_REST_Request( 'GET' );
 		$get_request->set_url_params( [ 'id' => $wpdb->insert_id ] );
 		return $this->get_topic( $get_request );
@@ -310,7 +378,23 @@ class Clipisode_REST_API {
 
 		$wpdb->update( $table, $fields, [ 'id' => $id ] );
 
+		if ( ! empty( $fields['hosted_by'] ) ) {
+			$this->ensure_host( $fields['hosted_by'] );
+		}
+
 		return $this->get_topic( $request );
+	}
+
+	private function ensure_host( string $name ): void {
+		if ( ! $name ) {
+			return;
+		}
+		global $wpdb;
+		$table = $wpdb->prefix . 'clipisode_hosts';
+		$exists = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM $table WHERE name = %s", $name ) );
+		if ( ! $exists ) {
+			$wpdb->insert( $table, [ 'name' => $name ] );
+		}
 	}
 
 	public function delete_topic( WP_REST_Request $request ): WP_REST_Response {
@@ -367,6 +451,7 @@ class Clipisode_REST_API {
 		] );
 
 		$link = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $wpdb->insert_id ) );
+		$link->clips_count = 0;
 		return new WP_REST_Response( $link, 201 );
 	}
 

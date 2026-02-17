@@ -48,6 +48,16 @@ KEY topic_id (topic_id)
 		);
 
 		dbDelta(
+			"CREATE TABLE {$wpdb->prefix}clipisode_hosts (
+id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+name VARCHAR(255) NOT NULL,
+created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+PRIMARY KEY  (id),
+UNIQUE KEY name (name)
+) $charset;"
+		);
+
+		dbDelta(
 			"CREATE TABLE {$wpdb->prefix}clipisode_clips (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 topic_id BIGINT UNSIGNED NOT NULL,
@@ -92,6 +102,10 @@ KEY status (status)
 			'post_status'  => 'publish',
 		] );
 		update_post_meta( $custom_terms_id, Clipisode_Post_Types::TERMS_TYPE_META, 'custom' );
+
+		$hosts_table = $wpdb->prefix . 'clipisode_hosts';
+		$wpdb->insert( $hosts_table, [ 'name' => 'Nationwide Social' ] );
+		$wpdb->insert( $hosts_table, [ 'name' => 'Acme Brand' ] );
 
 		$wpdb->insert( $topics_table, [
 			'title'           => 'Peyton and I need your help!',
