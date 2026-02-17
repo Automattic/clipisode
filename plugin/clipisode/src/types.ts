@@ -10,6 +10,7 @@ export interface Topic {
 	custom_terms_title: string | null;
 	status: string;
 	clips_count: number;
+	links_count: number;
 	clicks: number;
 	created_at: string;
 	updated_at: string;
@@ -77,11 +78,8 @@ declare global {
 	interface Window {
 		clipisodeAdmin?: {
 			page: string;
+			rest_root: string;
+			nonce: string;
 		};
 	}
-
-	const wpApiSettings: {
-		root: string;
-		nonce: string;
-	};
 }

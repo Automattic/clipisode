@@ -14,6 +14,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const [ links, setLinks ] = useState< InvitationLink[] >( [] );
 	const [ clips, setClips ] = useState< Clip[] >( [] );
 	const [ loading, setLoading ] = useState< boolean >( true );
+	const [ deleting, setDeleting ] = useState< boolean >( false );
 	const [ selectedClip, setSelectedClip ] = useState< Clip | null >( null );
 
 	const load = useCallback( () => {
@@ -39,6 +40,16 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 		} ).then( ( newLink ) => {
 			setLinks( ( prev ) => [ newLink, ...prev ] );
 		} );
+	};
+
+	const deleteTopic = () => {
+		if ( ! window.confirm( 'Delete this topic and all its clips? This cannot be undone.' ) ) {
+			return;
+		}
+		setDeleting( true );
+		apiFetch( { path: `/clipisode/v1/topics/${ id }`, method: 'DELETE' } )
+			.then( () => navigate( '' ) )
+			.finally( () => setDeleting( false ) );
 	};
 
 	const onClipUpdated = ( updatedClip: Clip ) => {
@@ -67,13 +78,25 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 			</a>
 
 			<div className="clipisode-topic-summary">
-				<Button
-					className="clipisode-topic-edit"
-					variant="primary"
-					onClick={ () => navigate( `${ id }/edit` ) }
-				>
-					Edit
-				</Button>
+				<div className="clipisode-topic-actions">
+					<Button
+						variant="primary"
+						onClick={ () => navigate( `${ id }/edit` ) }
+					>
+						Edit
+					</Button>
+					{ links.length === 0 && (
+						<Button
+							variant="tertiary"
+							isDestructive
+							onClick={ deleteTopic }
+							isBusy={ deleting }
+							disabled={ deleting }
+						>
+							Delete
+						</Button>
+					) }
+				</div>
 
 				<h1 className="clipisode-topic-title">{ topic.title }</h1>
 

@@ -44,6 +44,7 @@ export default function TopicList( { navigate }: TopicListProps ) {
 						<tr>
 							<th>Title</th>
 							<th>Hosted By</th>
+							<th>Invitations</th>
 							<th>Clicks</th>
 							<th>Clips</th>
 							<th>Status</th>
@@ -60,6 +61,7 @@ export default function TopicList( { navigate }: TopicListProps ) {
 									{ topic.title }
 								</td>
 								<td>{ topic.hosted_by || '—' }</td>
+								<td>{ Number( topic.links_count ).toLocaleString() }</td>
 								<td>{ Number( topic.clicks ).toLocaleString() }</td>
 								<td>{ Number( topic.clips_count ).toLocaleString() }</td>
 								<td>

@@ -107,8 +107,8 @@ function uploadFile(
 		xhr.addEventListener( 'error', () => reject( new Error( 'Upload failed.' ) ) );
 		xhr.addEventListener( 'abort', () => reject( new Error( 'Upload cancelled.' ) ) );
 
-		const root = wpApiSettings?.root || '/wp-json/';
-		const nonce = wpApiSettings?.nonce || '';
+		const root = window.clipisodeAdmin?.rest_root || '/wp-json/';
+		const nonce = window.clipisodeAdmin?.nonce || '';
 
 		xhr.open( 'POST', `${ root }clipisode/v1/videos/upload` );
 		xhr.setRequestHeader( 'X-WP-Nonce', nonce );

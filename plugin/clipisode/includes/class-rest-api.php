@@ -211,10 +211,11 @@ class Clipisode_REST_API {
 		$topics = $wpdb->get_results( "
 			SELECT t.*,
 				COALESCE(cl.clips_count, 0) AS clips_count,
+				COALESCE(lk.links_count, 0) AS links_count,
 				COALESCE(lk.clicks, 0) AS clicks
 			FROM $table t
 			LEFT JOIN (SELECT topic_id, COUNT(*) AS clips_count FROM $clips_tbl GROUP BY topic_id) cl ON cl.topic_id = t.id
-			LEFT JOIN (SELECT topic_id, SUM(clicks) AS clicks FROM $links_tbl GROUP BY topic_id) lk ON lk.topic_id = t.id
+			LEFT JOIN (SELECT topic_id, COUNT(*) AS links_count, SUM(clicks) AS clicks FROM $links_tbl GROUP BY topic_id) lk ON lk.topic_id = t.id
 			ORDER BY t.created_at DESC
 		" );
 
@@ -233,10 +234,11 @@ class Clipisode_REST_API {
 		$topic = $wpdb->get_row( $wpdb->prepare( "
 			SELECT t.*,
 				COALESCE(cl.clips_count, 0) AS clips_count,
+				COALESCE(lk.links_count, 0) AS links_count,
 				COALESCE(lk.clicks, 0) AS clicks
 			FROM $table t
 			LEFT JOIN (SELECT topic_id, COUNT(*) AS clips_count FROM $clips_tbl GROUP BY topic_id) cl ON cl.topic_id = t.id
-			LEFT JOIN (SELECT topic_id, SUM(clicks) AS clicks FROM $links_tbl GROUP BY topic_id) lk ON lk.topic_id = t.id
+			LEFT JOIN (SELECT topic_id, COUNT(*) AS links_count, SUM(clicks) AS clicks FROM $links_tbl GROUP BY topic_id) lk ON lk.topic_id = t.id
 			WHERE t.id = %d
 		", $id ) );
 
@@ -266,7 +268,9 @@ class Clipisode_REST_API {
 
 		$wpdb->insert( $table, $data );
 
-		return $this->get_topic( new WP_REST_Request( 'GET', '', [ 'id' => $wpdb->insert_id ] ) );
+		$get_request = new WP_REST_Request( 'GET' );
+		$get_request->set_url_params( [ 'id' => $wpdb->insert_id ] );
+		return $this->get_topic( $get_request );
 	}
 
 	public function update_topic( WP_REST_Request $request ): WP_REST_Response {
