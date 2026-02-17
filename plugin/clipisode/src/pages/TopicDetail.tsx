@@ -15,6 +15,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const [ clips, setClips ] = useState< Clip[] >( [] );
 	const [ loading, setLoading ] = useState< boolean >( true );
 	const [ deleting, setDeleting ] = useState< boolean >( false );
+	const [ copiedId, setCopiedId ] = useState< number | null >( null );
 	const [ selectedClip, setSelectedClip ] = useState< Clip | null >( null );
 
 	const load = useCallback( () => {
@@ -34,12 +35,30 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	}, [ load ] );
 
 	const createLink = () => {
-		apiFetch( {
+		apiFetch< InvitationLink >( {
 			path: `/clipisode/v1/topics/${ id }/invitation-links`,
 			method: 'POST',
 		} ).then( ( newLink ) => {
 			setLinks( ( prev ) => [ newLink, ...prev ] );
 		} );
+	};
+
+	const toggleLinkStatus = ( link: InvitationLink ) => {
+		const newStatus = link.status === 'open' ? 'closed' : 'open';
+		apiFetch< InvitationLink >( {
+			path: `/clipisode/v1/invitation-links/${ link.id }`,
+			method: 'PUT',
+			data: { status: newStatus },
+		} ).then( ( updated ) => {
+			setLinks( ( prev ) => prev.map( ( l ) => ( l.id === updated.id ? updated : l ) ) );
+		} );
+	};
+
+	const copyLinkUrl = ( link: InvitationLink ) => {
+		const url = `${ window.location.origin }/c/${ link.slug }`;
+		navigator.clipboard.writeText( url );
+		setCopiedId( link.id );
+		setTimeout( () => setCopiedId( ( prev ) => ( prev === link.id ? null : prev ) ), 3000 );
 	};
 
 	const deleteTopic = () => {
@@ -85,7 +104,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 					>
 						Edit
 					</Button>
-					{ links.length === 0 && (
+					{ Number( topic.clips_count ) === 0 && (
 						<Button
 							variant="tertiary"
 							isDestructive
@@ -116,10 +135,28 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 						<div className="clipisode-meta">
 							<div><strong>Created</strong> { new Date( topic.created_at ).toLocaleString() }</div>
 							<div><strong>Hosted By</strong> { topic.hosted_by || '—' }</div>
-							<div><strong>Brand Terms</strong> { topic.brand_terms_title || '—' }</div>
-							{ topic.custom_terms_title && (
-								<div><strong>Custom Terms</strong> { topic.custom_terms_title }</div>
-							) }
+							<div>
+								<strong>Terms</strong>
+								{ topic.brand_terms_url ? (
+									<a href={ topic.brand_terms_url } target="_blank" rel="noreferrer">
+										{ topic.brand_terms_title }
+									</a>
+								) : (
+									topic.brand_terms_title || '—'
+								) }
+								{ topic.custom_terms_title && (
+									<>
+										{ ', ' }
+										{ topic.custom_terms_url ? (
+											<a href={ topic.custom_terms_url } target="_blank" rel="noreferrer">
+												{ topic.custom_terms_title }
+											</a>
+										) : (
+											topic.custom_terms_title
+										) }
+									</>
+								) }
+							</div>
 						</div>
 					</div>
 
@@ -148,12 +185,13 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 								<th>Clicks</th>
 								<th>Clips</th>
 								<th>Created</th>
+								<th></th>
 							</tr>
 						</thead>
 						<tbody>
 							{ links.map( ( link ) => (
 								<tr key={ link.id }>
-									<td className="clickable">{ link.slug }</td>
+									<td>{ link.slug }</td>
 									<td>
 										<span className={ `clipisode-status-badge ${ link.status }` }>
 											{ link.status }
@@ -162,6 +200,23 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 									<td>{ Number( link.clicks ).toLocaleString() }</td>
 									<td>{ Number( link.clips_count ).toLocaleString() }</td>
 									<td>{ new Date( link.created_at ).toLocaleString() }</td>
+									<td className="clipisode-link-actions">
+										<Button
+											variant="tertiary"
+											size="compact"
+											onClick={ () => copyLinkUrl( link ) }
+										>
+											{ copiedId === link.id ? 'Copied' : 'Copy' }
+										</Button>
+										<Button
+											variant="tertiary"
+											size="compact"
+											isDestructive={ link.status === 'open' }
+											onClick={ () => toggleLinkStatus( link ) }
+										>
+											{ link.status === 'open' ? 'Close' : 'Open' }
+										</Button>
+									</td>
 								</tr>
 							) ) }
 						</tbody>

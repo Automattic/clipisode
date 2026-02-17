@@ -248,15 +248,19 @@ class Clipisode_REST_API {
 		if ( ! empty( $topic->brand_terms_id ) ) {
 			$brand_post = get_post( (int) $topic->brand_terms_id );
 			$topic->brand_terms_title = $brand_post ? $brand_post->post_title : null;
+			$topic->brand_terms_url   = $brand_post ? get_permalink( $brand_post->ID ) : null;
 		} else {
 			$topic->brand_terms_title = null;
+			$topic->brand_terms_url   = null;
 		}
 
 		if ( ! empty( $topic->custom_terms_id ) ) {
 			$custom_post = get_post( (int) $topic->custom_terms_id );
 			$topic->custom_terms_title = $custom_post ? $custom_post->post_title : null;
+			$topic->custom_terms_url   = $custom_post ? get_permalink( $custom_post->ID ) : null;
 		} else {
 			$topic->custom_terms_title = null;
+			$topic->custom_terms_url   = null;
 		}
 
 		if ( ! empty( $topic->intro_video_id ) ) {
@@ -333,11 +337,18 @@ class Clipisode_REST_API {
 		];
 
 		$wpdb->insert( $table, $data );
+		$topic_id = $wpdb->insert_id;
 
 		$this->ensure_host( $data['hosted_by'] );
 
+		$wpdb->insert( $wpdb->prefix . 'clipisode_invitation_links', [
+			'topic_id' => $topic_id,
+			'slug'     => substr( bin2hex( random_bytes( 3 ) ), 0, 6 ),
+			'status'   => 'open',
+		] );
+
 		$get_request = new WP_REST_Request( 'GET' );
-		$get_request->set_url_params( [ 'id' => $wpdb->insert_id ] );
+		$get_request->set_url_params( [ 'id' => $topic_id ] );
 		return $this->get_topic( $get_request );
 	}
 

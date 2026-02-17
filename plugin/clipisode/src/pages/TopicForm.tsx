@@ -63,12 +63,17 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 			setError( 'Title is required.' );
 			return;
 		}
+		if ( ! form.hosted_by.trim() ) {
+			setError( 'Hosted By is required.' );
+			return;
+		}
 
 		setSaving( true );
 		setError( null );
 
 		const data = {
 			...form,
+			hosted_by: form.hosted_by.trim(),
 			custom_terms_id: form.custom_terms_id || null,
 			intro_video_id: video?.id || null,
 		};

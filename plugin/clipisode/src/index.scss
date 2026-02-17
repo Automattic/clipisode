@@ -319,6 +319,12 @@
 		color: #646970;
 	}
 
+	.clipisode-link-actions {
+		display: flex;
+		gap: 4px;
+		justify-content: flex-end;
+	}
+
 	// --- Host Suggestions ---
 
 	.clipisode-host-suggestions {

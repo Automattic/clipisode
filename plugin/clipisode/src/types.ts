@@ -6,8 +6,10 @@ export interface Topic {
 	hosted_by: string;
 	brand_terms_id: number;
 	brand_terms_title: string | null;
+	brand_terms_url: string | null;
 	custom_terms_id: number | null;
 	custom_terms_title: string | null;
+	custom_terms_url: string | null;
 	status: string;
 	clips_count: number;
 	links_count: number;

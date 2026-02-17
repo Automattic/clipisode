@@ -43,6 +43,7 @@ class Clipisode_Post_Types {
 
 		add_filter( 'wp_unique_post_slug', [ __CLASS__, 'prefix_terms_slug' ], 10, 4 );
 		add_action( 'save_post_clipisode_terms', [ __CLASS__, 'ensure_terms_type_meta' ] );
+		add_filter( 'template_include', [ __CLASS__, 'terms_template' ] );
 	}
 
 	public static function ensure_terms_type_meta( int $post_id ): void {
@@ -56,6 +57,13 @@ class Clipisode_Post_Types {
 			return 'clipisode-' . $slug;
 		}
 		return $slug;
+	}
+
+	public static function terms_template( string $template ): string {
+		if ( is_singular( 'clipisode_terms' ) ) {
+			return CLIPISODE_PLUGIN_DIR . 'templates/terms-single.php';
+		}
+		return $template;
 	}
 
 	public static function get_brand_terms_id(): ?int {
