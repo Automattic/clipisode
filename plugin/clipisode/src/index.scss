@@ -206,47 +206,6 @@
 		text-overflow: ellipsis;
 	}
 
-	.clipisode-modal-body {
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-
-		.clipisode-modal-meta {
-			display: grid;
-			grid-template-columns: auto 1fr;
-			gap: 6px 16px;
-			font-size: 13px;
-
-			dt {
-				font-weight: 600;
-				color: #1d2327;
-			}
-
-			dd {
-				margin: 0;
-				color: #50575e;
-			}
-		}
-
-		.clipisode-modal-transcript {
-			background: #f6f7f7;
-			padding: 12px;
-			border-radius: 4px;
-			font-size: 13px;
-			line-height: 1.6;
-			max-height: 160px;
-			overflow-y: auto;
-		}
-
-		.clipisode-modal-actions {
-			display: flex;
-			gap: 8px;
-			justify-content: flex-end;
-			padding-top: 8px;
-			border-top: 1px solid #f0f0f1;
-		}
-	}
-
 	.clipisode-back-link {
 		display: inline-flex;
 		align-items: center;
@@ -474,6 +433,66 @@
 			display: block;
 		}
 	}
+}
+
+// --- Clip modal (portaled outside #clipisode-root) ---
+.clipisode-modal-body {
+	display: flex;
+	gap: 20px;
+}
+
+.clipisode-modal-video {
+	flex: 0 0 auto;
+	border-radius: 8px;
+	overflow: hidden;
+
+	video {
+		display: block;
+		max-height: 400px;
+		border-radius: 8px;
+	}
+}
+
+.clipisode-modal-info {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.clipisode-modal-meta {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 6px 16px;
+	font-size: 13px;
+
+	dt {
+		font-weight: 600;
+		color: #1d2327;
+	}
+
+	dd {
+		margin: 0;
+		color: #50575e;
+	}
+}
+
+.clipisode-modal-transcript {
+	background: #f6f7f7;
+	padding: 12px;
+	border-radius: 4px;
+	font-size: 13px;
+	line-height: 1.6;
+	max-height: 160px;
+	overflow-y: auto;
+}
+
+.clipisode-modal-actions {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+	padding-top: 8px;
+	border-top: 1px solid #f0f0f1;
 }
 
 // --- Themes grid ---

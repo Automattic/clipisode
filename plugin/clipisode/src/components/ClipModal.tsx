@@ -1,4 +1,4 @@
-import { useState } from '@wordpress/element';
+import { useState, useRef, useEffect } from '@wordpress/element';
 import { Modal, Button, TextControl } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import type { Clip } from '../types';
@@ -12,6 +12,11 @@ interface ClipModalProps {
 export default function ClipModal( { clip, onClose, onUpdated }: ClipModalProps ) {
 	const [ tag, setTag ] = useState< string >( clip.tag || '' );
 	const [ saving, setSaving ] = useState< boolean >( false );
+	const videoRef = useRef< HTMLVideoElement >( null );
+
+	useEffect( () => {
+		videoRef.current?.play();
+	}, [] );
 
 	const updateStatus = ( status: string ) => {
 		setSaving( true );
@@ -25,8 +30,20 @@ export default function ClipModal( { clip, onClose, onUpdated }: ClipModalProps 
 	};
 
 	return (
-		<Modal title={ clip.name } onRequestClose={ onClose } size="medium">
+		<Modal title={ clip.name } onRequestClose={ onClose } size="large">
 			<div className="clipisode-modal-body">
+				{ clip.video_url && (
+					<div className="clipisode-modal-video">
+						<video
+							ref={ videoRef }
+							src={ clip.video_url }
+							controls
+							playsInline
+						/>
+					</div>
+				) }
+
+				<div className="clipisode-modal-info">
 				<dl className="clipisode-modal-meta">
 					<dt>Status</dt>
 					<dd>
@@ -97,6 +114,7 @@ export default function ClipModal( { clip, onClose, onUpdated }: ClipModalProps 
 					>
 						Reject
 					</Button>
+				</div>
 				</div>
 			</div>
 		</Modal>
