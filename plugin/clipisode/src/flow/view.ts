@@ -45,6 +45,19 @@ function initFlow( root: HTMLElement ): void {
 	const handleInput = root.querySelector< HTMLInputElement >( '.ci-handle-input' );
 	const errorBox = root.querySelector< HTMLElement >( '.ci-error' );
 
+	const video = root.querySelector< HTMLVideoElement >( '.ci-video' );
+	const playBtn = root.querySelector< HTMLElement >( '.ci-play-btn' );
+
+	playBtn?.addEventListener( 'click', () => {
+		if ( ! video ) return;
+		video.play();
+		playBtn.classList.add( 'ci-hidden' );
+	} );
+
+	video?.addEventListener( 'ended', () => {
+		playBtn?.classList.remove( 'ci-hidden' );
+	} );
+
 	chooseBtn?.addEventListener( 'click', () => fileInput?.click() );
 
 	function checkSubmitReady(): void {
