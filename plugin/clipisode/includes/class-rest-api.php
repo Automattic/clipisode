@@ -130,6 +130,28 @@ class Clipisode_REST_API {
 			],
 		] );
 
+		// Themes (CPT-based invitation designs).
+		register_rest_route( self::NAMESPACE, '/themes', [
+			[
+				'methods'             => 'GET',
+				'callback'            => [ $this, 'list_themes' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+			[
+				'methods'             => 'POST',
+				'callback'            => [ $this, 'clone_theme' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+		] );
+
+		register_rest_route( self::NAMESPACE, '/themes/(?P<id>\d+)', [
+			[
+				'methods'             => 'DELETE',
+				'callback'            => [ $this, 'delete_theme' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+		] );
+
 		// Clips.
 		register_rest_route( self::NAMESPACE, '/clips', [
 			[
@@ -269,6 +291,15 @@ class Clipisode_REST_API {
 			$topic->intro_video_url = null;
 		}
 
+		if ( ! empty( $topic->invitation_id ) ) {
+			$inv_post = get_post( (int) $topic->invitation_id );
+			$topic->invitation_title    = $inv_post ? $inv_post->post_title : null;
+			$topic->invitation_edit_url = $inv_post ? get_edit_post_link( $inv_post->ID, 'raw' ) : null;
+		} else {
+			$topic->invitation_title    = null;
+			$topic->invitation_edit_url = null;
+		}
+
 		return $topic;
 	}
 
@@ -325,6 +356,7 @@ class Clipisode_REST_API {
 
 		$custom_terms_id = $request->get_param( 'custom_terms_id' );
 		$intro_video_id  = $request->get_param( 'intro_video_id' );
+		$invitation_id   = $request->get_param( 'invitation_id' );
 		$brand_terms_id  = Clipisode_Post_Types::ensure_brand_terms();
 
 		$data = [
@@ -333,6 +365,7 @@ class Clipisode_REST_API {
 			'hosted_by'       => sanitize_text_field( $request->get_param( 'hosted_by' ) ?? '' ),
 			'brand_terms_id'  => $brand_terms_id,
 			'custom_terms_id' => $custom_terms_id ? (int) $custom_terms_id : null,
+			'invitation_id'   => $invitation_id ? (int) $invitation_id : Clipisode_Post_Types::ensure_default_invitation(),
 			'status'          => 'active',
 		];
 
@@ -385,6 +418,10 @@ class Clipisode_REST_API {
 		if ( $request->has_param( 'custom_terms_id' ) ) {
 			$custom_terms_id = $request->get_param( 'custom_terms_id' );
 			$fields['custom_terms_id'] = $custom_terms_id ? (int) $custom_terms_id : null;
+		}
+		if ( $request->has_param( 'invitation_id' ) ) {
+			$invitation_id = $request->get_param( 'invitation_id' );
+			$fields['invitation_id'] = $invitation_id ? (int) $invitation_id : null;
 		}
 
 		$wpdb->update( $table, $fields, [ 'id' => $id ] );
@@ -659,6 +696,99 @@ class Clipisode_REST_API {
 		}
 
 		wp_delete_attachment( $id, true );
+
+		return new WP_REST_Response( null, 204 );
+	}
+
+	// --- Themes (CPT) ---
+
+	public function list_themes( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
+		$topics_table = $wpdb->prefix . 'clipisode_topics';
+
+		Clipisode_Post_Types::ensure_default_invitation();
+
+		$posts = get_posts( [
+			'post_type'   => 'clipisode_invite',
+			'post_status' => 'publish',
+			'numberposts' => -1,
+			'orderby'     => 'date',
+			'order'       => 'ASC',
+		] );
+
+		$invitations = array_map( function ( $post ) use ( $wpdb, $topics_table ) {
+			$topic_count = (int) $wpdb->get_var( $wpdb->prepare(
+				"SELECT COUNT(*) FROM $topics_table WHERE invitation_id = %d",
+				$post->ID
+			) );
+			$is_default = (bool) get_post_meta( $post->ID, Clipisode_Post_Types::DEFAULT_INVITATION_META, true );
+
+			return [
+				'id'          => $post->ID,
+				'title'       => $post->post_title,
+				'edit_url'    => get_edit_post_link( $post->ID, 'raw' ),
+				'topic_count' => $topic_count,
+				'is_default'  => $is_default,
+				'created_at'  => $post->post_date,
+			];
+		}, $posts );
+
+		return new WP_REST_Response( $invitations );
+	}
+
+	public function clone_theme( WP_REST_Request $request ): WP_REST_Response {
+		$source_id = $request->get_param( 'source_id' );
+		$title     = sanitize_text_field( $request->get_param( 'title' ) );
+
+		if ( ! $source_id ) {
+			$source_id = Clipisode_Post_Types::ensure_default_invitation();
+		}
+
+		$source = get_post( (int) $source_id );
+		if ( ! $source || $source->post_type !== 'clipisode_invite' ) {
+			return new WP_REST_Response( [ 'message' => 'Source theme not found.' ], 404 );
+		}
+
+		$new_id = wp_insert_post( [
+			'post_type'    => 'clipisode_invite',
+			'post_title'   => $title ?: $source->post_title . ' (Copy)',
+			'post_content' => $source->post_content,
+			'post_status'  => 'publish',
+		] );
+
+		if ( is_wp_error( $new_id ) ) {
+			return new WP_REST_Response( [ 'message' => $new_id->get_error_message() ], 400 );
+		}
+
+		return new WP_REST_Response( [
+			'id'       => $new_id,
+			'title'    => get_the_title( $new_id ),
+			'edit_url' => get_edit_post_link( $new_id, 'raw' ),
+		], 201 );
+	}
+
+	public function delete_theme( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
+		$id = (int) $request['id'];
+
+		$is_default = get_post_meta( $id, Clipisode_Post_Types::DEFAULT_INVITATION_META, true );
+		if ( $is_default ) {
+			return new WP_REST_Response( [ 'message' => 'Cannot delete the default theme.' ], 403 );
+		}
+
+		$topics_table = $wpdb->prefix . 'clipisode_topics';
+		$in_use = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT COUNT(*) FROM $topics_table WHERE invitation_id = %d",
+			$id
+		) );
+
+		if ( $in_use > 0 ) {
+			return new WP_REST_Response( [
+				'message' => "Cannot delete: $in_use topic(s) still use this theme.",
+			], 409 );
+		}
+
+		wp_delete_post( $id, true );
 
 		return new WP_REST_Response( null, 204 );
 	}

@@ -136,6 +136,18 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 							<div><strong>Created</strong> { new Date( topic.created_at ).toLocaleString() }</div>
 							<div><strong>Hosted By</strong> { topic.hosted_by || '—' }</div>
 							<div>
+								<strong>Theme</strong>
+								{ topic.invitation_title ? (
+									topic.invitation_edit_url ? (
+										<a href={ topic.invitation_edit_url } target="_blank" rel="noreferrer">
+											{ topic.invitation_title }
+										</a>
+									) : (
+										topic.invitation_title
+									)
+								) : '—' }
+							</div>
+							<div>
 								<strong>Terms</strong>
 								{ topic.brand_terms_url ? (
 									<a href={ topic.brand_terms_url } target="_blank" rel="noreferrer">

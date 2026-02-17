@@ -10,12 +10,24 @@ export interface Topic {
 	custom_terms_id: number | null;
 	custom_terms_title: string | null;
 	custom_terms_url: string | null;
+	invitation_id: number | null;
+	invitation_title: string | null;
+	invitation_edit_url: string | null;
 	status: string;
 	clips_count: number;
 	links_count: number;
 	clicks: number;
 	created_at: string;
 	updated_at: string;
+}
+
+export interface Theme {
+	id: number;
+	title: string;
+	edit_url: string;
+	topic_count: number;
+	is_default: boolean;
+	created_at: string;
 }
 
 export interface VideoValue {

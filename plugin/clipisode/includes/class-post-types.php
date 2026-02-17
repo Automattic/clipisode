@@ -6,7 +6,36 @@ class Clipisode_Post_Types {
 
 	const TERMS_TYPE_META = '_clipisode_terms_type';
 
+	const DEFAULT_INVITATION_META = '_clipisode_default_invitation';
+
 	public static function register(): void {
+		register_post_type( 'clipisode_invite', [
+			'labels'              => [
+				'name'               => 'Themes',
+				'singular_name'      => 'Theme',
+				'add_new_item'       => 'Add New Theme',
+				'edit_item'          => 'Edit Theme',
+				'new_item'           => 'New Theme',
+				'view_item'          => 'View Theme',
+				'search_items'       => 'Search Themes',
+				'not_found'          => 'No themes found.',
+				'not_found_in_trash' => 'No themes found in Trash.',
+				'menu_name'          => 'Themes',
+			],
+			'public'              => false,
+			'publicly_queryable'  => false,
+			'exclude_from_search' => true,
+			'show_in_nav_menus'   => false,
+			'show_ui'             => true,
+			'show_in_menu'        => false,
+			'show_in_rest'        => true,
+			'rest_base'           => 'clipisode-themes',
+			'supports'            => [ 'title', 'editor' ],
+			'capability_type'     => 'post',
+			'has_archive'         => false,
+			'rewrite'             => false,
+		] );
+
 		register_post_type( 'clipisode_terms', [
 			'labels'              => [
 				'name'               => 'Terms',
@@ -76,6 +105,60 @@ class Clipisode_Post_Types {
 		] );
 
 		return $posts ? (int) $posts[0]->ID : null;
+	}
+
+	public static function get_default_invitation_id(): ?int {
+		$posts = get_posts( [
+			'post_type'   => 'clipisode_invite',
+			'post_status' => 'publish',
+			'numberposts' => 1,
+			'meta_key'    => self::DEFAULT_INVITATION_META,
+			'meta_value'  => '1',
+		] );
+
+		return $posts ? (int) $posts[0]->ID : null;
+	}
+
+	public static function ensure_default_invitation(): int {
+		$existing = self::get_default_invitation_id();
+		if ( $existing ) {
+			$post = get_post( $existing );
+			if ( $post && str_contains( $post->post_content, 'wp:clipisode/invitation-flow' ) ) {
+				return $existing;
+			}
+			wp_delete_post( $existing, true );
+		}
+
+		$content = <<<'BLOCKS'
+<!-- wp:clipisode/invitation-flow {"slug":""} -->
+<!-- wp:clipisode/invitation-landing -->
+<!-- wp:clipisode/element {"type":"video","lock":{"remove":true}} /-->
+<!-- wp:clipisode/element {"type":"title","lock":{"remove":true}} /-->
+<!-- wp:clipisode/element {"type":"hosted","lock":{"remove":true}} /-->
+<!-- wp:clipisode/element {"type":"cta","lock":{"remove":true}} /-->
+<!-- wp:clipisode/element {"type":"terms","lock":{"remove":true}} /-->
+<!-- /wp:clipisode/invitation-landing -->
+<!-- wp:clipisode/invitation-record -->
+<!-- wp:clipisode/element {"type":"upload-form","lock":{"remove":true}} /-->
+<!-- /wp:clipisode/invitation-record -->
+<!-- wp:clipisode/invitation-thanks -->
+<!-- wp:clipisode/element {"type":"thanks-heading","lock":{"remove":true}} /-->
+<!-- wp:clipisode/element {"type":"thanks-body","lock":{"remove":true}} /-->
+<!-- wp:clipisode/element {"type":"thanks-cta","lock":{"remove":true}} /-->
+<!-- /wp:clipisode/invitation-thanks -->
+<!-- /wp:clipisode/invitation-flow -->
+BLOCKS;
+
+		$post_id = wp_insert_post( [
+			'post_type'    => 'clipisode_invite',
+			'post_title'   => 'Default',
+			'post_content' => $content,
+			'post_status'  => 'publish',
+		] );
+
+		update_post_meta( $post_id, self::DEFAULT_INVITATION_META, '1' );
+
+		return $post_id;
 	}
 
 	public static function ensure_brand_terms(): int {

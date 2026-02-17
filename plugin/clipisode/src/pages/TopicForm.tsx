@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from '@wordpress/element';
 import { Button, TextControl, SelectControl, Spinner, Notice } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import VideoUploader from '../components/VideoUploader';
-import type { Topic, VideoValue, CustomTermsItem, Host } from '../types';
+import type { Topic, VideoValue, CustomTermsItem, Host, Theme } from '../types';
 
 interface TopicFormProps {
 	id?: string;
@@ -15,9 +15,11 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 		title: '',
 		hosted_by: '',
 		custom_terms_id: '',
+		invitation_id: '',
 	} );
 	const [ video, setVideo ] = useState< VideoValue | null >( null );
 	const [ customTerms, setCustomTerms ] = useState< CustomTermsItem[] >( [] );
+	const [ themes, setThemes ] = useState< Theme[] >( [] );
 	const [ hostNames, setHostNames ] = useState< string[] >( [] );
 	const [ hostFocused, setHostFocused ] = useState( false );
 	const hostRef = useRef< HTMLDivElement >( null );
@@ -29,6 +31,7 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 		const promises: Promise< any >[] = [
 			apiFetch< CustomTermsItem[] >( { path: '/clipisode/v1/terms/custom' } ),
 			apiFetch< Host[] >( { path: '/clipisode/v1/hosts' } ),
+			apiFetch< Theme[] >( { path: '/clipisode/v1/themes' } ),
 		];
 
 		if ( isEdit ) {
@@ -36,19 +39,27 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 		}
 
 		Promise.all( promises )
-			.then( ( [ terms, hosts, topic ]: [ CustomTermsItem[], Host[], Topic? ] ) => {
+			.then( ( [ terms, hosts, themeList, topic ]: [ CustomTermsItem[], Host[], Theme[], Topic? ] ) => {
 				setCustomTerms( terms );
 				setHostNames( hosts.map( ( h ) => h.name ) );
+				setThemes( themeList );
 
 				if ( topic ) {
 					setForm( {
 						title: topic.title || '',
 						hosted_by: topic.hosted_by || '',
 						custom_terms_id: topic.custom_terms_id ? String( topic.custom_terms_id ) : '',
+						invitation_id: topic.invitation_id ? String( topic.invitation_id ) : '',
 					} );
 					if ( topic.intro_video_id && topic.intro_video_url ) {
 						setVideo( { id: topic.intro_video_id, url: topic.intro_video_url } );
 					}
+				} else if ( themeList.length > 0 ) {
+					const defaultTheme = themeList.find( ( t ) => t.is_default );
+					setForm( ( prev ) => ( {
+						...prev,
+						invitation_id: defaultTheme ? String( defaultTheme.id ) : String( themeList[ 0 ].id ),
+					} ) );
 				}
 			} )
 			.finally( () => setLoading( false ) );
@@ -63,11 +74,6 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 			setError( 'Title is required.' );
 			return;
 		}
-		if ( ! form.hosted_by.trim() ) {
-			setError( 'Hosted By is required.' );
-			return;
-		}
-
 		setSaving( true );
 		setError( null );
 
@@ -75,6 +81,7 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 			...form,
 			hosted_by: form.hosted_by.trim(),
 			custom_terms_id: form.custom_terms_id || null,
+			invitation_id: form.invitation_id || null,
 			intro_video_id: video?.id || null,
 		};
 
@@ -95,6 +102,8 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 			</div>
 		);
 	}
+
+	const selectedTheme = themes.find( ( t ) => String( t.id ) === form.invitation_id );
 
 	return (
 		<>
@@ -156,6 +165,35 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 				</div>
 				<div style={ { marginTop: 16 } }>
 					<VideoUploader value={ video } onChange={ setVideo } />
+				</div>
+				<div style={ { marginTop: 16 } }>
+					{ themes.length > 1 ? (
+						<SelectControl
+							label="Theme"
+							value={ form.invitation_id }
+							options={ themes.map( ( t ) => ( {
+								label: t.title + ( t.is_default ? ' (default)' : '' ),
+								value: String( t.id ),
+							} ) ) }
+							onChange={ updateField( 'invitation_id' ) }
+							help="Choose which theme guests will see on the invitation page."
+							__nextHasNoMarginBottom
+						/>
+					) : (
+						<div>
+							<p style={ { fontSize: 13, color: '#646970', margin: 0 } }>
+								<strong>Theme:</strong> { selectedTheme?.title || 'Default' }
+								{ selectedTheme?.edit_url && (
+									<>
+										{ ' — ' }
+										<a href={ selectedTheme.edit_url } target="_blank" rel="noreferrer">
+											Edit in block editor
+										</a>
+									</>
+								) }
+							</p>
+						</div>
+					) }
 				</div>
 				<div style={ { marginTop: 16 } }>
 					{ customTerms.length > 0 ? (

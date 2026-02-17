@@ -17,10 +17,24 @@ class Clipisode_Admin {
 
 		add_submenu_page( 'clipisode', 'Topics', 'Topics', 'manage_options', 'clipisode', [ $this, 'render_page' ] );
 		add_submenu_page( 'clipisode', 'Clips', 'Clips', 'manage_options', 'clipisode-clips', [ $this, 'render_page' ] );
+		add_submenu_page( 'clipisode', 'Themes', 'Themes', 'manage_options', 'clipisode-themes', [ $this, 'render_page' ] );
 		add_submenu_page( 'clipisode', 'Settings', 'Settings', 'manage_options', 'clipisode-settings', [ $this, 'render_page' ] );
 
 		add_action( "admin_print_styles-$hook", [ $this, 'enqueue_assets' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'maybe_enqueue' ] );
+		add_action( 'admin_init', [ $this, 'redirect_cpt_list' ] );
+	}
+
+	public function redirect_cpt_list(): void {
+		global $pagenow;
+		if (
+			$pagenow === 'edit.php' &&
+			isset( $_GET['post_type'] ) &&
+			$_GET['post_type'] === 'clipisode_invite'
+		) {
+			wp_safe_redirect( admin_url( 'admin.php?page=clipisode-themes' ) );
+			exit;
+		}
 	}
 
 	public function maybe_enqueue( string $hook_suffix ): void {

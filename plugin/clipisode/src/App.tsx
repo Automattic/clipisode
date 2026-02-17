@@ -2,6 +2,7 @@ import TopicList from './pages/TopicList';
 import TopicDetail from './pages/TopicDetail';
 import TopicForm from './pages/TopicForm';
 import ClipList from './pages/ClipList';
+import ThemeList from './pages/ThemeList';
 import Settings from './pages/Settings';
 import useHashRoute from './hooks/useHashRoute';
 
@@ -13,6 +14,10 @@ export default function App() {
 		const params = new URLSearchParams( window.location.search );
 		const topicId = params.get( 'topic_id' );
 		return <ClipList topicId={ topicId } />;
+	}
+
+	if ( page === 'clipisode-themes' ) {
+		return <ThemeList />;
 	}
 
 	if ( page === 'clipisode-settings' ) {

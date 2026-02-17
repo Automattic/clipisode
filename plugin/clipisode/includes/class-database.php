@@ -8,6 +8,7 @@ class Clipisode_Database {
 		ob_start();
 		self::create_tables();
 		self::seed();
+		Clipisode_Post_Types::ensure_default_invitation();
 		ob_end_clean();
 	}
 
@@ -25,6 +26,7 @@ intro_video_id BIGINT UNSIGNED DEFAULT NULL,
 hosted_by VARCHAR(255),
 brand_terms_id BIGINT UNSIGNED NOT NULL,
 custom_terms_id BIGINT UNSIGNED DEFAULT NULL,
+invitation_id BIGINT UNSIGNED DEFAULT NULL,
 status VARCHAR(20) NOT NULL DEFAULT 'active',
 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -93,7 +95,8 @@ KEY status (status)
 		}
 
 		Clipisode_Post_Types::register();
-		$brand_terms_id = Clipisode_Post_Types::ensure_brand_terms();
+		$brand_terms_id  = Clipisode_Post_Types::ensure_brand_terms();
+		$invitation_id   = Clipisode_Post_Types::ensure_default_invitation();
 
 		$custom_terms_id = wp_insert_post( [
 			'post_type'    => 'clipisode_terms',
@@ -113,6 +116,7 @@ KEY status (status)
 			'status'          => 'active',
 			'brand_terms_id'  => $brand_terms_id,
 			'custom_terms_id' => $custom_terms_id,
+			'invitation_id'   => $invitation_id,
 		] );
 		$topic_1 = $wpdb->insert_id;
 
@@ -121,6 +125,7 @@ KEY status (status)
 			'hosted_by'      => 'Acme Brand',
 			'status'         => 'active',
 			'brand_terms_id' => $brand_terms_id,
+			'invitation_id'  => $invitation_id,
 		] );
 		$topic_2 = $wpdb->insert_id;
 
