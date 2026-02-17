@@ -1,0 +1,438 @@
+#clipisode-root {
+	max-width: 1200px;
+	margin: 20px 20px 20px 0;
+
+	.clipisode-page-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 20px;
+
+		h1 {
+			margin: 0;
+			font-size: 23px;
+			font-weight: 400;
+			line-height: 1.3;
+		}
+	}
+
+	.clipisode-topic-summary {
+		position: relative;
+		background: #fff;
+		border: 1px solid #c3c4c7;
+		border-radius: 4px;
+		padding: 24px;
+		margin-bottom: 24px;
+
+		.clipisode-topic-edit {
+			position: absolute;
+			top: 16px;
+			right: 16px;
+		}
+
+		.clipisode-topic-title {
+			text-align: center;
+			font-size: 20px;
+			font-weight: 600;
+			margin: 0 0 20px;
+		}
+
+		.clipisode-topic-body {
+			display: flex;
+			gap: 24px;
+		}
+
+		.clipisode-topic-info {
+			flex: 1;
+		}
+
+		.clipisode-topic-video {
+			flex: 0 0 200px;
+
+			video {
+				width: 100%;
+				border-radius: 4px;
+				background: #1d2327;
+			}
+		}
+	}
+
+	.clipisode-stats {
+		display: flex;
+		gap: 32px;
+		justify-content: center;
+		margin: 0 0 20px;
+		padding-bottom: 20px;
+		border-bottom: 1px solid #f0f0f1;
+
+		.clipisode-stat {
+			text-align: center;
+
+			.value {
+				font-size: 28px;
+				font-weight: 600;
+				display: block;
+			}
+
+			.label {
+				font-size: 13px;
+				color: #646970;
+				text-transform: uppercase;
+			}
+		}
+	}
+
+	.clipisode-meta {
+		font-size: 13px;
+		color: #50575e;
+		line-height: 2.2;
+
+		strong {
+			display: inline-block;
+			min-width: 140px;
+			text-align: right;
+			margin-right: 12px;
+			color: #1d2327;
+			text-transform: uppercase;
+			font-size: 12px;
+			letter-spacing: 0.02em;
+		}
+	}
+
+	.clipisode-section {
+		margin-top: 24px;
+
+		h2 {
+			font-size: 16px;
+			font-weight: 600;
+			margin: 0 0 12px;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+		}
+	}
+
+	table.clipisode-table {
+		width: 100%;
+		border-collapse: collapse;
+		background: #fff;
+		border: 1px solid #c3c4c7;
+
+		th,
+		td {
+			padding: 8px 12px;
+			text-align: left;
+			border-bottom: 1px solid #f0f0f1;
+		}
+
+		th {
+			font-weight: 600;
+			font-size: 13px;
+			color: #1d2327;
+			background: #f6f7f7;
+		}
+
+		td {
+			font-size: 13px;
+		}
+
+		tr:hover td {
+			background: #f6f7f7;
+		}
+
+		.clickable {
+			cursor: pointer;
+			color: #2271b1;
+
+			&:hover {
+				color: #135e96;
+			}
+		}
+	}
+
+	.clipisode-filters {
+		display: flex;
+		gap: 12px;
+		align-items: center;
+		margin-bottom: 16px;
+		flex-wrap: wrap;
+	}
+
+	.clipisode-status-badge {
+		display: inline-block;
+		padding: 2px 8px;
+		border-radius: 3px;
+		font-size: 12px;
+		font-weight: 500;
+		text-transform: capitalize;
+
+		&.approved {
+			background: #d4edda;
+			color: #155724;
+		}
+
+		&.unapproved {
+			background: #fff3cd;
+			color: #856404;
+		}
+
+		&.on_hold {
+			background: #e2e3e5;
+			color: #383d41;
+		}
+
+		&.rejected {
+			background: #f8d7da;
+			color: #721c24;
+		}
+
+		&.open {
+			background: #d4edda;
+			color: #155724;
+		}
+
+		&.closed {
+			background: #f8d7da;
+			color: #721c24;
+		}
+	}
+
+	.clipisode-transcript-preview {
+		max-width: 320px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.clipisode-modal-body {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+
+		.clipisode-modal-meta {
+			display: grid;
+			grid-template-columns: auto 1fr;
+			gap: 6px 16px;
+			font-size: 13px;
+
+			dt {
+				font-weight: 600;
+				color: #1d2327;
+			}
+
+			dd {
+				margin: 0;
+				color: #50575e;
+			}
+		}
+
+		.clipisode-modal-transcript {
+			background: #f6f7f7;
+			padding: 12px;
+			border-radius: 4px;
+			font-size: 13px;
+			line-height: 1.6;
+			max-height: 160px;
+			overflow-y: auto;
+		}
+
+		.clipisode-modal-actions {
+			display: flex;
+			gap: 8px;
+			justify-content: flex-end;
+			padding-top: 8px;
+			border-top: 1px solid #f0f0f1;
+		}
+	}
+
+	.clipisode-back-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		margin-bottom: 12px;
+		font-size: 13px;
+		color: #2271b1;
+		cursor: pointer;
+		text-decoration: none;
+
+		&:hover {
+			color: #135e96;
+		}
+	}
+
+	.clipisode-empty {
+		text-align: center;
+		padding: 40px 20px;
+		color: #646970;
+	}
+
+	.clipisode-spinner-wrap {
+		display: flex;
+		justify-content: center;
+		padding: 40px;
+	}
+
+	// --- Settings ---
+
+	.clipisode-settings-section {
+		margin-bottom: 24px;
+
+		h2 {
+			font-size: 16px;
+			font-weight: 600;
+			margin: 0 0 12px;
+		}
+
+		.components-card__header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+	}
+
+	.clipisode-brand-terms-actions {
+		display: flex;
+		gap: 8px;
+	}
+
+	.clipisode-custom-terms {
+		margin-top: 16px;
+	}
+
+	.clipisode-custom-terms-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 12px;
+
+		h3 {
+			font-size: 14px;
+			font-weight: 600;
+			margin: 0;
+		}
+	}
+
+	.clipisode-empty-hint {
+		font-size: 13px;
+		color: #646970;
+	}
+
+	// --- Video Uploader ---
+
+	.clipisode-video-uploader {
+		> .components-base-control__label {
+			display: block;
+			margin-bottom: 8px;
+			font-weight: 600;
+			font-size: 11px;
+			text-transform: uppercase;
+		}
+	}
+
+	.clipisode-video-mode-toggle {
+		display: flex;
+		gap: 16px;
+		margin-bottom: 12px;
+
+		label {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			cursor: pointer;
+			font-size: 13px;
+		}
+	}
+
+	.clipisode-video-error {
+		background: #fcf0f1;
+		border-left: 4px solid #d63638;
+		padding: 8px 12px;
+		margin-bottom: 12px;
+		font-size: 13px;
+		color: #d63638;
+	}
+
+	.clipisode-video-dropzone {
+		border: 2px dashed #c3c4c7;
+		border-radius: 4px;
+		padding: 32px;
+		text-align: center;
+		cursor: pointer;
+		transition: border-color 0.2s, background 0.2s;
+
+		&:hover,
+		&.drag-over {
+			border-color: #2271b1;
+			background: #f0f6fc;
+		}
+
+		&.busy {
+			cursor: default;
+			pointer-events: none;
+			opacity: 0.8;
+		}
+	}
+
+	.clipisode-dropzone-icon {
+		margin-bottom: 8px;
+	}
+
+	.clipisode-dropzone-text {
+		font-size: 14px;
+		color: #1e1e1e;
+		margin-bottom: 4px;
+	}
+
+	.clipisode-dropzone-hint {
+		font-size: 12px;
+		color: #757575;
+	}
+
+	.clipisode-video-progress {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 8px;
+
+		span {
+			font-size: 13px;
+			color: #646970;
+		}
+	}
+
+	.clipisode-progress-bar {
+		width: 100%;
+		max-width: 300px;
+		height: 6px;
+		background: #dcdcde;
+		border-radius: 3px;
+		overflow: hidden;
+	}
+
+	.clipisode-progress-fill {
+		height: 100%;
+		background: #2271b1;
+		transition: width 0.3s;
+	}
+
+	.clipisode-video-url-input {
+		display: flex;
+		gap: 8px;
+
+		input {
+			flex: 1;
+		}
+	}
+
+	.clipisode-video-preview {
+		max-width: 240px;
+		border-radius: 4px;
+		overflow: hidden;
+		background: #000;
+
+		video {
+			width: 100%;
+			display: block;
+		}
+	}
+}

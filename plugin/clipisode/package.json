@@ -1,0 +1,23 @@
+{
+	"name": "clipisode",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Clipisode WordPress plugin",
+	"scripts": {
+		"build": "wp-scripts build",
+		"dev": "wp-scripts start",
+		"start": "wp-scripts start",
+		"lint:js": "wp-scripts lint-js",
+		"lint:css": "wp-scripts lint-style"
+	},
+	"devDependencies": {
+		"@wordpress/scripts": "^31.4.0"
+	},
+	"dependencies": {
+		"@wordpress/api-fetch": "^7.39.0",
+		"@wordpress/components": "^32.1.0",
+		"@wordpress/element": "^6.39.0",
+		"@wordpress/i18n": "^6.12.0",
+		"@wordpress/icons": "^11.6.0"
+	}
+}
