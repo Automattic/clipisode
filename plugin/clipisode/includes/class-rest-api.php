@@ -161,6 +161,14 @@ class Clipisode_REST_API {
 			],
 		] );
 
+		register_rest_route( self::NAMESPACE, '/outputs/(?P<id>\d+)', [
+			[
+				'methods'             => 'DELETE',
+				'callback'            => [ $this, 'delete_output' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+		] );
+
 		register_rest_route( self::NAMESPACE, '/outputs/(?P<id>\d+)/upload', [
 			[
 				'methods'             => 'POST',
@@ -563,6 +571,25 @@ class Clipisode_REST_API {
 			'name' => $name,
 			'slug' => $slug,
 		], 201 );
+	}
+
+	public function delete_output( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
+		$table = $wpdb->prefix . 'clipisode_outputs';
+		$id    = (int) $request['id'];
+
+		$output = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $id ) );
+		if ( ! $output ) {
+			return new WP_REST_Response( [ 'message' => 'Output not found.' ], 404 );
+		}
+
+		if ( $output->attachment_id ) {
+			wp_delete_attachment( (int) $output->attachment_id, true );
+		}
+
+		$wpdb->delete( $table, [ 'id' => $id ] );
+
+		return new WP_REST_Response( null, 204 );
 	}
 
 	public function upload_output( WP_REST_Request $request ): WP_REST_Response {

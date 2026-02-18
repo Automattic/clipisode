@@ -479,9 +479,13 @@
 		}
 	}
 
+	.clipisode-mux-output-actions {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
 	.clipisode-mux-pending {
-		display: block;
-		padding: 12px 0;
 		color: #646970;
 		font-size: 13px;
 	}

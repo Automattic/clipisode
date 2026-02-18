@@ -2,7 +2,7 @@
 
 **Status:** Draft
 **Authors:** Max Schmeling, Brian Alvey, Christoph Khouri
-**Last Updated:** 2026-02-17
+**Last Updated:** 2026-02-18
 
 ---
 
@@ -33,6 +33,7 @@ Collecting user-generated video is still painful:
 | **Topic** | A call for video clips. Has a title, optional intro video, hosted-by name, brand terms, optional custom terms, and one or more invitation links. |
 | **Invitation Link** | A shareable URL tied to a topic. Visitors land on a themed, mobile-optimized page where they can watch the prompt and record/upload a clip. No login or app install needed. Has a `type` field (`clip` for guest submissions; `intro` reserved for future host-recorded intro videos). |
 | **Clip** | A submitted video with metadata: name, transcript, social handle, social network, email, tag, timestamp. Clips go through moderation (Approved / Unapproved / On Hold / Rejected) and can be tagged and filtered. Each clip snapshots the exact brand and custom terms in effect at submission time (post ID + revision ID). |
+| **Output (Clipisode)** | A muxed video combining a topic's intro video and approved clips. Created by sending source video URLs to a local Mac app via WebSocket for compositing. Multiple outputs per topic are supported (e.g. "All Clips", "Highlight Reel"). `topic_id` is nullable to support future cross-topic outputs. Each output has a globally unique slug used as the download filename. |
 | **Terms** | Legal terms presented to guests before submission. Managed as a WordPress CPT (`clipisode_terms`). Two types: a single **Brand Terms** set (seeded on activation with `{{BRAND}}` replaced by the site name, always applied) and optional **Custom Terms** (can be assigned per-topic). Both support revisions. |
 
 ---
@@ -49,7 +50,8 @@ Top-level menu: **Clipisode**
 |---|---|
 | **Topics** | List and manage topics. |
 | **Clips** | Browse and moderate all clips across topics. |
-| **Settings** | Terms management, storage and transcription configuration. |
+| **Themes** | Manage invitation layout themes (clone, edit in block editor, delete). |
+| **Settings** | Terms management, hosts, storage and transcription configuration. |
 
 ### Topics List Page
 
@@ -77,7 +79,15 @@ Three sections on one screen:
 - Table: link slug, type, status (open/closed), clicks, clips, created date.
 - **New** button to create an invitation link for this topic.
 
-**3. Clips (for this topic)**
+**3. Clipisode (Outputs)**
+- "Generate Clipisode" button (disabled if no approved clips). Each click creates a new output — not a replacement.
+- Connects to a local Mac app via WebSocket (`ws://127.0.0.1:63481`), sends source video URLs and a callback URL.
+- Shows real-time progress (phase, message, progress bar) with cancel support.
+- On completion, the Mac app POSTs the muxed video to a WP REST endpoint; the admin UI shows a video player with download and delete buttons.
+- Existing outputs are listed with video player, download (`{slug}.mp4`), and delete (with confirmation, also removes media library attachment).
+- See [docs/mux.md](mux.md) for full protocol and implementation details.
+
+**4. Clips (for this topic)**
 - Table: status badge, name, tag, transcript preview, created date.
 - Each row opens a **Clip Detail Modal** for quick moderation:
   - Video player
@@ -134,12 +144,14 @@ A single, shared page used in two contexts:
 | `wp_clipisode_topics` | `id`, `title`, `intro_video_id`, `hosted_by`, `brand_terms_id`, `custom_terms_id`, `status`, `created_at`, `updated_at` |
 | `wp_clipisode_invitation_links` | `id`, `topic_id`, `slug` (unique), `type`, `status`, `clicks`, `created_at` |
 | `wp_clipisode_clips` | `id`, `topic_id`, `invitation_link_id`, `name`, `video_url`, `transcript`, `social_handle`, `social_network`, `tag`, `status`, `email`, `brand_terms_id`, `brand_terms_revision_id`, `custom_terms_id`, `custom_terms_revision_id`, `created_at`, `updated_at` |
+| `wp_clipisode_outputs` | `id`, `topic_id` (nullable), `name`, `slug` (unique, auto-incremented on conflict), `attachment_id` (nullable), `created_at` |
 
-**Custom Post Type:**
+**Custom Post Types:**
 
 | CPT | Purpose |
 |---|---|
 | `clipisode_terms` | Stores brand and custom terms. Distinguished by `_clipisode_terms_type` meta (`brand` or `custom`). Supports title, editor, and revisions. Hidden from frontend listings (`exclude_from_search`, no archive, no nav menus). Slugs auto-prefixed with `clipisode-`. Publicly queryable for admin preview only. |
+| `clipisode_invite` | Invitation themes (layouts). Block-based templates using custom Gutenberg blocks (`clipisode/invitation-flow`, stage blocks, element blocks). A default theme is seeded on activation; additional themes can be cloned and customized. |
 
 ### REST API
 
@@ -164,6 +176,12 @@ All endpoints under `clipisode/v1`, requiring `manage_options` capability.
 | POST | `/videos/upload` | Upload a video file to media library |
 | POST | `/videos/sideload` | Import a video from URL to media library |
 | DELETE | `/videos/:id` | Delete a Clipisode-managed video attachment |
+| POST | `/outputs` | Create an output row (accepts `topic_id`, `name`; returns `id`, `slug`) |
+| POST | `/outputs/:id/upload` | Receive muxed video from Mac app (no auth for POC) |
+| DELETE | `/outputs/:id` | Delete output and its media library attachment |
+| GET | `/themes` | List invitation themes |
+| POST | `/themes` | Clone an invitation theme |
+| DELETE | `/themes/:id` | Delete a theme (if not default or in use) |
 
 ### Media Handling
 
@@ -173,19 +191,22 @@ All endpoints under `clipisode/v1`, requiring `manage_options` capability.
 
 ### Invitation Link Frontend
 
-Each invitation link is a public-facing, themed page with these screens:
+Each invitation link resolves to a public-facing page at `/c/{slug}`. The page is device-responsive with client-side detection (`navigator.maxTouchPoints > 0 && window.innerWidth < 1280`).
+
+**Desktop:** Two-column layout — intro video on the left, QR code of the current URL on the right. No recording flow; visitors are prompted to scan with their phone.
+
+**Mobile/Tablet:** Multi-step recording flow:
 
 | Screen | Purpose |
 |---|---|
-| **Intro** | Shows intro video, title, play/reply/upload buttons, and links to terms. |
-| **Desktop Intro** | Explains the flow and shows a QR code to open on mobile. |
-| **Name** | Collects the guest's name and optional social handles (Instagram, TikTok, X) while the video uploads. |
-| **Email** | Optionally collects email and adds to a list (e.g. for sweepstakes). |
-| **Success** | Confirmation message after successful submission. |
-| **Closed** | Shown when the invitation link has expired. |
-| **Warning** | Contextual error states: no camera permission, network failure, silent audio, landscape video. |
+| **Landing** | Full-screen intro video as background, title overlay, play button, record/upload CTA, terms links. Videos pause when leaving the step. |
+| **Record** | Camera capture or file upload with progress indicator. |
+| **Form** | Collects name and optional social handles (Instagram, TikTok, X) while the video uploads in the background. |
+| **Thanks** | Confirmation message after successful submission. |
 
-Themes and screen content are managed via WordPress blocks and patterns rather than hard-coded templates.
+Terms links open a fullscreen modal with the terms content fetched via AJAX. Each terms element (brand and custom) has its own scoped modal.
+
+**Invitation Themes** are managed as Gutenberg block templates (`clipisode/invitation-flow` → stage blocks → element blocks). Stages: `invitation-desktop`, `invitation-landing`, `invitation-record`, `invitation-thanks`. Elements: `video`, `title`, `hosted`, `cta`, `terms`, `qr-code`. A default theme is seeded on activation; themes can be cloned and customized in the block editor.
 
 ### Video Submission (Web)
 - **MediaRecorder API** for in-browser recording on mobile and desktop.
@@ -212,9 +233,10 @@ Themes and screen content are managed via WordPress blocks and patterns rather t
 
 ## Out of Scope (for now)
 
-- Native macOS/iOS app and on-device video rendering.
-- Cloud-based video compositing and compilation.
+- Cloud-based video compositing (currently local Mac app via WebSocket).
+- Cross-topic outputs / highlight reels (database supports it via nullable `topic_id`, UI not yet built).
 - Answer/star flows (sending curated clips to a host for on-camera answers).
+- Authentication for the muxing upload endpoint (currently open for POC).
 - Analytics dashboard.
 - White-label / multi-tenant.
 - Pricing and billing.
@@ -237,4 +259,3 @@ Themes and screen content are managed via WordPress blocks and patterns rather t
 2. Gutenberg-only or also support Classic Editor?
 3. How to handle storage limits on budget hosting?
 4. Authentication for the Brand Manager area — WordPress roles, or a separate capability system?
-5. Integration with Jetpack, WooCommerce, or other Automattic properties?

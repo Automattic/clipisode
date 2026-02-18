@@ -25,6 +25,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const [ muxProgress, setMuxProgress ] = useState( 0 );
 	const [ muxError, setMuxError ] = useState( '' );
 	const [ muxOutputUrl, setMuxOutputUrl ] = useState< string | null >( null );
+	const [ muxOutputId, setMuxOutputId ] = useState< number | null >( null );
 	const wsRef = useRef< WebSocket | null >( null );
 
 	const WS_URL = 'ws://127.0.0.1:63481';
@@ -47,6 +48,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 		setMuxProgress( 0 );
 		setMuxError( '' );
 		setMuxOutputUrl( null );
+		setMuxOutputId( null );
 
 		let output: Output;
 		try {
@@ -61,6 +63,8 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 			return;
 		}
 
+		setMuxOutputId( output.id );
+
 		const segments = [
 			...( topic.intro_video_url ? [ { url: topic.intro_video_url, order: 1 } ] : [] ),
 			...approved.map( ( c, i ) => ( {
@@ -69,8 +73,8 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 			} ) ),
 		];
 
-		const restRoot = window.clipisodeAdmin?.rest_root || '/wp-json/';
-		const callbackUrl = `${ window.location.origin }${ restRoot }clipisode/v1/outputs/${ output.id }/upload`;
+		const restRoot = window.clipisodeAdmin?.rest_root || `${ window.location.origin }/wp-json/`;
+		const callbackUrl = `${ restRoot }clipisode/v1/outputs/${ output.id }/upload`;
 
 		const jobId = generateJobId();
 		const topicSlug = topic.title.toLowerCase().replace( /[^a-z0-9]+/g, '-' ).replace( /^-|-$/g, '' );
@@ -146,6 +150,24 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 		ws.onerror = () => {
 			ws.close();
 		};
+	};
+
+	const deleteOutput = ( outputId: number, name: string ) => {
+		if ( ! window.confirm( `Delete "${ name }"? The video will be permanently removed.` ) ) {
+			return;
+		}
+		apiFetch( {
+			path: `/clipisode/v1/outputs/${ outputId }`,
+			method: 'DELETE',
+		} ).then( () => {
+			setTopic( ( prev ) => {
+				if ( ! prev ) return prev;
+				return {
+					...prev,
+					outputs: prev.outputs.filter( ( o ) => o.id !== outputId ),
+				};
+			} );
+		} );
 	};
 
 	const cancelMuxing = () => {
@@ -442,16 +464,36 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 								{ o.url ? (
 									<>
 										<video src={ o.url } controls playsInline />
-										<a
-											className="components-button is-secondary is-compact"
-											href={ o.url }
-											download={ `${ o.slug }.mp4` }
-										>
-											Download
-										</a>
+										<div className="clipisode-mux-output-actions">
+											<a
+												className="components-button is-secondary is-compact"
+												href={ o.url }
+												download={ `${ o.slug }.mp4` }
+											>
+												Download
+											</a>
+											<Button
+												variant="tertiary"
+												size="compact"
+												isDestructive
+												onClick={ () => deleteOutput( o.id, o.name ) }
+											>
+												Delete
+											</Button>
+										</div>
 									</>
 								) : (
-									<span className="clipisode-mux-pending">Processing...</span>
+									<div className="clipisode-mux-output-actions">
+										<span className="clipisode-mux-pending">Processing...</span>
+										<Button
+											variant="tertiary"
+											size="compact"
+											isDestructive
+											onClick={ () => deleteOutput( o.id, o.name ) }
+										>
+											Delete
+										</Button>
+									</div>
 								) }
 							</div>
 						) ) }
@@ -464,7 +506,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 						onClick={ startMuxing }
 						disabled={ clips.filter( ( c ) => c.status === 'approved' ).length === 0 }
 					>
-						{ topic.outputs && topic.outputs.length > 0 ? 'Regenerate Clipisode' : 'Generate Clipisode' }
+						Generate Clipisode
 					</Button>
 				) }
 
@@ -497,18 +539,35 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 						{ muxOutputUrl && (
 							<>
 								<video src={ muxOutputUrl } controls playsInline />
-								<a
-									className="components-button is-secondary is-compact"
-									href={ muxOutputUrl }
-									download
-								>
-									Download
-								</a>
+								<div className="clipisode-mux-output-actions">
+									<a
+										className="components-button is-secondary is-compact"
+										href={ muxOutputUrl }
+										download
+									>
+										Download
+									</a>
+									{ muxOutputId && (
+										<Button
+											variant="tertiary"
+											size="compact"
+											isDestructive
+											onClick={ () => {
+												deleteOutput( muxOutputId, 'All Clips' );
+												setMuxState( 'idle' );
+											} }
+										>
+											Delete
+										</Button>
+									) }
+								</div>
 							</>
 						) }
-						<Button variant="secondary" onClick={ () => setMuxState( 'idle' ) }>
-							Done
-						</Button>
+						{ ! muxOutputUrl && (
+							<Button variant="secondary" onClick={ () => setMuxState( 'idle' ) }>
+								OK
+							</Button>
+						) }
 					</div>
 				) }
 
