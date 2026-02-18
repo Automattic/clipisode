@@ -664,16 +664,24 @@ class Clipisode_REST_API {
 		global $wpdb;
 		$table = $wpdb->prefix . 'clipisode_invitation_links';
 
-		$slug = $request->get_param( 'slug' );
-		if ( ! $slug ) {
-			$slug = substr( bin2hex( random_bytes( 3 ) ), 0, 6 );
+		$attempts = 5;
+		$result   = false;
+
+		while ( $attempts-- > 0 ) {
+			$slug   = substr( bin2hex( random_bytes( 3 ) ), 0, 6 );
+			$result = $wpdb->insert( $table, [
+				'topic_id' => (int) $request['topic_id'],
+				'slug'     => $slug,
+				'status'   => 'open',
+			] );
+			if ( $result !== false ) {
+				break;
+			}
 		}
 
-		$wpdb->insert( $table, [
-			'topic_id' => (int) $request['topic_id'],
-			'slug'     => sanitize_text_field( $slug ),
-			'status'   => 'open',
-		] );
+		if ( $result === false ) {
+			return new WP_REST_Response( [ 'message' => 'Failed to generate a unique slug.' ], 500 );
+		}
 
 		$link = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $wpdb->insert_id ) );
 		$link->clips_count = 0;
@@ -690,9 +698,31 @@ class Clipisode_REST_API {
 			$fields['status'] = sanitize_text_field( $request->get_param( 'status' ) );
 		}
 
-		$wpdb->update( $table, $fields, [ 'id' => $id ] );
+		if ( $request->get_param( 'slug' ) !== null ) {
+			$new_slug = sanitize_text_field( $request->get_param( 'slug' ) );
+			if ( ! preg_match( '/^[a-zA-Z0-9]{1,20}$/', $new_slug ) ) {
+				return new WP_REST_Response( [ 'message' => 'Slug must be 1–20 alphanumeric characters.' ], 400 );
+			}
+			$existing = $wpdb->get_var( $wpdb->prepare(
+				"SELECT id FROM $table WHERE slug = %s AND id != %d", $new_slug, $id
+			) );
+			if ( $existing ) {
+				return new WP_REST_Response( [ 'message' => 'That slug is already in use.' ], 409 );
+			}
+			$fields['slug'] = $new_slug;
+		}
 
-		$link = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $id ) );
+		if ( ! empty( $fields ) ) {
+			$wpdb->update( $table, $fields, [ 'id' => $id ] );
+		}
+
+		$clips_tbl = $wpdb->prefix . 'clipisode_clips';
+		$link = $wpdb->get_row( $wpdb->prepare(
+			"SELECT l.*, COALESCE(cl.clips_count, 0) AS clips_count
+			 FROM $table l
+			 LEFT JOIN (SELECT invitation_link_id, COUNT(*) AS clips_count FROM $clips_tbl GROUP BY invitation_link_id) cl ON cl.invitation_link_id = l.id
+			 WHERE l.id = %d", $id
+		) );
 		return new WP_REST_Response( $link );
 	}
 

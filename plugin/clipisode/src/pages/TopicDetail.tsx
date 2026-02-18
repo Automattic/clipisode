@@ -16,6 +16,9 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const [ loading, setLoading ] = useState< boolean >( true );
 	const [ deleting, setDeleting ] = useState< boolean >( false );
 	const [ copiedId, setCopiedId ] = useState< number | null >( null );
+	const [ editingSlug, setEditingSlug ] = useState< Record< number, string > >( {} );
+	const [ slugError, setSlugError ] = useState< Record< number, string > >( {} );
+	const [ savingSlug, setSavingSlug ] = useState< Record< number, boolean > >( {} );
 	const [ selectedClip, setSelectedClip ] = useState< Clip | null >( null );
 
 	type MuxState = 'idle' | 'connecting' | 'processing' | 'done' | 'error';
@@ -216,6 +219,31 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 		} );
 	};
 
+	const saveSlug = async ( link: InvitationLink ) => {
+		const newSlug = editingSlug[ link.id ];
+		if ( ! newSlug || newSlug === link.slug ) {
+			setEditingSlug( ( prev ) => { const n = { ...prev }; delete n[ link.id ]; return n; } );
+			return;
+		}
+		setSavingSlug( ( prev ) => ( { ...prev, [ link.id ]: true } ) );
+		setSlugError( ( prev ) => { const n = { ...prev }; delete n[ link.id ]; return n; } );
+		try {
+			const updated = await apiFetch< InvitationLink >( {
+				path: `/clipisode/v1/invitation-links/${ link.id }`,
+				method: 'PUT',
+				data: { slug: newSlug },
+			} );
+			setLinks( ( prev ) => prev.map( ( l ) => ( l.id === updated.id ? updated : l ) ) );
+			setEditingSlug( ( prev ) => { const n = { ...prev }; delete n[ link.id ]; return n; } );
+		} catch ( err: unknown ) {
+			const message = err instanceof Error ? err.message
+				: ( err as { message?: string } )?.message || 'Slug update failed.';
+			setSlugError( ( prev ) => ( { ...prev, [ link.id ]: message } ) );
+		} finally {
+			setSavingSlug( ( prev ) => ( { ...prev, [ link.id ]: false } ) );
+		}
+	};
+
 	const copyLinkUrl = ( link: InvitationLink ) => {
 		const url = `${ window.location.origin }/c/${ link.slug }`;
 		navigator.clipboard.writeText( url );
@@ -365,7 +393,44 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 						<tbody>
 							{ links.map( ( link ) => (
 								<tr key={ link.id }>
-									<td>{ link.slug }</td>
+									<td>
+										{ editingSlug[ link.id ] !== undefined ? (
+											<span className="clipisode-slug-edit">
+												<input
+													type="text"
+													value={ editingSlug[ link.id ] }
+													maxLength={ 20 }
+													onChange={ ( e ) => setEditingSlug( ( prev ) => ( { ...prev, [ link.id ]: e.target.value } ) ) }
+													onKeyDown={ ( e ) => {
+														if ( e.key === 'Enter' ) saveSlug( link );
+														if ( e.key === 'Escape' ) setEditingSlug( ( prev ) => { const n = { ...prev }; delete n[ link.id ]; return n; } );
+													} }
+													disabled={ savingSlug[ link.id ] }
+												/>
+												<Button variant="tertiary" size="compact" onClick={ () => saveSlug( link ) } disabled={ savingSlug[ link.id ] }>
+													{ savingSlug[ link.id ] ? '…' : 'Save' }
+												</Button>
+												<Button variant="tertiary" size="compact" onClick={ () => {
+													setEditingSlug( ( prev ) => { const n = { ...prev }; delete n[ link.id ]; return n; } );
+													setSlugError( ( prev ) => { const n = { ...prev }; delete n[ link.id ]; return n; } );
+												} }>
+													Cancel
+												</Button>
+												{ slugError[ link.id ] && (
+													<span className="clipisode-slug-error">{ slugError[ link.id ] }</span>
+												) }
+											</span>
+										) : (
+											<button
+												type="button"
+												className="clipisode-slug-btn"
+												onClick={ () => setEditingSlug( ( prev ) => ( { ...prev, [ link.id ]: link.slug } ) ) }
+												title="Click to edit"
+											>
+												{ link.slug }
+											</button>
+										) }
+									</td>
 									<td>
 										<span className={ `clipisode-status-badge ${ link.status }` }>
 											{ link.status }
