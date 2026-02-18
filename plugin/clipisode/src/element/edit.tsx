@@ -90,6 +90,18 @@ export default function Edit( { attributes }: EditProps ) {
 				</div>
 			);
 
+		case 'qr-code':
+			return (
+				<div { ...blockProps }>
+					<div className="ci-qr-placeholder">
+						<span>⬜ QR Code</span>
+						<p className="ci-el-small">
+							Desktop visitors see a QR code to scan with their phone
+						</p>
+					</div>
+				</div>
+			);
+
 		default:
 			return (
 				<div { ...blockProps }>

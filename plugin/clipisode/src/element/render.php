@@ -110,4 +110,13 @@ switch ( $type ) {
 	case 'thanks-cta':
 		echo "<div $wrapper><p class=\"ci-thanks-stay\">Stay tuned!</p></div>";
 		break;
+
+	case 'qr-code':
+		echo "<div $wrapper>";
+		echo '<div class="ci-qr-wrap">';
+		echo '<div class="ci-qr-canvas"></div>';
+		echo '<p class="ci-qr-label">Scan with your phone to record a reply</p>';
+		echo '</div>';
+		echo '</div>';
+		break;
 }

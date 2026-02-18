@@ -4,6 +4,7 @@ import { PanelBody, TextControl } from '@wordpress/components';
 const STAGE_LOCK = { lock: { move: true, remove: true } };
 
 const TEMPLATE: [ string, Record< string, unknown > ][] = [
+	[ 'clipisode/invitation-desktop', STAGE_LOCK ],
 	[ 'clipisode/invitation-landing', STAGE_LOCK ],
 	[ 'clipisode/invitation-record', STAGE_LOCK ],
 	[ 'clipisode/invitation-thanks', STAGE_LOCK ],
@@ -36,11 +37,12 @@ export default function Edit( { attributes, setAttributes }: EditProps ) {
 				<InnerBlocks
 					template={ TEMPLATE }
 					templateLock={ false }
-					allowedBlocks={ [
-						'clipisode/invitation-landing',
-						'clipisode/invitation-record',
-						'clipisode/invitation-thanks',
-					] }
+				allowedBlocks={ [
+					'clipisode/invitation-desktop',
+					'clipisode/invitation-landing',
+					'clipisode/invitation-record',
+					'clipisode/invitation-thanks',
+				] }
 				/>
 			</div>
 		</>

@@ -33,10 +33,45 @@ html, body {
 	text-align: center;
 }
 
-/* Landing */
+/* Landing — fullscreen video background on mobile */
 .ci-stage-landing {
-	background: #1a1a2e;
+	position: relative;
+	background: #000;
 	color: #fff;
+	overflow: hidden;
+	justify-content: flex-end;
+	padding-bottom: 48px;
+}
+
+.ci-stage-landing .ci-el-video {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	z-index: 0;
+}
+
+.ci-stage-landing .ci-play-btn {
+	z-index: 2;
+	pointer-events: auto;
+}
+
+.ci-stage-landing .ci-video-wrap {
+	width: 100%;
+	height: 100%;
+	max-width: none;
+	border-radius: 0;
+	margin: 0;
+	aspect-ratio: auto;
+}
+
+.ci-stage-landing .ci-video {
+	object-fit: cover;
+}
+
+.ci-stage-landing .ci-el:not(.ci-el-video) {
+	position: relative;
+	z-index: 1;
 }
 
 /* Record */
@@ -265,6 +300,88 @@ html, body {
 	font-size: 20px;
 	font-weight: 600;
 	margin: 24px 0 0;
+}
+
+/* -------------------------------------------------------------------
+   Desktop stage — CSS controls visibility based on root class
+   ------------------------------------------------------------------- */
+
+.ci-flow-root .ci-stage-desktop {
+	display: none;
+}
+
+.ci-flow-root.ci-desktop .ci-stage-desktop {
+	display: flex;
+	min-height: 100dvh;
+	background: #1a1a2e;
+	color: #fff;
+	flex-direction: row;
+	justify-content: center;
+	align-items: center;
+	gap: 64px;
+	padding: 48px;
+}
+
+.ci-flow-root.ci-desktop .ci-stage-landing,
+.ci-flow-root.ci-desktop .ci-stage-record,
+.ci-flow-root.ci-desktop .ci-stage-thanks {
+	display: none;
+}
+
+.ci-stage-desktop .ci-video-wrap {
+	max-width: 400px;
+	flex-shrink: 0;
+}
+
+/* QR code element */
+
+.ci-qr-wrap {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 16px;
+}
+
+.ci-qr-canvas canvas {
+	display: block;
+}
+
+.ci-qr-label {
+	font-size: 15px;
+	opacity: 0.7;
+	margin: 0;
+	max-width: 220px;
+	text-align: center;
+	line-height: 1.4;
+}
+
+/* -------------------------------------------------------------------
+   Editor: QR code placeholder
+   ------------------------------------------------------------------- */
+
+.ci-qr-placeholder {
+	width: 100%;
+	max-width: 200px;
+	aspect-ratio: 1;
+	background: rgba(255, 255, 255, 0.06);
+	border: 2px dashed rgba(255, 255, 255, 0.15);
+	border-radius: 16px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	margin: 0 auto 10px;
+	font-size: 14px;
+	opacity: 0.6;
+	gap: 8px;
+}
+
+.ci-qr-placeholder .ci-el-small {
+	font-size: 11px;
+	opacity: 0.5;
+	margin: 0;
+	text-align: center;
+	padding: 0 12px;
 }
 
 /* -------------------------------------------------------------------

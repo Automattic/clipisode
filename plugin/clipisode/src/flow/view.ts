@@ -1,9 +1,13 @@
 import './view.css';
+import QRCode from 'qrcode';
 
 function initFlow( root: HTMLElement ): void {
 	const slug = root.dataset.slug || '';
 	const restUrl = root.dataset.restUrl || '';
 	const nonce = root.dataset.nonce || '';
+
+	const isMobile =
+		navigator.maxTouchPoints > 0 && window.innerWidth < 1280;
 
 	const stages = root.querySelectorAll< HTMLElement >( '[data-step]' );
 	let attachmentId: number | null = null;
@@ -13,6 +17,79 @@ function initFlow( root: HTMLElement ): void {
 		stages.forEach( ( el ) => {
 			el.style.display = el.dataset.step === step ? '' : 'none';
 		} );
+	}
+
+	// Video play / pause — attach to every video-wrap pair.
+	root.querySelectorAll< HTMLElement >( '.ci-video-wrap' ).forEach( ( wrap ) => {
+		const vid = wrap.querySelector< HTMLVideoElement >( '.ci-video' );
+		const btn = wrap.querySelector< HTMLElement >( '.ci-play-btn' );
+		if ( ! vid || ! btn ) return;
+
+		btn.addEventListener( 'click', () => {
+			vid.play();
+			btn.classList.add( 'ci-hidden' );
+		} );
+
+		vid.addEventListener( 'ended', () => {
+			btn.classList.remove( 'ci-hidden' );
+		} );
+	} );
+
+	// Terms modal (shared).
+	const termsModal = root.querySelector< HTMLElement >( '.ci-terms-modal' );
+	const termsContent = root.querySelector< HTMLElement >( '.ci-terms-content' );
+	const termsClose = root.querySelector< HTMLElement >( '.ci-terms-close' );
+
+	root.querySelectorAll< HTMLAnchorElement >( '.ci-terms-open' ).forEach( ( link ) => {
+		link.addEventListener( 'click', async ( e ) => {
+			e.preventDefault();
+			if ( ! termsModal || ! termsContent ) return;
+
+			const url = link.dataset.termsUrl;
+			if ( ! url ) return;
+
+			termsContent.innerHTML = '<p style="opacity:0.5">Loading…</p>';
+			termsModal.hidden = false;
+
+			try {
+				const res = await fetch( url );
+				const html = await res.text();
+				const doc = new DOMParser().parseFromString( html, 'text/html' );
+				const body = doc.querySelector( '.entry-content' )
+					|| doc.querySelector( 'article' )
+					|| doc.querySelector( '.post-content' )
+					|| doc.querySelector( 'main' )
+					|| doc.body;
+				termsContent.innerHTML = body?.innerHTML || html;
+			} catch {
+				termsContent.innerHTML = '<p>Could not load terms. Please try again.</p>';
+			}
+		} );
+	} );
+
+	termsClose?.addEventListener( 'click', () => {
+		if ( termsModal ) termsModal.hidden = true;
+	} );
+
+	// Desktop: add class (CSS handles visibility), render QR code.
+	if ( ! isMobile ) {
+		root.classList.add( 'ci-desktop' );
+
+		const qrContainer = root.querySelector< HTMLElement >( '.ci-qr-canvas' );
+		if ( qrContainer ) {
+			QRCode.toCanvas(
+				window.location.href,
+				{ width: 200, margin: 2, color: { dark: '#000000', light: '#ffffff' } },
+				( err: Error | null, canvas: HTMLCanvasElement ) => {
+					if ( ! err && canvas ) {
+						canvas.style.borderRadius = '12px';
+						qrContainer.appendChild( canvas );
+					}
+				}
+			);
+		}
+
+		return;
 	}
 
 	root.addEventListener( 'click', ( e: Event ) => {
@@ -44,19 +121,6 @@ function initFlow( root: HTMLElement ): void {
 	const nameInput = root.querySelector< HTMLInputElement >( '.ci-name-input' );
 	const handleInput = root.querySelector< HTMLInputElement >( '.ci-handle-input' );
 	const errorBox = root.querySelector< HTMLElement >( '.ci-error' );
-
-	const video = root.querySelector< HTMLVideoElement >( '.ci-video' );
-	const playBtn = root.querySelector< HTMLElement >( '.ci-play-btn' );
-
-	playBtn?.addEventListener( 'click', () => {
-		if ( ! video ) return;
-		video.play();
-		playBtn.classList.add( 'ci-hidden' );
-	} );
-
-	video?.addEventListener( 'ended', () => {
-		playBtn?.classList.remove( 'ci-hidden' );
-	} );
 
 	chooseBtn?.addEventListener( 'click', () => fileInput?.click() );
 
@@ -168,42 +232,6 @@ function initFlow( root: HTMLElement ): void {
 			submitBtn.disabled = false;
 			submitBtn.textContent = 'Save My Reply';
 		}
-	} );
-
-	// Terms modal.
-	const termsModal = root.querySelector< HTMLElement >( '.ci-terms-modal' );
-	const termsContent = root.querySelector< HTMLElement >( '.ci-terms-content' );
-	const termsClose = root.querySelector< HTMLElement >( '.ci-terms-close' );
-
-	root.querySelectorAll< HTMLAnchorElement >( '.ci-terms-open' ).forEach( ( link ) => {
-		link.addEventListener( 'click', async ( e ) => {
-			e.preventDefault();
-			if ( ! termsModal || ! termsContent ) return;
-
-			const url = link.dataset.termsUrl;
-			if ( ! url ) return;
-
-			termsContent.innerHTML = '<p style="opacity:0.5">Loading…</p>';
-			termsModal.hidden = false;
-
-			try {
-				const res = await fetch( url );
-				const html = await res.text();
-				const doc = new DOMParser().parseFromString( html, 'text/html' );
-				const body = doc.querySelector( '.entry-content' )
-					|| doc.querySelector( 'article' )
-					|| doc.querySelector( '.post-content' )
-					|| doc.querySelector( 'main' )
-					|| doc.body;
-				termsContent.innerHTML = body?.innerHTML || html;
-			} catch {
-				termsContent.innerHTML = '<p>Could not load terms. Please try again.</p>';
-			}
-		} );
-	} );
-
-	termsClose?.addEventListener( 'click', () => {
-		if ( termsModal ) termsModal.hidden = true;
 	} );
 
 	showStep( 'landing' );

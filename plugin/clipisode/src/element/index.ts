@@ -67,6 +67,13 @@ const variations: BlockVariation[] = [
 		attributes: { type: 'thanks-cta' },
 		isActive: ( attrs ) => attrs.type === 'thanks-cta',
 	},
+	{
+		name: 'qr-code',
+		title: 'QR Code (Desktop)',
+		icon: 'smartphone',
+		attributes: { type: 'qr-code' },
+		isActive: ( attrs ) => attrs.type === 'qr-code',
+	},
 ];
 
 registerBlockType( metadata.name, {

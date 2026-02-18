@@ -131,6 +131,13 @@ class Clipisode_Post_Types {
 
 		$content = <<<'BLOCKS'
 <!-- wp:clipisode/invitation-flow {"slug":""} -->
+<!-- wp:clipisode/invitation-desktop -->
+<!-- wp:clipisode/element {"type":"video","lock":{"remove":true}} /-->
+<!-- wp:clipisode/element {"type":"title","lock":{"remove":true}} /-->
+<!-- wp:clipisode/element {"type":"hosted","lock":{"remove":true}} /-->
+<!-- wp:clipisode/element {"type":"qr-code","lock":{"remove":true}} /-->
+<!-- wp:clipisode/element {"type":"terms","lock":{"remove":true}} /-->
+<!-- /wp:clipisode/invitation-desktop -->
 <!-- wp:clipisode/invitation-landing -->
 <!-- wp:clipisode/element {"type":"video","lock":{"remove":true}} /-->
 <!-- wp:clipisode/element {"type":"title","lock":{"remove":true}} /-->

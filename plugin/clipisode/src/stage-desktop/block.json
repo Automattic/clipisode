@@ -1,24 +1,13 @@
 {
 	"$schema": "https://schemas.wp.org/trunk/block.json",
 	"apiVersion": 3,
-	"name": "clipisode/element",
-	"title": "Clipisode Element",
+	"name": "clipisode/invitation-desktop",
+	"title": "Invitation: Desktop",
 	"category": "widgets",
-	"icon": "screenoptions",
-	"description": "A single invitation element. Content is locked (from DB); styles are editable. Drag to reorder within a stage.",
-	"parent": [
-		"clipisode/invitation-desktop",
-		"clipisode/invitation-landing",
-		"clipisode/invitation-record",
-		"clipisode/invitation-thanks"
-	],
+	"icon": "desktop",
+	"description": "Desktop stage — shown to non-mobile visitors with the intro video and a QR code to scan on their phone.",
+	"parent": [ "clipisode/invitation-flow" ],
 	"usesContext": [ "clipisode/slug" ],
-	"attributes": {
-		"type": {
-			"type": "string",
-			"default": ""
-		}
-	},
 	"supports": {
 		"html": false,
 		"reusable": false,
