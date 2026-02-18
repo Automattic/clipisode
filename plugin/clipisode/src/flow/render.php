@@ -13,8 +13,9 @@ $slug = $attributes['slug'] ?? '';
 $wrapper = get_block_wrapper_attributes( [
 	'class'     => 'ci-flow-root',
 	'data-slug' => esc_attr( $slug ),
-	'data-rest-url' => esc_attr( esc_url_raw( rest_url() ) ),
-	'data-nonce'    => esc_attr( wp_create_nonce( 'wp_rest' ) ),
+	'data-rest-url'     => esc_attr( esc_url_raw( rest_url() ) ),
+	'data-nonce'        => esc_attr( wp_create_nonce( 'wp_rest' ) ),
+	'data-upload-nonce' => esc_attr( wp_create_nonce( 'clipisode_upload_' . $slug ) ),
 ] );
 
 echo "<div $wrapper>$content</div>";

@@ -49,6 +49,32 @@ class Clipisode_Invitation {
 	}
 
 	public function upload_video( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
+
+		$slug  = sanitize_text_field( $request->get_param( 'slug' ) );
+		$nonce = sanitize_text_field( $request->get_param( '_clipisode_nonce' ) );
+
+		if ( ! $slug ) {
+			return new WP_REST_Response( [ 'message' => 'Missing invitation slug.' ], 400 );
+		}
+
+		if ( ! $nonce || ! wp_verify_nonce( $nonce, 'clipisode_upload_' . $slug ) ) {
+			return new WP_REST_Response( [ 'message' => 'Invalid or expired nonce.' ], 403 );
+		}
+
+		$links_table = $wpdb->prefix . 'clipisode_invitation_links';
+		$link = $wpdb->get_row( $wpdb->prepare(
+			"SELECT status FROM $links_table WHERE slug = %s", $slug
+		) );
+
+		if ( ! $link ) {
+			return new WP_REST_Response( [ 'message' => 'Invitation link not found.' ], 404 );
+		}
+
+		if ( $link->status !== 'open' ) {
+			return new WP_REST_Response( [ 'message' => 'This invitation is no longer accepting replies.' ], 403 );
+		}
+
 		require_once ABSPATH . 'wp-admin/includes/image.php';
 		require_once ABSPATH . 'wp-admin/includes/file.php';
 		require_once ABSPATH . 'wp-admin/includes/media.php';
@@ -89,12 +115,17 @@ class Clipisode_Invitation {
 		global $wpdb;
 
 		$slug          = sanitize_text_field( $request->get_param( 'slug' ) );
+		$nonce         = sanitize_text_field( $request->get_param( '_clipisode_nonce' ) );
 		$name          = sanitize_text_field( $request->get_param( 'name' ) );
 		$social_handle = sanitize_text_field( $request->get_param( 'social_handle' ) ?? '' );
 		$attachment_id = (int) $request->get_param( 'attachment_id' );
 
 		if ( ! $slug || ! $name ) {
 			return new WP_REST_Response( [ 'message' => 'Slug and name are required.' ], 400 );
+		}
+
+		if ( ! $nonce || ! wp_verify_nonce( $nonce, 'clipisode_upload_' . $slug ) ) {
+			return new WP_REST_Response( [ 'message' => 'Invalid or expired nonce.' ], 403 );
 		}
 
 		$links_table = $wpdb->prefix . 'clipisode_invitation_links';

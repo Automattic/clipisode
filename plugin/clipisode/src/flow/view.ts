@@ -5,6 +5,7 @@ function initFlow( root: HTMLElement ): void {
 	const slug = root.dataset.slug || '';
 	const restUrl = root.dataset.restUrl || '';
 	const nonce = root.dataset.nonce || '';
+	const uploadNonce = root.dataset.uploadNonce || '';
 
 	const isMobile =
 		navigator.maxTouchPoints > 0 && window.innerWidth < 1280;
@@ -151,6 +152,8 @@ function initFlow( root: HTMLElement ): void {
 
 		const formData = new FormData();
 		formData.append( 'video', file );
+		formData.append( 'slug', slug );
+		formData.append( '_clipisode_nonce', uploadNonce );
 
 		const xhr = new XMLHttpRequest();
 
@@ -215,6 +218,7 @@ function initFlow( root: HTMLElement ): void {
 						name,
 						social_handle: handleInput?.value.trim() || null,
 						attachment_id: attachmentId,
+						_clipisode_nonce: uploadNonce,
 					} ),
 				}
 			);
