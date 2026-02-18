@@ -7,6 +7,11 @@ import Foundation
 import SwiftUI
 import Observation
 
+/// Shared reference so the app delegate can run the launch render.
+enum AppStateHolder {
+    static weak var shared: AppState?
+}
+
 @Observable
 @MainActor
 final class AppState {
@@ -47,6 +52,59 @@ final class AppState {
         
         // Run cleanup
         CleanupManager.runOnLaunch()
+    }
+    
+    // MARK: - Local Job
+    
+    /// Combine local video files and write the result to a specified output URL.
+    /// Each input is used in full (no trimming). Progress is reflected in `isWorking`.
+    func runLocalJob(inputs: [URL], names: [String] = [], output: URL) {
+        guard !isWorking else { return }
+        isWorking = true
+        
+        Task {
+            do {
+                let jobId = UUID().uuidString
+                let jobFolder = FileLocations.jobFolder(jobId)
+                let tempFolder = FileLocations.tempFolder(jobId)
+                try FileManager.default.createDirectory(at: jobFolder, withIntermediateDirectories: true)
+                try FileManager.default.createDirectory(at: tempFolder, withIntermediateDirectories: true)
+                
+                // Trim / normalise each input with per-segment FFmpeg effects
+                var segmentFiles: [URL] = []
+                for (index, input) in inputs.enumerated() {
+                    let segmentFile = tempFolder.appendingPathComponent(
+                        "segment_\(String(format: "%02d", index + 1)).mp4"
+                    )
+                    let extraFilters: String? = (index == 0)
+                        ? "rgbashift=rh=-3:rv=2:bh=3:bv=-2,eq=contrast=1.15:brightness=0.02:saturation=1.3,vignette=PI/4"
+                        : nil
+                    try await FFmpegRunner.trim(input: input, start: nil, end: nil, extraFilters: extraFilters, output: segmentFile)
+                    segmentFiles.append(segmentFile)
+                }
+                
+                // Declare per-segment compositor effects (face tracking, particles, etc.)
+                // The custom VideoCompositor handles these per-frame during export.
+                var effects: [Set<SegmentEffect>] = Array(repeating: [], count: segmentFiles.count)
+                if segmentFiles.count > 1 { effects[1] = [.faceTracking] }
+                if segmentFiles.count > 2 { effects[2] = [.particles] }
+                
+                try await CompositionExporter.export(
+                    segments: segmentFiles,
+                    names: names,
+                    effects: effects,
+                    to: output
+                )
+                
+                try? FileManager.default.removeItem(at: tempFolder)
+                
+                print("✅ Local job complete: \(output.path)")
+            } catch {
+                print("❌ Local job failed: \(error.localizedDescription)")
+            }
+            
+            isWorking = false
+        }
     }
     
     private func setupServers() {
