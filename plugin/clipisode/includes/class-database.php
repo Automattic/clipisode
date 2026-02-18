@@ -5,11 +5,9 @@ defined( 'ABSPATH' ) || exit;
 class Clipisode_Database {
 
 	public static function activate(): void {
-		ob_start();
 		self::create_tables();
 		self::seed();
 		Clipisode_Post_Types::ensure_default_invitation();
-		ob_end_clean();
 	}
 
 	private static function create_tables(): void {
