@@ -177,24 +177,24 @@ class Clipisode_REST_API {
 			],
 		] );
 
-		// Clips.
-		register_rest_route( self::NAMESPACE, '/clips', [
+		// Replies.
+		register_rest_route( self::NAMESPACE, '/replies', [
 			[
 				'methods'             => 'GET',
-				'callback'            => [ $this, 'list_clips' ],
+				'callback'            => [ $this, 'list_replies' ],
 				'permission_callback' => [ $this, 'check_permission' ],
 			],
 		] );
 
-		register_rest_route( self::NAMESPACE, '/clips/(?P<id>\d+)', [
+		register_rest_route( self::NAMESPACE, '/replies/(?P<id>\d+)', [
 			[
 				'methods'             => 'GET',
-				'callback'            => [ $this, 'get_clip' ],
+				'callback'            => [ $this, 'get_reply' ],
 				'permission_callback' => [ $this, 'check_permission' ],
 			],
 			[
 				'methods'             => 'PUT',
-				'callback'            => [ $this, 'update_clip' ],
+				'callback'            => [ $this, 'update_reply' ],
 				'permission_callback' => [ $this, 'check_permission' ],
 			],
 		] );
@@ -349,16 +349,16 @@ class Clipisode_REST_API {
 	public function list_topics( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
 		$table     = $wpdb->prefix . 'clipisode_topics';
-		$clips_tbl = $wpdb->prefix . 'clipisode_clips';
+		$replies_tbl = $wpdb->prefix . 'clipisode_replies';
 		$links_tbl = $wpdb->prefix . 'clipisode_invitation_links';
 
 		$topics = $wpdb->get_results( "
 			SELECT t.*,
-				COALESCE(cl.clips_count, 0) AS clips_count,
+				COALESCE(cl.replies_count, 0) AS replies_count,
 				COALESCE(lk.links_count, 0) AS links_count,
 				COALESCE(lk.clicks, 0) AS clicks
 			FROM $table t
-			LEFT JOIN (SELECT topic_id, COUNT(*) AS clips_count FROM $clips_tbl GROUP BY topic_id) cl ON cl.topic_id = t.id
+			LEFT JOIN (SELECT topic_id, COUNT(*) AS replies_count FROM $replies_tbl GROUP BY topic_id) cl ON cl.topic_id = t.id
 			LEFT JOIN (SELECT topic_id, COUNT(*) AS links_count, SUM(clicks) AS clicks FROM $links_tbl GROUP BY topic_id) lk ON lk.topic_id = t.id
 			ORDER BY t.created_at DESC
 		" );
@@ -371,17 +371,17 @@ class Clipisode_REST_API {
 	public function get_topic( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
 		$table     = $wpdb->prefix . 'clipisode_topics';
-		$clips_tbl = $wpdb->prefix . 'clipisode_clips';
+		$replies_tbl = $wpdb->prefix . 'clipisode_replies';
 		$links_tbl = $wpdb->prefix . 'clipisode_invitation_links';
 
 		$id    = (int) $request['id'];
 		$topic = $wpdb->get_row( $wpdb->prepare( "
 			SELECT t.*,
-				COALESCE(cl.clips_count, 0) AS clips_count,
+				COALESCE(cl.replies_count, 0) AS replies_count,
 				COALESCE(lk.links_count, 0) AS links_count,
 				COALESCE(lk.clicks, 0) AS clicks
 			FROM $table t
-			LEFT JOIN (SELECT topic_id, COUNT(*) AS clips_count FROM $clips_tbl GROUP BY topic_id) cl ON cl.topic_id = t.id
+			LEFT JOIN (SELECT topic_id, COUNT(*) AS replies_count FROM $replies_tbl GROUP BY topic_id) cl ON cl.topic_id = t.id
 			LEFT JOIN (SELECT topic_id, COUNT(*) AS links_count, SUM(clicks) AS clicks FROM $links_tbl GROUP BY topic_id) lk ON lk.topic_id = t.id
 			WHERE t.id = %d
 		", $id ) );
@@ -511,7 +511,7 @@ class Clipisode_REST_API {
 		}
 
 		$wpdb->delete( $wpdb->prefix . 'clipisode_outputs', [ 'topic_id' => $id ] );
-		$wpdb->delete( $wpdb->prefix . 'clipisode_clips', [ 'topic_id' => $id ] );
+		$wpdb->delete( $wpdb->prefix . 'clipisode_replies', [ 'topic_id' => $id ] );
 		$wpdb->delete( $wpdb->prefix . 'clipisode_invitation_links', [ 'topic_id' => $id ] );
 		$wpdb->delete( $wpdb->prefix . 'clipisode_topics', [ 'id' => $id ] );
 
@@ -648,13 +648,13 @@ class Clipisode_REST_API {
 	public function list_invitation_links( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
 		$table     = $wpdb->prefix . 'clipisode_invitation_links';
-		$clips_tbl = $wpdb->prefix . 'clipisode_clips';
+		$replies_tbl = $wpdb->prefix . 'clipisode_replies';
 		$topic_id  = (int) $request['topic_id'];
 
 		$links = $wpdb->get_results( $wpdb->prepare( "
-			SELECT l.*, COALESCE(cl.clips_count, 0) AS clips_count
+			SELECT l.*, COALESCE(cl.replies_count, 0) AS replies_count
 			FROM $table l
-			LEFT JOIN (SELECT invitation_link_id, COUNT(*) AS clips_count FROM $clips_tbl GROUP BY invitation_link_id) cl ON cl.invitation_link_id = l.id
+			LEFT JOIN (SELECT invitation_link_id, COUNT(*) AS replies_count FROM $replies_tbl GROUP BY invitation_link_id) cl ON cl.invitation_link_id = l.id
 			WHERE l.topic_id = %d
 			ORDER BY l.created_at DESC
 		", $topic_id ) );
@@ -686,7 +686,7 @@ class Clipisode_REST_API {
 		}
 
 		$link = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $wpdb->insert_id ) );
-		$link->clips_count = 0;
+		$link->replies_count = 0;
 		return new WP_REST_Response( $link, 201 );
 	}
 
@@ -718,11 +718,11 @@ class Clipisode_REST_API {
 			$wpdb->update( $table, $fields, [ 'id' => $id ] );
 		}
 
-		$clips_tbl = $wpdb->prefix . 'clipisode_clips';
+		$replies_tbl = $wpdb->prefix . 'clipisode_replies';
 		$link = $wpdb->get_row( $wpdb->prepare(
-			"SELECT l.*, COALESCE(cl.clips_count, 0) AS clips_count
+			"SELECT l.*, COALESCE(cl.replies_count, 0) AS replies_count
 			 FROM $table l
-			 LEFT JOIN (SELECT invitation_link_id, COUNT(*) AS clips_count FROM $clips_tbl GROUP BY invitation_link_id) cl ON cl.invitation_link_id = l.id
+			 LEFT JOIN (SELECT invitation_link_id, COUNT(*) AS replies_count FROM $replies_tbl GROUP BY invitation_link_id) cl ON cl.invitation_link_id = l.id
 			 WHERE l.id = %d", $id
 		) );
 		return new WP_REST_Response( $link );
@@ -735,11 +735,11 @@ class Clipisode_REST_API {
 		return new WP_REST_Response( null, 204 );
 	}
 
-	// --- Clips ---
+	// --- Replies ---
 
-	public function list_clips( WP_REST_Request $request ): WP_REST_Response {
+	public function list_replies( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
-		$table     = $wpdb->prefix . 'clipisode_clips';
+		$table     = $wpdb->prefix . 'clipisode_replies';
 		$topic_tbl = $wpdb->prefix . 'clipisode_topics';
 
 		$where  = [];
@@ -782,29 +782,29 @@ class Clipisode_REST_API {
 		return new WP_REST_Response( $wpdb->get_results( $query ) );
 	}
 
-	public function get_clip( WP_REST_Request $request ): WP_REST_Response {
+	public function get_reply( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
-		$table     = $wpdb->prefix . 'clipisode_clips';
+		$table     = $wpdb->prefix . 'clipisode_replies';
 		$topic_tbl = $wpdb->prefix . 'clipisode_topics';
 		$id        = (int) $request['id'];
 
-		$clip = $wpdb->get_row( $wpdb->prepare( "
+		$reply = $wpdb->get_row( $wpdb->prepare( "
 			SELECT cl.*, t.title AS topic_title
 			FROM $table cl
 			LEFT JOIN $topic_tbl t ON t.id = cl.topic_id
 			WHERE cl.id = %d
 		", $id ) );
 
-		if ( ! $clip ) {
-			return new WP_REST_Response( [ 'message' => 'Clip not found.' ], 404 );
+		if ( ! $reply ) {
+			return new WP_REST_Response( [ 'message' => 'Reply not found.' ], 404 );
 		}
 
-		return new WP_REST_Response( $clip );
+		return new WP_REST_Response( $reply );
 	}
 
-	public function update_clip( WP_REST_Request $request ): WP_REST_Response {
+	public function update_reply( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
-		$table = $wpdb->prefix . 'clipisode_clips';
+		$table = $wpdb->prefix . 'clipisode_replies';
 		$id    = (int) $request['id'];
 
 		$fields = [];

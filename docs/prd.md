@@ -30,10 +30,10 @@ Collecting user-generated video is still painful:
 
 | Concept | Description |
 |---|---|
-| **Topic** | A call for video clips. Has a title, optional intro video, hosted-by name, brand terms, optional custom terms, and one or more invitation links. |
-| **Invitation Link** | A shareable URL tied to a topic. Visitors land on a themed, mobile-optimized page where they can watch the prompt and record/upload a clip. No login or app install needed. Has a `type` field (`clip` for guest submissions; `intro` reserved for future host-recorded intro videos). |
-| **Clip** | A submitted video with metadata: name, transcript, social handle, social network, email, tag, timestamp. Clips go through moderation (Approved / Unapproved / On Hold / Rejected) and can be tagged and filtered. Each clip snapshots the exact brand and custom terms in effect at submission time (post ID + revision ID). |
-| **Output (Clipisode)** | A muxed video combining a topic's intro video and approved clips. Created by sending source video URLs to a local Mac app via WebSocket for compositing. Multiple outputs per topic are supported (e.g. "All Clips", "Highlight Reel"). `topic_id` is nullable to support future cross-topic outputs. Each output has a globally unique slug used as the download filename. |
+| **Topic** | A call for video replies. Has a title, optional intro video, hosted-by name, brand terms, optional custom terms, and one or more invitation links. |
+| **Invitation Link** | A shareable URL tied to a topic. Visitors land on a themed, mobile-optimized page where they can watch the prompt and record/upload a reply. No login or app install needed. Has a `type` field (`reply` for guest submissions; `intro` reserved for future host-recorded intro videos). |
+| **Reply** | A submitted video with metadata: name, transcript, social handle, social network, email, tag, timestamp. Replies go through moderation (Approved / Unapproved / On Hold / Rejected) and can be tagged and filtered. Each reply snapshots the exact brand and custom terms in effect at submission time (post ID + revision ID). |
+| **Output (Clipisode)** | A muxed video combining a topic's intro video and approved replies. Created by sending source video URLs to a local Mac app via WebSocket for compositing. Multiple outputs per topic are supported (e.g. "All Replies", "Highlight Reel"). `topic_id` is nullable to support future cross-topic outputs. Each output has a globally unique slug used as the download filename. |
 | **Terms** | Legal terms presented to guests before submission. Managed as a WordPress CPT (`clipisode_terms`). Two types: a single **Brand Terms** set (seeded on activation with `{{BRAND}}` replaced by the site name, always applied) and optional **Custom Terms** (can be assigned per-topic). Both support revisions. |
 
 ---
@@ -49,13 +49,13 @@ Top-level menu: **Clipisode**
 | Submenu | Description |
 |---|---|
 | **Topics** | List and manage topics. |
-| **Clips** | Browse and moderate all clips across topics. |
+| **Replies** | Browse and moderate all replies across topics. |
 | **Themes** | Manage invitation layout themes (clone, edit in block editor, delete). |
 | **Settings** | Terms management, hosts, storage and transcription configuration. |
 
 ### Topics List Page
 
-- Table of all topics showing title, clicks, clips count, status, created date.
+- Table of all topics showing title, clicks, replies count, status, created date.
 - **New Topic** button.
 
 ### New / Edit Topic
@@ -71,39 +71,39 @@ Three sections on one screen:
 
 **1. Topic Summary**
 - Title, intro video player, created date, hosted by.
-- Aggregate stats: clicks, clips.
+- Aggregate stats: clicks, replies.
 - Links to brand terms and custom terms (if assigned).
 - Edit button.
 
 **2. Invitation Links**
-- Table: link slug, type, status (open/closed), clicks, clips, created date.
+- Table: link slug, type, status (open/closed), clicks, replies, created date.
 - **New** button to create an invitation link for this topic.
 
 **3. Clipisode (Outputs)**
-- "Generate Clipisode" button (disabled if no approved clips). Each click creates a new output — not a replacement.
+- "Generate Clipisode" button (disabled if no approved replies). Each click creates a new output — not a replacement.
 - Connects to a local Mac app via WebSocket (`ws://127.0.0.1:63481`), sends source video URLs and a callback URL.
 - Shows real-time progress (phase, message, progress bar) with cancel support.
 - On completion, the Mac app POSTs the muxed video to a WP REST endpoint; the admin UI shows a video player with download and delete buttons.
 - Existing outputs are listed with video player, download (`{slug}.mp4`), and delete (with confirmation, also removes media library attachment).
 - See [docs/mux.md](mux.md) for full protocol and implementation details.
 
-**4. Clips (for this topic)**
+**4. Replies (for this topic)**
 - Table: status badge, name, tag, transcript preview, created date.
-- Each row opens a **Clip Detail Modal** for quick moderation:
+- Each row opens a **Reply Detail Modal** for quick moderation:
   - Video player
   - Name, social handle, transcript, timestamp, download link
   - Actions: **Approve**, **Reject**, **On Hold**
   - Tag editing
 - Sort by newest / oldest; filter by tag.
-- **See All** link navigates to the Clips page scoped to this topic.
+- **See All** link navigates to the Replies page scoped to this topic.
 
-### Clips Page
+### Replies Page
 
 A single, shared page used in two contexts:
 
 | Context | Behavior |
 |---|---|
-| From **Clipisode → Clips** submenu | Shows all clips across all topics. Topic column visible; topic filter dropdown available. |
+| From **Clipisode → Replies** submenu | Shows all replies across all topics. Topic column visible; topic filter dropdown available. |
 | From a Topic Detail **See All** link | Pre-filtered to that topic. Topic column hidden. |
 
 **Filters & sorting:**
@@ -112,9 +112,9 @@ A single, shared page used in two contexts:
 - Tag.
 - Sort: Newest / Oldest.
 
-**Row actions:** same Clip Detail Modal as on Topic Detail.
+**Row actions:** same Reply Detail Modal as on Topic Detail.
 
-**Bulk actions:** Approve, Reject, On Hold selected clips.
+**Bulk actions:** Approve, Reject, On Hold selected replies.
 
 ### Settings Page
 
@@ -143,7 +143,7 @@ A single, shared page used in two contexts:
 |---|---|
 | `wp_clipisode_topics` | `id`, `title`, `intro_video_id`, `hosted_by`, `brand_terms_id`, `custom_terms_id`, `status`, `created_at`, `updated_at` |
 | `wp_clipisode_invitation_links` | `id`, `topic_id`, `slug` (unique), `type`, `status`, `clicks`, `created_at` |
-| `wp_clipisode_clips` | `id`, `topic_id`, `invitation_link_id`, `name`, `video_url`, `transcript`, `social_handle`, `social_network`, `tag`, `status`, `email`, `brand_terms_id`, `brand_terms_revision_id`, `custom_terms_id`, `custom_terms_revision_id`, `created_at`, `updated_at` |
+| `wp_clipisode_replies` | `id`, `topic_id`, `invitation_link_id`, `name`, `video_url`, `transcript`, `social_handle`, `social_network`, `tag`, `status`, `email`, `brand_terms_id`, `brand_terms_revision_id`, `custom_terms_id`, `custom_terms_revision_id`, `created_at`, `updated_at` |
 | `wp_clipisode_outputs` | `id`, `topic_id` (nullable), `name`, `slug` (unique, auto-incremented on conflict), `attachment_id` (nullable), `created_at` |
 
 **Custom Post Types:**
@@ -165,14 +165,14 @@ All endpoints under `clipisode/v1`, requiring `manage_options` capability.
 | POST | `/topics` | Create a topic |
 | GET | `/topics/:id` | Get a single topic |
 | PUT | `/topics/:id` | Update a topic |
-| DELETE | `/topics/:id` | Delete a topic and its links/clips |
+| DELETE | `/topics/:id` | Delete a topic and its links/replies |
 | GET | `/topics/:topic_id/invitation-links` | List invitation links for a topic |
 | POST | `/topics/:topic_id/invitation-links` | Create an invitation link |
 | PUT | `/invitation-links/:id` | Update an invitation link |
 | DELETE | `/invitation-links/:id` | Delete an invitation link |
-| GET | `/clips` | List clips (filterable by topic_id, status, tag) |
-| GET | `/clips/:id` | Get a single clip |
-| PUT | `/clips/:id` | Update a clip (moderation, tags) |
+| GET | `/replies` | List replies (filterable by topic_id, status, tag) |
+| GET | `/replies/:id` | Get a single reply |
+| PUT | `/replies/:id` | Update a reply (moderation, tags) |
 | POST | `/videos/upload` | Upload a video file to media library |
 | POST | `/videos/sideload` | Import a video from URL to media library |
 | DELETE | `/videos/:id` | Delete a Clipisode-managed video attachment |
@@ -215,7 +215,7 @@ Terms links open a fullscreen modal with the terms content fetched via AJAX. Eac
 
 ### Rights & Consent
 - Brand terms always applied; custom terms optionally assigned per-topic.
-- Clips store `brand_terms_id`, `brand_terms_revision_id`, `custom_terms_id`, and `custom_terms_revision_id` to snapshot the exact terms content accepted at submission time.
+- Replies store `brand_terms_id`, `brand_terms_revision_id`, `custom_terms_id`, and `custom_terms_revision_id` to snapshot the exact terms content accepted at submission time.
 
 ### Transcription
 - Automatic transcription of submissions (Whisper or equivalent).
@@ -227,7 +227,7 @@ Terms links open a fullscreen modal with the terms content fetched via AJAX. Eac
 - CDN delivery for published videos.
 
 ### Publishing
-- Gutenberg blocks for embedding topics and individual clips on posts/pages.
+- Gutenberg blocks for embedding topics and individual replies on posts/pages.
 
 ---
 
@@ -235,20 +235,20 @@ Terms links open a fullscreen modal with the terms content fetched via AJAX. Eac
 
 - Cloud-based video compositing (currently local Mac app via WebSocket).
 - Cross-topic outputs / highlight reels (database supports it via nullable `topic_id`, UI not yet built).
-- Answer/star flows (sending curated clips to a host for on-camera answers).
+- Answer/star flows (sending curated replies to a host for on-camera answers).
 - Authentication for the muxing upload endpoint (currently open for POC).
 - Analytics dashboard.
 - White-label / multi-tenant.
 - Pricing and billing.
-- CSV export of clips.
+- CSV export of replies.
 
 ---
 
 ## Success Metrics
 
 - Time from plugin install to first topic live: **< 5 minutes**
-- Submission completion rate (start recording → clip received)
-- Clips collected per topic
+- Submission completion rate (start recording → reply received)
+- Replies collected per topic
 - Creator/brand retention (monthly active topics)
 
 ---

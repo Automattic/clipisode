@@ -2,7 +2,7 @@
 
 ## Overview
 
-The muxing system allows site owners to combine a topic's intro video and approved reply clips into a single "Clipisode" output video. The admin UI connects to a local Mac app via WebSocket, sends it the source video URLs, and receives real-time progress updates. The Mac app downloads the source files, muxes them, and POSTs the result back to a WordPress REST endpoint. Multiple outputs per topic are supported.
+The muxing system allows site owners to combine a topic's intro video and approved replies into a single "Clipisode" output video. The admin UI connects to a local Mac app via WebSocket, sends it the source video URLs, and receives real-time progress updates. The Mac app downloads the source files, muxes them, and POSTs the result back to a WordPress REST endpoint. Multiple outputs per topic are supported.
 
 ## Flow
 
@@ -70,7 +70,7 @@ Connection is initiated only when the user clicks "Generate Clipisode". The admi
 
 - `output_name`: `<topic-title-slug>-all.mp4` — used as the filename for the muxed video
 - `callback_url`: WP REST endpoint with the output row ID, where the Mac app POSTs the final video
-- `segments`: intro video first (if present), then approved clips in creation order
+- `segments`: intro video first (if present), then approved replies in creation order
 
 ## Database: `wp_clipisode_outputs`
 
@@ -78,7 +78,7 @@ Connection is initiated only when the user clicks "Generate Clipisode". The admi
 |---|---|---|
 | `id` | BIGINT UNSIGNED AUTO_INCREMENT | PK |
 | `topic_id` | BIGINT UNSIGNED NULLABLE | NULL for future cross-topic outputs (highlight reels) |
-| `name` | VARCHAR(255) | Display name, e.g. "All Clips", "Highlight Reel" |
+| `name` | VARCHAR(255) | Display name, e.g. "All Replies", "Highlight Reel" |
 | `slug` | VARCHAR(255) UNIQUE | URL/file-safe identifier, auto-incremented on conflict (highlight-reel, highlight-reel-1) |
 | `attachment_id` | BIGINT UNSIGNED NULLABLE | WP media library ID, NULL until muxing completes |
 | `created_at` | DATETIME | |
@@ -97,11 +97,11 @@ Outputs are also included in the topic response via `enrich_topic()` as `outputs
 
 ## Admin UI States
 
-The "Clipisode" section appears on the Topic Detail page below Clips.
+The "Clipisode" section appears on the Topic Detail page below Replies.
 
 | State | What's shown |
 |---|---|
-| **Idle** | Existing outputs (video player, download, delete each). "Generate Clipisode" button (disabled if no approved clips). Each generate creates a new output. |
+| **Idle** | Existing outputs (video player, download, delete each). "Generate Clipisode" button (disabled if no approved replies). Each generate creates a new output. |
 | **Connecting** | Spinner + "Connecting to muxing service..." |
 | **Processing** | Phase label, progress message, progress bar, cancel button |
 | **Done** | Video player with the uploaded URL + download + delete |

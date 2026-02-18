@@ -1,7 +1,7 @@
 import TopicList from './pages/TopicList';
 import TopicDetail from './pages/TopicDetail';
 import TopicForm from './pages/TopicForm';
-import ClipList from './pages/ClipList';
+import ReplyList from './pages/ReplyList';
 import ThemeList from './pages/ThemeList';
 import Settings from './pages/Settings';
 import useHashRoute from './hooks/useHashRoute';
@@ -10,10 +10,10 @@ export default function App() {
 	const page = window.clipisodeAdmin?.page || 'clipisode';
 	const { route, navigate } = useHashRoute();
 
-	if ( page === 'clipisode-clips' ) {
+	if ( page === 'clipisode-replies' ) {
 		const params = new URLSearchParams( window.location.search );
 		const topicId = params.get( 'topic_id' );
-		return <ClipList topicId={ topicId } />;
+		return <ReplyList topicId={ topicId } />;
 	}
 
 	if ( page === 'clipisode-themes' ) {

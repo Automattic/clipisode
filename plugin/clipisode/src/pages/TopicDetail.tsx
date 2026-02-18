@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
 import { Button, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
-import ClipModal from '../components/ClipModal';
-import type { Topic, InvitationLink, Clip, Output } from '../types';
+import ReplyModal from '../components/ReplyModal';
+import type { Topic, InvitationLink, Reply, Output } from '../types';
 
 interface TopicDetailProps {
 	id: string;
@@ -12,14 +12,14 @@ interface TopicDetailProps {
 export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const [ topic, setTopic ] = useState< Topic | null >( null );
 	const [ links, setLinks ] = useState< InvitationLink[] >( [] );
-	const [ clips, setClips ] = useState< Clip[] >( [] );
+	const [ replies, setReplies ] = useState< Reply[] >( [] );
 	const [ loading, setLoading ] = useState< boolean >( true );
 	const [ deleting, setDeleting ] = useState< boolean >( false );
 	const [ copiedId, setCopiedId ] = useState< number | null >( null );
 	const [ editingSlug, setEditingSlug ] = useState< Record< number, string > >( {} );
 	const [ slugError, setSlugError ] = useState< Record< number, string > >( {} );
 	const [ savingSlug, setSavingSlug ] = useState< Record< number, boolean > >( {} );
-	const [ selectedClip, setSelectedClip ] = useState< Clip | null >( null );
+	const [ selectedReply, setSelectedReply ] = useState< Reply | null >( null );
 
 	type MuxState = 'idle' | 'connecting' | 'processing' | 'done' | 'error';
 	const [ muxState, setMuxState ] = useState< MuxState >( 'idle' );
@@ -42,7 +42,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const startMuxing = async () => {
 		if ( ! topic ) return;
 
-		const approved = clips.filter( ( c ) => c.status === 'approved' );
+		const approved = replies.filter( ( r ) => r.status === 'approved' );
 		if ( approved.length === 0 ) return;
 
 		setMuxState( 'connecting' );
@@ -58,7 +58,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 			output = await apiFetch< Output >( {
 				path: '/clipisode/v1/outputs',
 				method: 'POST',
-				data: { topic_id: topic.id, name: 'All Clips' },
+				data: { topic_id: topic.id, name: 'All Replies' },
 			} );
 		} catch {
 			setMuxState( 'error' );
@@ -187,11 +187,11 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 		Promise.all( [
 			apiFetch< Topic >( { path: `/clipisode/v1/topics/${ id }` } ),
 			apiFetch< InvitationLink[] >( { path: `/clipisode/v1/topics/${ id }/invitation-links` } ),
-			apiFetch< Clip[] >( { path: `/clipisode/v1/clips?topic_id=${ id }` } ),
+			apiFetch< Reply[] >( { path: `/clipisode/v1/replies?topic_id=${ id }` } ),
 		] ).then( ( [ t, l, cl ] ) => {
 			setTopic( t );
 			setLinks( l );
-			setClips( cl );
+			setReplies( cl );
 		} ).finally( () => setLoading( false ) );
 	}, [ id ] );
 
@@ -252,7 +252,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	};
 
 	const deleteTopic = () => {
-		if ( ! window.confirm( 'Delete this topic and all its clips? This cannot be undone.' ) ) {
+		if ( ! window.confirm( 'Delete this topic and all its replies? This cannot be undone.' ) ) {
 			return;
 		}
 		setDeleting( true );
@@ -261,11 +261,11 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 			.finally( () => setDeleting( false ) );
 	};
 
-	const onClipUpdated = ( updatedClip: Clip ) => {
-		setClips( ( prev ) =>
-			prev.map( ( c ) => ( c.id === updatedClip.id ? updatedClip : c ) )
+	const onReplyUpdated = ( updatedReply: Reply ) => {
+		setReplies( ( prev ) =>
+			prev.map( ( r ) => ( r.id === updatedReply.id ? updatedReply : r ) )
 		);
-		setSelectedClip( null );
+		setSelectedReply( null );
 	};
 
 	if ( loading ) {
@@ -294,7 +294,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 					>
 						Edit
 					</Button>
-					{ Number( topic.clips_count ) === 0 && (
+					{ Number( topic.replies_count ) === 0 && (
 						<Button
 							variant="tertiary"
 							isDestructive
@@ -317,8 +317,8 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 								<span className="label">Clicks</span>
 							</div>
 							<div className="clipisode-stat">
-								<span className="value">{ Number( topic.clips_count ).toLocaleString() }</span>
-								<span className="label">Clips</span>
+								<span className="value">{ Number( topic.replies_count ).toLocaleString() }</span>
+								<span className="label">Replies</span>
 							</div>
 						</div>
 
@@ -385,7 +385,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 								<th>Link</th>
 								<th>Status</th>
 								<th>Clicks</th>
-								<th>Clips</th>
+								<th>Replies</th>
 								<th>Created</th>
 								<th></th>
 							</tr>
@@ -437,7 +437,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 										</span>
 									</td>
 									<td>{ Number( link.clicks ).toLocaleString() }</td>
-									<td>{ Number( link.clips_count ).toLocaleString() }</td>
+									<td>{ Number( link.replies_count ).toLocaleString() }</td>
 									<td>{ new Date( link.created_at ).toLocaleString() }</td>
 									<td className="clipisode-link-actions">
 										<Button
@@ -465,16 +465,16 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 
 			<div className="clipisode-section">
 				<h2>
-					Clips ({ clips.length })
+					Replies ({ replies.length })
 					<Button
 						variant="link"
-						href={ `admin.php?page=clipisode-clips&topic_id=${ id }` }
+						href={ `admin.php?page=clipisode-replies&topic_id=${ id }` }
 					>
 						See All
 					</Button>
 				</h2>
 
-				{ clips.length > 0 && (
+				{ replies.length > 0 && (
 					<table className="clipisode-table">
 						<thead>
 							<tr>
@@ -486,26 +486,26 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 							</tr>
 						</thead>
 						<tbody>
-							{ clips.slice( 0, 10 ).map( ( clip ) => (
+							{ replies.slice( 0, 10 ).map( ( reply ) => (
 								<tr
-									key={ clip.id }
+									key={ reply.id }
 									className="clickable"
-									onClick={ () => setSelectedClip( clip ) }
+									onClick={ () => setSelectedReply( reply ) }
 									style={ { cursor: 'pointer' } }
 								>
-									<td>{ clip.name }</td>
-									<td>{ clip.tag || '—' }</td>
+									<td>{ reply.name }</td>
+									<td>{ reply.tag || '—' }</td>
 									<td>
-										<span className={ `clipisode-status-badge ${ clip.status }` }>
-											{ clip.status.replace( '_', ' ' ) }
+										<span className={ `clipisode-status-badge ${ reply.status }` }>
+											{ reply.status.replace( '_', ' ' ) }
 										</span>
 									</td>
 									<td>
 										<div className="clipisode-transcript-preview">
-											{ clip.transcript || '—' }
+											{ reply.transcript || '—' }
 										</div>
 									</td>
-									<td>{ new Date( clip.created_at ).toLocaleDateString() }</td>
+									<td>{ new Date( reply.created_at ).toLocaleDateString() }</td>
 								</tr>
 							) ) }
 						</tbody>
@@ -569,7 +569,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 					<Button
 						variant="primary"
 						onClick={ startMuxing }
-						disabled={ clips.filter( ( c ) => c.status === 'approved' ).length === 0 }
+						disabled={ replies.filter( ( r ) => r.status === 'approved' ).length === 0 }
 					>
 						Generate Clipisode
 					</Button>
@@ -618,7 +618,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 											size="compact"
 											isDestructive
 											onClick={ () => {
-												deleteOutput( muxOutputId, 'All Clips' );
+												deleteOutput( muxOutputId, 'All Replies' );
 												setMuxState( 'idle' );
 											} }
 										>
@@ -647,11 +647,11 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 				) }
 			</div>
 
-			{ selectedClip && (
-				<ClipModal
-					clip={ selectedClip }
-					onClose={ () => setSelectedClip( null ) }
-					onUpdated={ onClipUpdated }
+			{ selectedReply && (
+				<ReplyModal
+					reply={ selectedReply }
+					onClose={ () => setSelectedReply( null ) }
+					onUpdated={ onReplyUpdated }
 				/>
 			) }
 		</>

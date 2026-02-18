@@ -174,7 +174,7 @@ export default function Settings(): JSX.Element {
 					</CardHeader>
 					<CardBody>
 						<p style={ { margin: 0, color: '#646970', fontSize: 13 } }>
-							Storage configuration coming soon. Clips currently use the WordPress media library.
+							Storage configuration coming soon. Replies currently use the WordPress media library.
 						</p>
 					</CardBody>
 				</Card>

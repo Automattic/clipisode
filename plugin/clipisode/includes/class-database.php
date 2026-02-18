@@ -58,7 +58,7 @@ UNIQUE KEY name (name)
 		);
 
 		dbDelta(
-			"CREATE TABLE {$wpdb->prefix}clipisode_clips (
+			"CREATE TABLE {$wpdb->prefix}clipisode_replies (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 topic_id BIGINT UNSIGNED NOT NULL,
 invitation_link_id BIGINT UNSIGNED,
@@ -150,9 +150,9 @@ KEY topic_id (topic_id)
 		$wpdb->insert( $links_table, [ 'topic_id' => $topic_1, 'slug' => 'fb1be3', 'status' => 'open', 'clicks' => 1092 ] );
 		$wpdb->insert( $links_table, [ 'topic_id' => $topic_2, 'slug' => 'x9k4m2', 'status' => 'open', 'clicks' => 87 ] );
 
-		$clips_table = $wpdb->prefix . 'clipisode_clips';
+		$replies_table = $wpdb->prefix . 'clipisode_replies';
 
-		$sample_clips = [
+		$sample_replies = [
 			[ 'topic_id' => $topic_1, 'invitation_link_id' => $link_1, 'name' => 'Ace Rice', 'transcript' => 'Mhm. Yeah. You\'re happy with your band on the road? No traveling with your team.', 'social_handle' => '@acerice', 'social_network' => 'instagram', 'tag' => 'funny', 'status' => 'approved', 'brand_terms_id' => $brand_terms_id, 'custom_terms_id' => $custom_terms_id ],
 			[ 'topic_id' => $topic_1, 'invitation_link_id' => $link_1, 'name' => 'Maria Santos', 'transcript' => 'I just wanted to say thank you for everything you do for the community.', 'social_handle' => '@mariasantos', 'social_network' => 'tiktok', 'status' => 'unapproved', 'brand_terms_id' => $brand_terms_id, 'custom_terms_id' => $custom_terms_id ],
 			[ 'topic_id' => $topic_1, 'invitation_link_id' => $link_1, 'name' => 'Jake Thompson', 'transcript' => 'Hey Peyton! Big fan here from Indiana. What\'s your favorite pre-game meal?', 'social_handle' => '@jakethompson', 'social_network' => 'x', 'tag' => 'question', 'status' => 'unapproved', 'brand_terms_id' => $brand_terms_id, 'custom_terms_id' => $custom_terms_id ],
@@ -161,8 +161,8 @@ KEY topic_id (topic_id)
 			[ 'topic_id' => $topic_2, 'invitation_link_id' => null, 'name' => 'Sarah Kim', 'transcript' => 'Check out our team\'s attempt. Nailed it on the third try!', 'social_handle' => '@sarahkim', 'social_network' => 'instagram', 'status' => 'rejected', 'brand_terms_id' => $brand_terms_id ],
 		];
 
-		foreach ( $sample_clips as $clip ) {
-			$wpdb->insert( $clips_table, $clip );
+		foreach ( $sample_replies as $reply ) {
+			$wpdb->insert( $replies_table, $reply );
 		}
 	}
 }

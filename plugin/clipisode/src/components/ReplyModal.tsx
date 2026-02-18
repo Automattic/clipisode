@@ -1,16 +1,16 @@
 import { useState, useRef, useEffect } from '@wordpress/element';
 import { Modal, Button, TextControl } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
-import type { Clip } from '../types';
+import type { Reply } from '../types';
 
-interface ClipModalProps {
-	clip: Clip;
+interface ReplyModalProps {
+	reply: Reply;
 	onClose: () => void;
-	onUpdated: ( clip: Clip ) => void;
+	onUpdated: ( reply: Reply ) => void;
 }
 
-export default function ClipModal( { clip, onClose, onUpdated }: ClipModalProps ) {
-	const [ tag, setTag ] = useState< string >( clip.tag || '' );
+export default function ReplyModal( { reply, onClose, onUpdated }: ReplyModalProps ) {
+	const [ tag, setTag ] = useState< string >( reply.tag || '' );
 	const [ saving, setSaving ] = useState< boolean >( false );
 	const videoRef = useRef< HTMLVideoElement >( null );
 
@@ -21,7 +21,7 @@ export default function ClipModal( { clip, onClose, onUpdated }: ClipModalProps 
 	const updateStatus = ( status: string ) => {
 		setSaving( true );
 		apiFetch( {
-			path: `/clipisode/v1/clips/${ clip.id }`,
+			path: `/clipisode/v1/replies/${ reply.id }`,
 			method: 'PUT',
 			data: { status, tag },
 		} )
@@ -30,13 +30,13 @@ export default function ClipModal( { clip, onClose, onUpdated }: ClipModalProps 
 	};
 
 	return (
-		<Modal title={ clip.name } onRequestClose={ onClose } size="large">
+		<Modal title={ reply.name } onRequestClose={ onClose } size="large">
 			<div className="clipisode-modal-body">
-				{ clip.video_url && (
+				{ reply.video_url && (
 					<div className="clipisode-modal-video">
 						<video
 							ref={ videoRef }
-							src={ clip.video_url }
+							src={ reply.video_url }
 							controls
 							playsInline
 						/>
@@ -47,39 +47,39 @@ export default function ClipModal( { clip, onClose, onUpdated }: ClipModalProps 
 				<dl className="clipisode-modal-meta">
 					<dt>Status</dt>
 					<dd>
-						<span className={ `clipisode-status-badge ${ clip.status }` }>
-							{ clip.status.replace( '_', ' ' ) }
+						<span className={ `clipisode-status-badge ${ reply.status }` }>
+							{ reply.status.replace( '_', ' ' ) }
 						</span>
 					</dd>
 
-					{ clip.social_handle && (
+					{ reply.social_handle && (
 						<>
 							<dt>Social</dt>
-							<dd>{ clip.social_handle } ({ clip.social_network })</dd>
+							<dd>{ reply.social_handle } ({ reply.social_network })</dd>
 						</>
 					) }
 
-					{ clip.email && (
+					{ reply.email && (
 						<>
 							<dt>Email</dt>
-							<dd>{ clip.email }</dd>
+							<dd>{ reply.email }</dd>
 						</>
 					) }
 
 					<dt>Created</dt>
-					<dd>{ new Date( clip.created_at ).toLocaleString() }</dd>
+					<dd>{ new Date( reply.created_at ).toLocaleString() }</dd>
 
-					{ clip.topic_title && (
+					{ reply.topic_title && (
 						<>
 							<dt>Topic</dt>
-							<dd>{ clip.topic_title }</dd>
+							<dd>{ reply.topic_title }</dd>
 						</>
 					) }
 				</dl>
 
-				{ clip.transcript && (
+				{ reply.transcript && (
 					<div className="clipisode-modal-transcript">
-						{ clip.transcript }
+						{ reply.transcript }
 					</div>
 				) }
 

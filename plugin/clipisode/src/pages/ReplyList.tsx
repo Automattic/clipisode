@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from '@wordpress/element';
 import { Button, SelectControl, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
-import ClipModal from '../components/ClipModal';
-import type { Clip, Topic } from '../types';
+import ReplyModal from '../components/ReplyModal';
+import type { Reply, Topic } from '../types';
 
 const STATUS_OPTIONS = [
 	{ label: 'All Statuses', value: '' },
@@ -17,21 +17,21 @@ const SORT_OPTIONS = [
 	{ label: 'Oldest', value: 'asc' },
 ];
 
-interface ClipListProps {
+interface ReplyListProps {
 	topicId?: string | null;
 }
 
-export default function ClipList( { topicId }: ClipListProps ) {
-	const [ clips, setClips ] = useState< Clip[] >( [] );
+export default function ReplyList( { topicId }: ReplyListProps ) {
+	const [ replies, setReplies ] = useState< Reply[] >( [] );
 	const [ topics, setTopics ] = useState< Topic[] >( [] );
 	const [ loading, setLoading ] = useState< boolean >( true );
 	const [ statusFilter, setStatusFilter ] = useState< string >( '' );
 	const [ topicFilter, setTopicFilter ] = useState< string >( topicId || '' );
 	const [ sortOrder, setSortOrder ] = useState< string >( 'desc' );
-	const [ selectedClip, setSelectedClip ] = useState< Clip | null >( null );
+	const [ selectedReply, setSelectedReply ] = useState< Reply | null >( null );
 	const [ selected, setSelected ] = useState< number[] >( [] );
 
-	const fetchClips = useCallback( () => {
+	const fetchReplies = useCallback( () => {
 		const params = new URLSearchParams();
 		if ( statusFilter ) {
 			params.set( 'status', statusFilter );
@@ -41,26 +41,26 @@ export default function ClipList( { topicId }: ClipListProps ) {
 		}
 		params.set( 'order', sortOrder );
 
-		apiFetch( { path: `/clipisode/v1/clips?${ params }` } )
-			.then( setClips )
+		apiFetch< Reply[] >( { path: `/clipisode/v1/replies?${ params }` } )
+			.then( setReplies )
 			.finally( () => setLoading( false ) );
 	}, [ statusFilter, topicFilter, sortOrder ] );
 
 	useEffect( () => {
-		fetchClips();
-	}, [ fetchClips ] );
+		fetchReplies();
+	}, [ fetchReplies ] );
 
 	useEffect( () => {
 		if ( ! topicId ) {
-			apiFetch( { path: '/clipisode/v1/topics' } ).then( setTopics );
+			apiFetch< Topic[] >( { path: '/clipisode/v1/topics' } ).then( setTopics );
 		}
 	}, [ topicId ] );
 
-	const onClipUpdated = ( updatedClip: Clip ) => {
-		setClips( ( prev ) =>
-			prev.map( ( c ) => ( c.id === updatedClip.id ? updatedClip : c ) )
+	const onReplyUpdated = ( updatedReply: Reply ) => {
+		setReplies( ( prev ) =>
+			prev.map( ( r ) => ( r.id === updatedReply.id ? updatedReply : r ) )
 		);
-		setSelectedClip( null );
+		setSelectedReply( null );
 	};
 
 	const bulkAction = ( status: string ) => {
@@ -68,35 +68,35 @@ export default function ClipList( { topicId }: ClipListProps ) {
 			return;
 		}
 		Promise.all(
-			selected.map( ( clipId ) =>
-				apiFetch( {
-					path: `/clipisode/v1/clips/${ clipId }`,
+			selected.map( ( replyId ) =>
+				apiFetch< Reply >( {
+					path: `/clipisode/v1/replies/${ replyId }`,
 					method: 'PUT',
 					data: { status },
 				} )
 			)
-		).then( ( updatedClips: Clip[] ) => {
-			setClips( ( prev ) =>
-				prev.map( ( c ) => {
-					const updated = updatedClips.find( ( u: Clip ) => u.id === c.id );
-					return updated || c;
+		).then( ( updatedReplies: Reply[] ) => {
+			setReplies( ( prev ) =>
+				prev.map( ( r ) => {
+					const updated = updatedReplies.find( ( u: Reply ) => u.id === r.id );
+					return updated || r;
 				} )
 			);
 			setSelected( [] );
 		} );
 	};
 
-	const toggleSelect = ( clipId: number ) => {
+	const toggleSelect = ( replyId: number ) => {
 		setSelected( ( prev ) =>
-			prev.includes( clipId )
-				? prev.filter( ( id ) => id !== clipId )
-				: [ ...prev, clipId ]
+			prev.includes( replyId )
+				? prev.filter( ( id ) => id !== replyId )
+				: [ ...prev, replyId ]
 		);
 	};
 
 	const toggleAll = () => {
 		setSelected( ( prev ) =>
-			prev.length === clips.length ? [] : clips.map( ( c ) => c.id )
+			prev.length === replies.length ? [] : replies.map( ( r ) => r.id )
 		);
 	};
 
@@ -117,7 +117,7 @@ export default function ClipList( { topicId }: ClipListProps ) {
 		<>
 			<div className="clipisode-page-header">
 				<h1>
-					Clips
+					Replies
 					{ topicId && (
 						<span style={ { fontWeight: 300, fontSize: 16, marginLeft: 8 } }>
 							(filtered by topic)
@@ -166,9 +166,9 @@ export default function ClipList( { topicId }: ClipListProps ) {
 				) }
 			</div>
 
-			{ clips.length === 0 ? (
+			{ replies.length === 0 ? (
 				<div className="clipisode-empty">
-					<p>No clips match the current filters.</p>
+					<p>No replies match the current filters.</p>
 				</div>
 			) : (
 				<table className="clipisode-table">
@@ -177,7 +177,7 @@ export default function ClipList( { topicId }: ClipListProps ) {
 							<th style={ { width: 32 } }>
 								<input
 									type="checkbox"
-									checked={ selected.length === clips.length }
+									checked={ selected.length === replies.length }
 									onChange={ toggleAll }
 								/>
 							</th>
@@ -190,45 +190,45 @@ export default function ClipList( { topicId }: ClipListProps ) {
 						</tr>
 					</thead>
 					<tbody>
-						{ clips.map( ( clip ) => (
-							<tr key={ clip.id }>
+						{ replies.map( ( reply ) => (
+							<tr key={ reply.id }>
 								<td>
 									<input
 										type="checkbox"
-										checked={ selected.includes( clip.id ) }
-										onChange={ () => toggleSelect( clip.id ) }
+										checked={ selected.includes( reply.id ) }
+										onChange={ () => toggleSelect( reply.id ) }
 									/>
 								</td>
 								<td
 									className="clickable"
-									onClick={ () => setSelectedClip( clip ) }
+									onClick={ () => setSelectedReply( reply ) }
 								>
-									{ clip.name }
+									{ reply.name }
 								</td>
-								{ ! topicId && <td>{ clip.topic_title || '—' }</td> }
-								<td>{ clip.tag || '—' }</td>
+								{ ! topicId && <td>{ reply.topic_title || '—' }</td> }
+								<td>{ reply.tag || '—' }</td>
 								<td>
-									<span className={ `clipisode-status-badge ${ clip.status }` }>
-										{ clip.status.replace( '_', ' ' ) }
+									<span className={ `clipisode-status-badge ${ reply.status }` }>
+										{ reply.status.replace( '_', ' ' ) }
 									</span>
 								</td>
 								<td>
 									<div className="clipisode-transcript-preview">
-										{ clip.transcript || '—' }
+										{ reply.transcript || '—' }
 									</div>
 								</td>
-								<td>{ new Date( clip.created_at ).toLocaleDateString() }</td>
+								<td>{ new Date( reply.created_at ).toLocaleDateString() }</td>
 							</tr>
 						) ) }
 					</tbody>
 				</table>
 			) }
 
-			{ selectedClip && (
-				<ClipModal
-					clip={ selectedClip }
-					onClose={ () => setSelectedClip( null ) }
-					onUpdated={ onClipUpdated }
+			{ selectedReply && (
+				<ReplyModal
+					reply={ selectedReply }
+					onClose={ () => setSelectedReply( null ) }
+					onUpdated={ onReplyUpdated }
 				/>
 			) }
 		</>

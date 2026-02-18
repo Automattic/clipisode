@@ -16,7 +16,7 @@ class Clipisode_Admin {
 		);
 
 		add_submenu_page( 'clipisode', 'Topics', 'Topics', 'manage_options', 'clipisode', [ $this, 'render_page' ] );
-		add_submenu_page( 'clipisode', 'Clips', 'Clips', 'manage_options', 'clipisode-clips', [ $this, 'render_page' ] );
+		add_submenu_page( 'clipisode', 'Replies', 'Replies', 'manage_options', 'clipisode-replies', [ $this, 'render_page' ] );
 		add_submenu_page( 'clipisode', 'Themes', 'Themes', 'manage_options', 'clipisode-themes', [ $this, 'render_page' ] );
 		add_submenu_page( 'clipisode', 'Settings', 'Settings', 'manage_options', 'clipisode-settings', [ $this, 'render_page' ] );
 

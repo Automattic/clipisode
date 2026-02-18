@@ -43,7 +43,7 @@ class Clipisode_Invitation {
 
 		register_rest_route( 'clipisode/v1', '/invitation/submit', [
 			'methods'             => 'POST',
-			'callback'            => [ $this, 'submit_clip' ],
+			'callback'            => [ $this, 'submit_reply' ],
 			'permission_callback' => '__return_true',
 		] );
 	}
@@ -111,7 +111,7 @@ class Clipisode_Invitation {
 		] );
 	}
 
-	public function submit_clip( WP_REST_Request $request ): WP_REST_Response {
+	public function submit_reply( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
 
 		$slug          = sanitize_text_field( $request->get_param( 'slug' ) );
@@ -163,7 +163,7 @@ class Clipisode_Invitation {
 			$custom_revision_id = $revisions ? array_key_first( $revisions ) : null;
 		}
 
-		$wpdb->insert( $wpdb->prefix . 'clipisode_clips', [
+		$wpdb->insert( $wpdb->prefix . 'clipisode_replies', [
 			'topic_id'                 => $topic->id,
 			'invitation_link_id'       => $link->id,
 			'name'                     => $name,
@@ -177,7 +177,7 @@ class Clipisode_Invitation {
 			'custom_terms_revision_id' => $custom_revision_id,
 		] );
 
-		return new WP_REST_Response( [ 'ok' => true, 'clip_id' => $wpdb->insert_id ] );
+		return new WP_REST_Response( [ 'ok' => true, 'reply_id' => $wpdb->insert_id ] );
 	}
 
 	public static function flush_rewrites(): void {

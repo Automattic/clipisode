@@ -14,7 +14,7 @@ export interface Topic {
 	invitation_title: string | null;
 	invitation_edit_url: string | null;
 	status: string;
-	clips_count: number;
+	replies_count: number;
 	links_count: number;
 	clicks: number;
 	outputs: Output[];
@@ -52,11 +52,11 @@ export interface InvitationLink {
 	type: string;
 	status: string;
 	clicks: number;
-	clips_count: number;
+	replies_count: number;
 	created_at: string;
 }
 
-export interface Clip {
+export interface Reply {
 	id: number;
 	topic_id: number;
 	invitation_link_id: number | null;
