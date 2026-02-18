@@ -120,15 +120,6 @@ class Clipisode_Post_Types {
 	}
 
 	public static function ensure_default_invitation(): int {
-		$existing = self::get_default_invitation_id();
-		if ( $existing ) {
-			$post = get_post( $existing );
-			if ( $post && str_contains( $post->post_content, 'wp:clipisode/invitation-flow' ) ) {
-				return $existing;
-			}
-			wp_delete_post( $existing, true );
-		}
-
 		$content = <<<'BLOCKS'
 <!-- wp:clipisode/invitation-flow {"slug":""} -->
 <!-- wp:clipisode/invitation-desktop -->
@@ -155,6 +146,19 @@ class Clipisode_Post_Types {
 <!-- /wp:clipisode/invitation-thanks -->
 <!-- /wp:clipisode/invitation-flow -->
 BLOCKS;
+
+		$existing = self::get_default_invitation_id();
+		if ( $existing ) {
+			$post = get_post( $existing );
+			if ( $post && str_contains( $post->post_content, 'wp:clipisode/invitation-flow' ) ) {
+				return $existing;
+			}
+			wp_update_post( [
+				'ID'           => $existing,
+				'post_content' => $content,
+			] );
+			return $existing;
+		}
 
 		$post_id = wp_insert_post( [
 			'post_type'    => 'clipisode_invite',
