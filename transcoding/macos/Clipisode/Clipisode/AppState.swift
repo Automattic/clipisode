@@ -7,6 +7,11 @@ import Foundation
 import SwiftUI
 import Observation
 
+/// Shared reference so the app delegate can run the launch render.
+enum AppStateHolder {
+    static weak var shared: AppState?
+}
+
 @Observable
 @MainActor
 final class AppState {
@@ -47,6 +52,47 @@ final class AppState {
         
         // Run cleanup
         CleanupManager.runOnLaunch()
+    }
+    
+    // MARK: - Local Job
+    
+    /// Combine local video files and write the result to a specified output URL.
+    /// Each input is used in full (no trimming). Progress is reflected in `isWorking`.
+    func runLocalJob(inputs: [URL], output: URL) {
+        guard !isWorking else { return }
+        isWorking = true
+        
+        Task {
+            do {
+                let jobId = UUID().uuidString
+                let jobFolder = FileLocations.jobFolder(jobId)
+                let tempFolder = FileLocations.tempFolder(jobId)
+                try FileManager.default.createDirectory(at: jobFolder, withIntermediateDirectories: true)
+                try FileManager.default.createDirectory(at: tempFolder, withIntermediateDirectories: true)
+                
+                // Trim / normalise each input (no start/end = full clip)
+                var segmentFiles: [URL] = []
+                for (index, input) in inputs.enumerated() {
+                    let segmentFile = tempFolder.appendingPathComponent(
+                        "segment_\(String(format: "%02d", index + 1)).mp4"
+                    )
+                    try await FFmpegRunner.trim(input: input, start: nil, end: nil, output: segmentFile)
+                    segmentFiles.append(segmentFile)
+                }
+                
+                // Compose segments with crossfade transitions
+                try await CompositionExporter.export(segments: segmentFiles, to: output)
+                
+                // Tidy up scratch files
+                try? FileManager.default.removeItem(at: tempFolder)
+                
+                print("✅ Local job complete: \(output.path)")
+            } catch {
+                print("❌ Local job failed: \(error.localizedDescription)")
+            }
+            
+            isWorking = false
+        }
     }
     
     private func setupServers() {
