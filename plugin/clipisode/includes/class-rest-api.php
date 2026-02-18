@@ -496,7 +496,7 @@ class Clipisode_REST_API {
 			"SELECT intro_video_id FROM {$wpdb->prefix}clipisode_topics WHERE id = %d",
 			$id
 		) );
-		if ( $video_id ) {
+		if ( $video_id && get_post_meta( $video_id, Clipisode_Media::META_KEY, true ) ) {
 			wp_delete_attachment( $video_id, true );
 		}
 
@@ -505,7 +505,9 @@ class Clipisode_REST_API {
 			$id
 		) );
 		foreach ( $output_attachments as $att_id ) {
-			wp_delete_attachment( (int) $att_id, true );
+			if ( get_post_meta( (int) $att_id, Clipisode_Media::META_KEY, true ) ) {
+				wp_delete_attachment( (int) $att_id, true );
+			}
 		}
 
 		$wpdb->delete( $wpdb->prefix . 'clipisode_outputs', [ 'topic_id' => $id ] );
