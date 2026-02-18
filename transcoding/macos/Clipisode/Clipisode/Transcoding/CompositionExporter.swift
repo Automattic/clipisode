@@ -17,6 +17,7 @@ enum CompositionExporter {
     static func export(
         segments: [URL],
         names: [String] = [],
+        overlays: [[CALayer]] = [],
         to output: URL,
         transitionDuration: TimeInterval = 1.0
     ) async throws {
@@ -126,9 +127,12 @@ enum CompositionExporter {
         videoComposition.renderSize = renderSize
         videoComposition.instructions = instructions
 
-        // MARK: Name overlay (CoreAnimation)
+        // MARK: Overlays (CoreAnimation)
 
-        if names.count == placements.count {
+        let hasNames = names.count == placements.count
+        let hasOverlays = overlays.count == placements.count
+
+        if hasNames || hasOverlays {
             let totalSeconds = CMTimeGetSeconds(placements.last!.end)
 
             let parentLayer = CALayer()
@@ -143,14 +147,26 @@ enum CompositionExporter {
             overlayLayer.frame = parentLayer.bounds
             parentLayer.addSublayer(overlayLayer)
 
-            for (i, placement) in placements.enumerated() {
-                let badge = buildNameBadge(
-                    name: names[i],
-                    placementStart: CMTimeGetSeconds(placement.start),
-                    placementEnd: CMTimeGetSeconds(placement.end),
-                    totalDuration: totalSeconds
-                )
-                overlayLayer.addSublayer(badge)
+            // Per-segment effect overlays (glow rings, particles, etc.)
+            if hasOverlays {
+                for (i, layers) in overlays.enumerated() where i < placements.count {
+                    for layer in layers {
+                        overlayLayer.addSublayer(layer)
+                    }
+                }
+            }
+
+            // Name badges (rendered on top of effect overlays)
+            if hasNames {
+                for (i, placement) in placements.enumerated() {
+                    let badge = buildNameBadge(
+                        name: names[i],
+                        placementStart: CMTimeGetSeconds(placement.start),
+                        placementEnd: CMTimeGetSeconds(placement.end),
+                        totalDuration: totalSeconds
+                    )
+                    overlayLayer.addSublayer(badge)
+                }
             }
 
             videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(

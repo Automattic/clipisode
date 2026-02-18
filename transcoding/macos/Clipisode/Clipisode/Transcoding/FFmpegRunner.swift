@@ -15,7 +15,7 @@ enum FFmpegRunner {
     /// - Parameters:
     ///   - start: Start time in seconds, or nil for beginning
     ///   - end: End time in seconds, or nil for end of file
-    static func trim(input: URL, start: Double?, end: Double?, output: URL) async throws {
+    static func trim(input: URL, start: Double?, end: Double?, extraFilters: String? = nil, output: URL) async throws {
         guard let ffmpeg = binaryPath else {
             throw JobError.ffmpegFailed("ffmpeg binary not found in app bundle")
         }
@@ -43,7 +43,13 @@ enum FFmpegRunner {
         // Normalize all segments to same specs for reliable concatenation
         args += [
             // Video: scale to 720×1280 portrait, pad for aspect ratio, normalize to 30fps
-            "-vf", "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,fps=30",
+            "-vf", {
+                var chain = "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,fps=30"
+                if let extra = extraFilters {
+                    chain += "," + extra
+                }
+                return chain
+            }(),
             "-r", "30",
             "-c:v", "libx264",
             "-preset", "fast",
