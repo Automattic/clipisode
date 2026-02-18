@@ -35,40 +35,42 @@ function initFlow( root: HTMLElement ): void {
 		} );
 	} );
 
-	// Terms modal (shared).
-	const termsModal = root.querySelector< HTMLElement >( '.ci-terms-modal' );
-	const termsContent = root.querySelector< HTMLElement >( '.ci-terms-content' );
-	const termsClose = root.querySelector< HTMLElement >( '.ci-terms-close' );
+	// Terms modals — each terms element has its own modal.
+	root.querySelectorAll< HTMLElement >( '.ci-el-terms' ).forEach( ( termsEl ) => {
+		const modal = termsEl.querySelector< HTMLElement >( '.ci-terms-modal' );
+		const content = termsEl.querySelector< HTMLElement >( '.ci-terms-content' );
+		const close = termsEl.querySelector< HTMLElement >( '.ci-terms-close' );
 
-	root.querySelectorAll< HTMLAnchorElement >( '.ci-terms-open' ).forEach( ( link ) => {
-		link.addEventListener( 'click', async ( e ) => {
-			e.preventDefault();
-			if ( ! termsModal || ! termsContent ) return;
+		termsEl.querySelectorAll< HTMLAnchorElement >( '.ci-terms-open' ).forEach( ( link ) => {
+			link.addEventListener( 'click', async ( e ) => {
+				e.preventDefault();
+				if ( ! modal || ! content ) return;
 
-			const url = link.dataset.termsUrl;
-			if ( ! url ) return;
+				const url = link.dataset.termsUrl;
+				if ( ! url ) return;
 
-			termsContent.innerHTML = '<p style="opacity:0.5">Loading…</p>';
-			termsModal.hidden = false;
+				content.innerHTML = '<p style="opacity:0.5">Loading…</p>';
+				modal.hidden = false;
 
-			try {
-				const res = await fetch( url );
-				const html = await res.text();
-				const doc = new DOMParser().parseFromString( html, 'text/html' );
-				const body = doc.querySelector( '.entry-content' )
-					|| doc.querySelector( 'article' )
-					|| doc.querySelector( '.post-content' )
-					|| doc.querySelector( 'main' )
-					|| doc.body;
-				termsContent.innerHTML = body?.innerHTML || html;
-			} catch {
-				termsContent.innerHTML = '<p>Could not load terms. Please try again.</p>';
-			}
+				try {
+					const res = await fetch( url );
+					const html = await res.text();
+					const doc = new DOMParser().parseFromString( html, 'text/html' );
+					const body = doc.querySelector( '.entry-content' )
+						|| doc.querySelector( 'article' )
+						|| doc.querySelector( '.post-content' )
+						|| doc.querySelector( 'main' )
+						|| doc.body;
+					content.innerHTML = body?.innerHTML || html;
+				} catch {
+					content.innerHTML = '<p>Could not load terms. Please try again.</p>';
+				}
+			} );
 		} );
-	} );
 
-	termsClose?.addEventListener( 'click', () => {
-		if ( termsModal ) termsModal.hidden = true;
+		close?.addEventListener( 'click', () => {
+			if ( modal ) modal.hidden = true;
+		} );
 	} );
 
 	// Desktop: add class (CSS handles visibility), render QR code.
@@ -100,6 +102,7 @@ function initFlow( root: HTMLElement ): void {
 		e.preventDefault();
 
 		const step = btn.dataset.goto!;
+		root.querySelectorAll< HTMLVideoElement >( 'video' ).forEach( ( v ) => v.pause() );
 		showStep( step );
 
 		if ( step === 'record' ) {
@@ -138,7 +141,7 @@ function initFlow( root: HTMLElement ): void {
 		if ( ! file ) return;
 
 		if ( chooseBtn ) chooseBtn.style.display = 'none';
-		if ( formSection ) formSection.style.display = '';
+		if ( formSection ) formSection.style.display = 'block';
 
 		startUpload( file );
 	} );
