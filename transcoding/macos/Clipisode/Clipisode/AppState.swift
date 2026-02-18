@@ -6,7 +6,6 @@
 import Foundation
 import SwiftUI
 import Observation
-import AVFoundation
 
 /// Shared reference so the app delegate can run the launch render.
 enum AppStateHolder {
@@ -71,78 +70,32 @@ final class AppState {
                 try FileManager.default.createDirectory(at: jobFolder, withIntermediateDirectories: true)
                 try FileManager.default.createDirectory(at: tempFolder, withIntermediateDirectories: true)
                 
-                // Trim / normalise each input with per-segment effects
-                let renderSize = CGSize(width: 720, height: 1280)
+                // Trim / normalise each input with per-segment FFmpeg effects
                 var segmentFiles: [URL] = []
                 for (index, input) in inputs.enumerated() {
                     let segmentFile = tempFolder.appendingPathComponent(
                         "segment_\(String(format: "%02d", index + 1)).mp4"
                     )
-                    // Video 2 (index 1): chromatic aberration + cinematic grade
-                    let extraFilters: String? = (index == 1)
+                    let extraFilters: String? = (index == 0)
                         ? "rgbashift=rh=-3:rv=2:bh=3:bv=-2,eq=contrast=1.15:brightness=0.02:saturation=1.3,vignette=PI/4"
                         : nil
                     try await FFmpegRunner.trim(input: input, start: nil, end: nil, extraFilters: extraFilters, output: segmentFile)
                     segmentFiles.append(segmentFile)
                 }
                 
-                // Video 1 (index 0): detect face for glow ring overlay
-                let faceRect = await FaceDetector.detectFace(in: segmentFiles[0], renderSize: renderSize)
+                // Declare per-segment compositor effects (face tracking, particles, etc.)
+                // The custom VideoCompositor handles these per-frame during export.
+                var effects: [Set<SegmentEffect>] = Array(repeating: [], count: segmentFiles.count)
+                if segmentFiles.count > 1 { effects[1] = [.faceTracking] }
+                if segmentFiles.count > 2 { effects[2] = [.particles] }
                 
-                // Build per-segment overlay layers using placeholder durations
-                // (actual timing is resolved by CompositionExporter from the segment durations)
-                // We need segment durations to calculate placement times for overlay animations.
-                var durations: [Double] = []
-                for url in segmentFiles {
-                    let asset = AVURLAsset(url: url)
-                    let dur = try await asset.load(.duration)
-                    durations.append(CMTimeGetSeconds(dur))
-                }
+                try await CompositionExporter.export(
+                    segments: segmentFiles,
+                    names: names,
+                    effects: effects,
+                    to: output
+                )
                 
-                let transitionDur = 1.0
-                var placementStarts: [Double] = []
-                var insertTime = 0.0
-                for (i, dur) in durations.enumerated() {
-                    placementStarts.append(insertTime)
-                    if i < durations.count - 1 {
-                        insertTime += dur - transitionDur
-                    }
-                }
-                let totalDuration = insertTime + durations.last!
-                
-                var overlays: [[CALayer]] = []
-                for i in 0..<segmentFiles.count {
-                    let pStart = placementStarts[i]
-                    let pEnd = pStart + durations[i]
-                    
-                    var layers: [CALayer] = []
-                    
-                    if i == 0, let face = faceRect {
-                        layers.append(OverlayBuilder.buildGlowRing(
-                            faceRect: face,
-                            renderSize: renderSize,
-                            placementStart: pStart,
-                            placementEnd: pEnd,
-                            totalDuration: totalDuration
-                        ))
-                    }
-                    
-                    if i == 2 {
-                        layers.append(OverlayBuilder.buildParticleOverlay(
-                            renderSize: renderSize,
-                            placementStart: pStart,
-                            placementEnd: pEnd,
-                            totalDuration: totalDuration
-                        ))
-                    }
-                    
-                    overlays.append(layers)
-                }
-                
-                // Compose segments with crossfade transitions, name overlays, and effects
-                try await CompositionExporter.export(segments: segmentFiles, names: names, overlays: overlays, to: output)
-                
-                // Tidy up scratch files
                 try? FileManager.default.removeItem(at: tempFolder)
                 
                 print("✅ Local job complete: \(output.path)")

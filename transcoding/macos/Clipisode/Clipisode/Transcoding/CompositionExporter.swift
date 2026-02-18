@@ -4,26 +4,26 @@
 //
 
 import AVFoundation
-import AppKit
-import QuartzCore
 
 enum CompositionExporter {
 
     private static let renderSize = CGSize(width: 720, height: 1280)
 
-    /// Joins normalized segments with ~1 s crossfade + zoom transitions and exports to `output`.
-    /// If `names` is provided and matches the segment count, a blue gradient lower-third with each
-    /// person's name is composited over the corresponding clip, fading in and out.
+    /// Joins normalized segments with crossfade + zoom transitions, per-segment
+    /// effects, and name badges — all rendered per-frame by `VideoCompositor`.
     static func export(
         segments: [URL],
         names: [String] = [],
-        overlays: [[CALayer]] = [],
+        effects: [Set<SegmentEffect>] = [],
         to output: URL,
         transitionDuration: TimeInterval = 1.0
     ) async throws {
         guard !segments.isEmpty else { return }
 
-        if segments.count == 1 {
+        let hasEffects = effects.contains { !$0.isEmpty }
+        let hasNames = !names.isEmpty
+
+        if segments.count == 1 && !hasEffects && !hasNames {
             try FileManager.default.copyItem(at: segments[0], to: output)
             return
         }
@@ -31,21 +31,34 @@ enum CompositionExporter {
         let transDur = CMTime(seconds: transitionDuration, preferredTimescale: 600)
         let composition = AVMutableComposition()
 
-        guard let videoTrackA = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
-              let videoTrackB = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
-              let audioTrackA = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid),
-              let audioTrackB = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
+        // One video track per segment (the custom compositor composites them).
+        var videoTracks: [AVMutableCompositionTrack] = []
+        for _ in segments {
+            guard let track = composition.addMutableTrack(
+                withMediaType: .video,
+                preferredTrackID: kCMPersistentTrackID_Invalid
+            ) else {
+                throw ExportError.compositionSetupFailed
+            }
+            videoTracks.append(track)
+        }
+
+        // Audio on alternating A/B tracks so overlapping segments don't collide.
+        guard let audioTrackA = composition.addMutableTrack(
+                  withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid),
+              let audioTrackB = composition.addMutableTrack(
+                  withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
         else {
             throw ExportError.compositionSetupFailed
         }
-
-        let videoTracks = [videoTrackA, videoTrackB]
         let audioTracks = [audioTrackA, audioTrackB]
 
-        // MARK: Insert segments onto alternating tracks with overlap
+        // MARK: Insert segments
 
         struct Placement {
-            let trackIndex: Int
+            let segmentIndex: Int
+            let videoTrackID: CMPersistentTrackID
+            let audioTrackIndex: Int
             let start: CMTime
             let duration: CMTime
             var end: CMTime { CMTimeAdd(start, duration) }
@@ -57,123 +70,90 @@ enum CompositionExporter {
         for (index, url) in segments.enumerated() {
             let asset = AVURLAsset(url: url)
             let duration = try await asset.load(.duration)
-            let trackIdx = index % 2
 
             guard let videoAssetTrack = try await asset.loadTracks(withMediaType: .video).first else {
                 throw ExportError.missingVideoTrack(url.lastPathComponent)
             }
 
             let range = CMTimeRange(start: .zero, duration: duration)
-            try videoTracks[trackIdx].insertTimeRange(range, of: videoAssetTrack, at: insertionTime)
+            try videoTracks[index].insertTimeRange(range, of: videoAssetTrack, at: insertionTime)
 
+            let audioIdx = index % 2
             if let audioAssetTrack = try? await asset.loadTracks(withMediaType: .audio).first {
-                try audioTracks[trackIdx].insertTimeRange(range, of: audioAssetTrack, at: insertionTime)
+                try audioTracks[audioIdx].insertTimeRange(range, of: audioAssetTrack, at: insertionTime)
             }
 
-            placements.append(Placement(trackIndex: trackIdx, start: insertionTime, duration: duration))
+            placements.append(Placement(
+                segmentIndex: index,
+                videoTrackID: videoTracks[index].trackID,
+                audioTrackIndex: audioIdx,
+                start: insertionTime,
+                duration: duration
+            ))
 
             if index < segments.count - 1 {
                 insertionTime = CMTimeAdd(insertionTime, CMTimeSubtract(duration, transDur))
             }
         }
 
+        let totalDuration = placements.last!.end
+
+        // MARK: Build segment metadata for the compositor
+
+        let segmentInfos: [CompositionInstruction.Segment] = placements.map { p in
+            CompositionInstruction.Segment(
+                trackID: p.videoTrackID,
+                timeRange: CMTimeRange(start: p.start, duration: p.duration),
+                name: names.indices.contains(p.segmentIndex) ? names[p.segmentIndex] : nil,
+                effects: effects.indices.contains(p.segmentIndex) ? effects[p.segmentIndex] : []
+            )
+        }
+
         // MARK: Build video composition instructions
 
-        var instructions: [AVMutableVideoCompositionInstruction] = []
+        // Create per-phase instructions so `requiredSourceTrackIDs` only lists
+        // the tracks that actually have content at each point in time.
+        var instructions: [CompositionInstruction] = []
 
         for i in 0..<placements.count {
             let p = placements[i]
 
+            // Solo portion (between transitions)
             let soloStart = (i == 0) ? p.start : CMTimeAdd(p.start, transDur)
             let soloEnd = (i == placements.count - 1) ? p.end : CMTimeSubtract(p.end, transDur)
 
             if CMTimeCompare(soloEnd, soloStart) > 0 {
-                let inst = AVMutableVideoCompositionInstruction()
-                inst.timeRange = CMTimeRange(start: soloStart, end: soloEnd)
-                let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTracks[p.trackIndex])
-                inst.layerInstructions = [layer]
-                instructions.append(inst)
+                instructions.append(CompositionInstruction(
+                    timeRange: CMTimeRange(start: soloStart, end: soloEnd),
+                    segments: segmentInfos,
+                    transitionDuration: transDur,
+                    renderSize: renderSize,
+                    requiredTrackIDs: [p.videoTrackID]
+                ))
             }
 
+            // Transition overlap with the next segment
             if i < placements.count - 1 {
                 let nextP = placements[i + 1]
                 let transStart = CMTimeSubtract(p.end, transDur)
-                let transRange = CMTimeRange(start: transStart, duration: transDur)
 
-                let inst = AVMutableVideoCompositionInstruction()
-                inst.timeRange = transRange
-
-                let toLayer = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTracks[nextP.trackIndex])
-                toLayer.setOpacityRamp(fromStartOpacity: 0, toEndOpacity: 1, timeRange: transRange)
-
-                let fromLayer = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTracks[p.trackIndex])
-                let endScale: CGFloat = 1.08
-                let cx = renderSize.width / 2
-                let cy = renderSize.height / 2
-                let endTransform = CGAffineTransform(translationX: -cx, y: -cy)
-                    .scaledBy(x: endScale, y: endScale)
-                    .translatedBy(x: cx, y: cy)
-                fromLayer.setTransformRamp(fromStart: .identity, toEnd: endTransform, timeRange: transRange)
-
-                inst.layerInstructions = [toLayer, fromLayer]
-                instructions.append(inst)
+                instructions.append(CompositionInstruction(
+                    timeRange: CMTimeRange(start: transStart, duration: transDur),
+                    segments: segmentInfos,
+                    transitionDuration: transDur,
+                    renderSize: renderSize,
+                    requiredTrackIDs: [p.videoTrackID, nextP.videoTrackID]
+                ))
             }
         }
 
         instructions.sort { CMTimeCompare($0.timeRange.start, $1.timeRange.start) < 0 }
 
         let videoComposition = AVMutableVideoComposition()
+        videoComposition.customVideoCompositorClass = VideoCompositor.self
         videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
         videoComposition.renderSize = renderSize
         videoComposition.instructions = instructions
-
-        // MARK: Overlays (CoreAnimation)
-
-        let hasNames = names.count == placements.count
-        let hasOverlays = overlays.count == placements.count
-
-        if hasNames || hasOverlays {
-            let totalSeconds = CMTimeGetSeconds(placements.last!.end)
-
-            let parentLayer = CALayer()
-            parentLayer.frame = CGRect(origin: .zero, size: renderSize)
-            parentLayer.isGeometryFlipped = true
-
-            let videoLayer = CALayer()
-            videoLayer.frame = parentLayer.bounds
-            parentLayer.addSublayer(videoLayer)
-
-            let overlayLayer = CALayer()
-            overlayLayer.frame = parentLayer.bounds
-            parentLayer.addSublayer(overlayLayer)
-
-            // Per-segment effect overlays (glow rings, particles, etc.)
-            if hasOverlays {
-                for (i, layers) in overlays.enumerated() where i < placements.count {
-                    for layer in layers {
-                        overlayLayer.addSublayer(layer)
-                    }
-                }
-            }
-
-            // Name badges (rendered on top of effect overlays)
-            if hasNames {
-                for (i, placement) in placements.enumerated() {
-                    let badge = buildNameBadge(
-                        name: names[i],
-                        placementStart: CMTimeGetSeconds(placement.start),
-                        placementEnd: CMTimeGetSeconds(placement.end),
-                        totalDuration: totalSeconds
-                    )
-                    overlayLayer.addSublayer(badge)
-                }
-            }
-
-            videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(
-                postProcessingAsVideoLayer: videoLayer,
-                in: parentLayer
-            )
-        }
 
         // MARK: Audio crossfade
 
@@ -183,7 +163,7 @@ enum CompositionExporter {
         for trackIdx in 0...1 {
             let params = AVMutableAudioMixInputParameters(track: audioTracks[trackIdx])
 
-            for i in 0..<placements.count where placements[i].trackIndex == trackIdx {
+            for i in 0..<placements.count where placements[i].audioTrackIndex == trackIdx {
                 let p = placements[i]
 
                 if i > 0 {
@@ -207,7 +187,10 @@ enum CompositionExporter {
 
         try? FileManager.default.removeItem(at: output)
 
-        guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+        guard let session = AVAssetExportSession(
+            asset: composition,
+            presetName: AVAssetExportPresetHighestQuality
+        ) else {
             throw ExportError.exportSessionCreationFailed
         }
 
@@ -226,113 +209,6 @@ enum CompositionExporter {
         default:
             throw session.error ?? ExportError.unknownExportFailure
         }
-    }
-
-    // MARK: - Name Badge Builder
-
-    private static func buildNameBadge(
-        name: String,
-        placementStart: Double,
-        placementEnd: Double,
-        totalDuration: Double
-    ) -> CALayer {
-        let badgeHeight: CGFloat = 120
-        let fadeDuration: TimeInterval = 0.5
-        let delayAfterStart: TimeInterval = 0.8
-        let delayBeforeEnd: TimeInterval = 0.8
-
-        let badge = CALayer()
-        badge.frame = CGRect(x: 0, y: renderSize.height - badgeHeight, width: renderSize.width, height: badgeHeight)
-        badge.opacity = 0
-
-        // Blue gradient background: transparent at top → deep blue at bottom
-        let gradient = CAGradientLayer()
-        gradient.frame = badge.bounds
-        gradient.colors = [
-            CGColor(srgbRed: 0, green: 0.12, blue: 0.35, alpha: 0),
-            CGColor(srgbRed: 0, green: 0.12, blue: 0.35, alpha: 0.88),
-        ]
-        gradient.startPoint = CGPoint(x: 0.5, y: 0)
-        gradient.endPoint = CGPoint(x: 0.5, y: 1)
-        badge.addSublayer(gradient)
-
-        // Render name text into an image (CATextLayer doesn't render in offline export)
-        let textImage = renderTextImage(
-            name,
-            size: CGSize(width: renderSize.width - 72, height: 48),
-            font: NSFont.systemFont(ofSize: 32, weight: .medium),
-            color: .white
-        )
-        let textLayer = CALayer()
-        textLayer.frame = CGRect(x: 36, y: 40, width: renderSize.width - 72, height: 48)
-        textLayer.contents = textImage
-        textLayer.contentsGravity = .left
-        badge.addSublayer(textLayer)
-
-        // Keyframe opacity animation: hidden → fade in → visible → fade out → hidden
-        let fadeInStart = placementStart + delayAfterStart
-        let fadeInEnd = fadeInStart + fadeDuration
-        let fadeOutStart = placementEnd - delayBeforeEnd - fadeDuration
-        let fadeOutEnd = fadeOutStart + fadeDuration
-
-        let anim = CAKeyframeAnimation(keyPath: "opacity")
-        anim.beginTime = AVCoreAnimationBeginTimeAtZero
-        anim.duration = totalDuration
-        anim.isRemovedOnCompletion = false
-        anim.fillMode = .forwards
-        anim.calculationMode = .linear
-
-        anim.keyTimes = [
-            0,
-            NSNumber(value: max(fadeInStart, 0) / totalDuration),
-            NSNumber(value: fadeInEnd / totalDuration),
-            NSNumber(value: max(fadeOutStart, fadeInEnd) / totalDuration),
-            NSNumber(value: min(fadeOutEnd, totalDuration) / totalDuration),
-            1,
-        ]
-        anim.values = [0, 0, 1, 1, 0, 0] as [NSNumber]
-
-        badge.add(anim, forKey: "opacity")
-
-        return badge
-    }
-
-    private static func renderTextImage(
-        _ text: String,
-        size: CGSize,
-        font: NSFont,
-        color: NSColor
-    ) -> CGImage? {
-        let scale: CGFloat = 2
-        let pixelWidth = Int(size.width * scale)
-        let pixelHeight = Int(size.height * scale)
-
-        guard let context = CGContext(
-            data: nil,
-            width: pixelWidth,
-            height: pixelHeight,
-            bitsPerComponent: 8,
-            bytesPerRow: 0,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
-        ) else { return nil }
-
-        context.scaleBy(x: scale, y: scale)
-
-        let gc = NSGraphicsContext(cgContext: context, flipped: false)
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = gc
-
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: color,
-        ]
-        let attrStr = NSAttributedString(string: text, attributes: attrs)
-        attrStr.draw(in: CGRect(origin: .zero, size: size))
-
-        NSGraphicsContext.restoreGraphicsState()
-
-        return context.makeImage()
     }
 }
 

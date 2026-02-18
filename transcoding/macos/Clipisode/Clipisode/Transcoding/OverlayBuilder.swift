@@ -8,11 +8,17 @@ import QuartzCore
 
 enum OverlayBuilder {
 
-    // MARK: - Glow Ring (Video 1 - Face Detection)
+    // MARK: - Face Scan Wireframe (Video 1 - Facial Landmarks)
 
-    /// Creates a pulsing neon ring positioned around a detected face.
-    static func buildGlowRing(
-        faceRect: CGRect,
+    private static let neonCyan = CGColor(srgbRed: 0, green: 0.9, blue: 1, alpha: 0.9)
+    private static let neonCyanGlow = CGColor(srgbRed: 0, green: 0.9, blue: 1, alpha: 1)
+    private static let neonMagenta = CGColor(srgbRed: 1, green: 0.1, blue: 0.6, alpha: 0.8)
+
+    /// Creates a sci-fi face scan wireframe from detected facial landmarks:
+    /// neon-traced features, pulsing dots on key points, geometric connecting
+    /// lines, and an animated scan line sweeping across the face.
+    static func buildFaceScan(
+        landmarks: FaceLandmarks,
         renderSize: CGSize,
         placementStart: Double,
         placementEnd: Double,
@@ -22,53 +28,267 @@ enum OverlayBuilder {
         container.frame = CGRect(origin: .zero, size: renderSize)
         container.opacity = 0
 
-        let centerX = faceRect.midX
-        let centerY = faceRect.midY
-        let radius = max(faceRect.width, faceRect.height) * 0.7
+        let segDuration = placementEnd - placementStart
 
-        let ringPath = CGPath(
-            ellipseIn: CGRect(x: -radius, y: -radius, width: radius * 2, height: radius * 2),
-            transform: nil
+        // --- Feature trace lines (draw themselves on via strokeEnd animation) ---
+        let featureSets: [(points: [CGPoint], color: CGColor, width: CGFloat, closed: Bool)] = [
+            (landmarks.faceContour, neonCyan, 2.0, false),
+            (landmarks.leftEyebrow, neonCyan, 1.5, false),
+            (landmarks.rightEyebrow, neonCyan, 1.5, false),
+            (landmarks.leftEye, neonCyan, 1.5, true),
+            (landmarks.rightEye, neonCyan, 1.5, true),
+            (landmarks.nose, neonCyan, 1.5, false),
+            (landmarks.noseCrest, neonCyan, 1.0, false),
+            (landmarks.outerLips, neonMagenta, 1.5, true),
+        ]
+
+        for (index, feature) in featureSets.enumerated() {
+            guard feature.points.count >= 2 else { continue }
+            let line = makeTraceLine(
+                points: feature.points,
+                color: feature.color,
+                lineWidth: feature.width,
+                closed: feature.closed,
+                drawDelay: Double(index) * 0.12,
+                drawDuration: 0.6,
+                placementStart: placementStart
+            )
+            container.addSublayer(line)
+        }
+
+        // --- Geometric mesh: connecting lines between key feature centers ---
+        let leftEyeC = landmarks.leftEyeCenter
+        let rightEyeC = landmarks.rightEyeCenter
+        let noseC = landmarks.noseCenter
+        let mouthC = landmarks.mouthCenter
+
+        let meshLines: [(CGPoint, CGPoint)] = [
+            (leftEyeC, rightEyeC),
+            (leftEyeC, noseC),
+            (rightEyeC, noseC),
+            (noseC, mouthC),
+            (leftEyeC, mouthC),
+            (rightEyeC, mouthC),
+        ]
+
+        for (i, line) in meshLines.enumerated() {
+            let mesh = makeMeshLine(
+                from: line.0, to: line.1,
+                drawDelay: 0.8 + Double(i) * 0.08,
+                drawDuration: 0.35,
+                placementStart: placementStart
+            )
+            container.addSublayer(mesh)
+        }
+
+        // --- Pulsing dots on key landmarks ---
+        let keyPoints: [CGPoint] = [
+            leftEyeC, rightEyeC, noseC, mouthC,
+        ]
+        + (landmarks.leftEye.count >= 1 ? [landmarks.leftEye[0], landmarks.leftEye[landmarks.leftEye.count / 2]] : [])
+        + (landmarks.rightEye.count >= 1 ? [landmarks.rightEye[0], landmarks.rightEye[landmarks.rightEye.count / 2]] : [])
+        + (landmarks.outerLips.count >= 2 ? [landmarks.outerLips[0], landmarks.outerLips[landmarks.outerLips.count / 2]] : [])
+
+        for (i, point) in keyPoints.enumerated() {
+            let dot = makePulsingDot(
+                at: point,
+                radius: (i < 4) ? 5 : 3,
+                delay: 0.4 + Double(i) * 0.06,
+                placementStart: placementStart
+            )
+            container.addSublayer(dot)
+        }
+
+        // --- Scan line sweeping top-to-bottom across the face ---
+        let scanLine = makeScanLine(
+            faceRect: landmarks.faceRect,
+            renderSize: renderSize,
+            sweepDuration: segDuration * 0.6,
+            placementStart: placementStart,
+            segDuration: segDuration
         )
+        container.addSublayer(scanLine)
 
-        let ring = CAShapeLayer()
-        ring.path = ringPath
-        ring.position = CGPoint(x: centerX, y: centerY)
-        ring.fillColor = nil
-        ring.strokeColor = CGColor(srgbRed: 0, green: 0.9, blue: 1, alpha: 0.9)
-        ring.lineWidth = 4
-        ring.shadowColor = CGColor(srgbRed: 0, green: 0.9, blue: 1, alpha: 1)
-        ring.shadowRadius = 12
-        ring.shadowOpacity = 1
-        ring.shadowOffset = .zero
-        container.addSublayer(ring)
-
-        // Pulse scale animation
-        let pulse = CABasicAnimation(keyPath: "transform.scale")
-        pulse.fromValue = 1.0
-        pulse.toValue = 1.12
-        pulse.duration = 0.8
-        pulse.autoreverses = true
-        pulse.repeatCount = .infinity
-        pulse.beginTime = AVCoreAnimationBeginTimeAtZero
-        pulse.isRemovedOnCompletion = false
-        ring.add(pulse, forKey: "pulse")
-
-        // Glow intensity animation
-        let glow = CABasicAnimation(keyPath: "shadowRadius")
-        glow.fromValue = 10
-        glow.toValue = 25
-        glow.duration = 0.8
-        glow.autoreverses = true
-        glow.repeatCount = .infinity
-        glow.beginTime = AVCoreAnimationBeginTimeAtZero
-        glow.isRemovedOnCompletion = false
-        ring.add(glow, forKey: "glow")
-
-        // Fade in/out timed to the segment
         addFadeAnimation(to: container, start: placementStart, end: placementEnd, totalDuration: totalDuration)
 
         return container
+    }
+
+    // MARK: Face Scan Helpers
+
+    private static func makeTraceLine(
+        points: [CGPoint],
+        color: CGColor,
+        lineWidth: CGFloat,
+        closed: Bool,
+        drawDelay: Double,
+        drawDuration: Double,
+        placementStart: Double
+    ) -> CAShapeLayer {
+        let path = CGMutablePath()
+        path.move(to: points[0])
+        for pt in points.dropFirst() {
+            path.addLine(to: pt)
+        }
+        if closed { path.closeSubpath() }
+
+        let layer = CAShapeLayer()
+        layer.path = path
+        layer.fillColor = nil
+        layer.strokeColor = color
+        layer.lineWidth = lineWidth
+        layer.lineCap = .round
+        layer.lineJoin = .round
+        layer.shadowColor = color
+        layer.shadowRadius = 6
+        layer.shadowOpacity = 0.8
+        layer.shadowOffset = .zero
+        layer.strokeEnd = 0
+
+        let draw = CABasicAnimation(keyPath: "strokeEnd")
+        draw.fromValue = 0
+        draw.toValue = 1
+        draw.duration = drawDuration
+        draw.beginTime = AVCoreAnimationBeginTimeAtZero + placementStart + drawDelay
+        draw.fillMode = .forwards
+        draw.isRemovedOnCompletion = false
+        layer.add(draw, forKey: "draw")
+
+        let glowPulse = CABasicAnimation(keyPath: "shadowRadius")
+        glowPulse.fromValue = 4
+        glowPulse.toValue = 10
+        glowPulse.duration = 1.0
+        glowPulse.autoreverses = true
+        glowPulse.repeatCount = .infinity
+        glowPulse.beginTime = AVCoreAnimationBeginTimeAtZero
+        glowPulse.isRemovedOnCompletion = false
+        layer.add(glowPulse, forKey: "glowPulse")
+
+        return layer
+    }
+
+    private static func makeMeshLine(
+        from start: CGPoint,
+        to end: CGPoint,
+        drawDelay: Double,
+        drawDuration: Double,
+        placementStart: Double
+    ) -> CAShapeLayer {
+        let path = CGMutablePath()
+        path.move(to: start)
+        path.addLine(to: end)
+
+        let layer = CAShapeLayer()
+        layer.path = path
+        layer.fillColor = nil
+        layer.strokeColor = CGColor(srgbRed: 0, green: 0.9, blue: 1, alpha: 0.35)
+        layer.lineWidth = 1.0
+        layer.lineDashPattern = [4, 4]
+        layer.shadowColor = neonCyan
+        layer.shadowRadius = 3
+        layer.shadowOpacity = 0.5
+        layer.shadowOffset = .zero
+        layer.strokeEnd = 0
+
+        let draw = CABasicAnimation(keyPath: "strokeEnd")
+        draw.fromValue = 0
+        draw.toValue = 1
+        draw.duration = drawDuration
+        draw.beginTime = AVCoreAnimationBeginTimeAtZero + placementStart + drawDelay
+        draw.fillMode = .forwards
+        draw.isRemovedOnCompletion = false
+        layer.add(draw, forKey: "draw")
+
+        return layer
+    }
+
+    private static func makePulsingDot(
+        at point: CGPoint,
+        radius: CGFloat,
+        delay: Double,
+        placementStart: Double
+    ) -> CALayer {
+        let dot = CALayer()
+        let size = radius * 2
+        dot.frame = CGRect(x: point.x - radius, y: point.y - radius, width: size, height: size)
+        dot.cornerRadius = radius
+        dot.backgroundColor = neonCyan
+        dot.shadowColor = neonCyanGlow
+        dot.shadowRadius = 8
+        dot.shadowOpacity = 1
+        dot.shadowOffset = .zero
+        dot.opacity = 0
+
+        let appear = CABasicAnimation(keyPath: "opacity")
+        appear.fromValue = 0
+        appear.toValue = 1
+        appear.duration = 0.3
+        appear.beginTime = AVCoreAnimationBeginTimeAtZero + placementStart + delay
+        appear.fillMode = .forwards
+        appear.isRemovedOnCompletion = false
+        dot.add(appear, forKey: "appear")
+
+        let pulse = CABasicAnimation(keyPath: "transform.scale")
+        pulse.fromValue = 1.0
+        pulse.toValue = 1.5
+        pulse.duration = 0.6
+        pulse.autoreverses = true
+        pulse.repeatCount = .infinity
+        pulse.beginTime = AVCoreAnimationBeginTimeAtZero + placementStart + delay
+        pulse.isRemovedOnCompletion = false
+        dot.add(pulse, forKey: "pulse")
+
+        return dot
+    }
+
+    private static func makeScanLine(
+        faceRect: CGRect,
+        renderSize: CGSize,
+        sweepDuration: Double,
+        placementStart: Double,
+        segDuration: Double
+    ) -> CALayer {
+        let lineHeight: CGFloat = 2
+        let margin: CGFloat = 40
+
+        let line = CAGradientLayer()
+        line.frame = CGRect(
+            x: faceRect.minX - margin,
+            y: faceRect.minY,
+            width: faceRect.width + margin * 2,
+            height: lineHeight
+        )
+        line.colors = [
+            CGColor(srgbRed: 0, green: 0.9, blue: 1, alpha: 0),
+            CGColor(srgbRed: 0, green: 0.9, blue: 1, alpha: 0.9),
+            CGColor(srgbRed: 0, green: 0.9, blue: 1, alpha: 0),
+        ]
+        line.startPoint = CGPoint(x: 0, y: 0.5)
+        line.endPoint = CGPoint(x: 1, y: 0.5)
+        line.opacity = 0
+
+        let fadeIn = CABasicAnimation(keyPath: "opacity")
+        fadeIn.fromValue = 0
+        fadeIn.toValue = 1
+        fadeIn.duration = 0.2
+        fadeIn.beginTime = AVCoreAnimationBeginTimeAtZero + placementStart + 0.3
+        fadeIn.fillMode = .forwards
+        fadeIn.isRemovedOnCompletion = false
+        line.add(fadeIn, forKey: "fadeIn")
+
+        let topY = faceRect.minY - 20
+        let bottomY = faceRect.maxY + 20
+
+        let sweep = CAKeyframeAnimation(keyPath: "position.y")
+        sweep.values = [topY, bottomY, topY, bottomY] as [NSNumber]
+        sweep.keyTimes = [0, 0.5, 0.75, 1] as [NSNumber]
+        sweep.duration = min(sweepDuration, segDuration - 1.0)
+        sweep.beginTime = AVCoreAnimationBeginTimeAtZero + placementStart + 0.5
+        sweep.fillMode = .forwards
+        sweep.isRemovedOnCompletion = false
+        line.add(sweep, forKey: "sweep")
+
+        return line
     }
 
     // MARK: - Particles + Rotating Ring (Video 3)
