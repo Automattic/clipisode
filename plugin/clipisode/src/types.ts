@@ -26,6 +26,7 @@ export interface Output {
 	id: number;
 	name: string;
 	slug: string;
+	upload_token?: string;
 	url: string | null;
 	created_at: string;
 }

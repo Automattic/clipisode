@@ -74,7 +74,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 		];
 
 		const restRoot = window.clipisodeAdmin?.rest_root || `${ window.location.origin }/wp-json/`;
-		const callbackUrl = `${ restRoot }clipisode/v1/outputs/${ output.id }/upload`;
+		const callbackUrl = `${ restRoot }clipisode/v1/outputs/${ output.id }/upload?token=${ output.upload_token }`;
 
 		const jobId = generateJobId();
 		const topicSlug = topic.title.toLowerCase().replace( /[^a-z0-9]+/g, '-' ).replace( /^-|-$/g, '' );
@@ -182,9 +182,9 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 
 	const load = useCallback( () => {
 		Promise.all( [
-			apiFetch( { path: `/clipisode/v1/topics/${ id }` } ),
-			apiFetch( { path: `/clipisode/v1/topics/${ id }/invitation-links` } ),
-			apiFetch( { path: `/clipisode/v1/clips?topic_id=${ id }` } ),
+			apiFetch< Topic >( { path: `/clipisode/v1/topics/${ id }` } ),
+			apiFetch< InvitationLink[] >( { path: `/clipisode/v1/topics/${ id }/invitation-links` } ),
+			apiFetch< Clip[] >( { path: `/clipisode/v1/clips?topic_id=${ id }` } ),
 		] ).then( ( [ t, l, cl ] ) => {
 			setTopic( t );
 			setLinks( l );

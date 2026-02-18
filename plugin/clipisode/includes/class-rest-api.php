@@ -558,18 +558,21 @@ class Clipisode_REST_API {
 			return new WP_REST_Response( [ 'message' => 'Name is required.' ], 400 );
 		}
 
-		$slug = $this->generate_unique_slug( $name );
+		$slug         = $this->generate_unique_slug( $name );
+		$upload_token = wp_generate_password( 32, false );
 
 		$wpdb->insert( $table, [
-			'topic_id' => $topic_id ? (int) $topic_id : null,
-			'name'     => $name,
-			'slug'     => $slug,
+			'topic_id'     => $topic_id ? (int) $topic_id : null,
+			'name'         => $name,
+			'slug'         => $slug,
+			'upload_token' => $upload_token,
 		] );
 
 		return new WP_REST_Response( [
-			'id'   => $wpdb->insert_id,
-			'name' => $name,
-			'slug' => $slug,
+			'id'           => $wpdb->insert_id,
+			'name'         => $name,
+			'slug'         => $slug,
+			'upload_token' => $upload_token,
 		], 201 );
 	}
 
@@ -596,10 +599,15 @@ class Clipisode_REST_API {
 		global $wpdb;
 		$table = $wpdb->prefix . 'clipisode_outputs';
 		$id    = (int) $request['id'];
+		$token = sanitize_text_field( $request->get_param( 'token' ) );
 
 		$output = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $id ) );
 		if ( ! $output ) {
 			return new WP_REST_Response( [ 'message' => 'Output not found.' ], 404 );
+		}
+
+		if ( ! $token || ! $output->upload_token || ! hash_equals( $output->upload_token, $token ) ) {
+			return new WP_REST_Response( [ 'message' => 'Invalid upload token.' ], 403 );
 		}
 
 		require_once ABSPATH . 'wp-admin/includes/image.php';
@@ -622,7 +630,10 @@ class Clipisode_REST_API {
 
 		update_post_meta( $attachment_id, Clipisode_Media::META_KEY, '1' );
 
-		$wpdb->update( $table, [ 'attachment_id' => $attachment_id ], [ 'id' => $id ] );
+		$wpdb->update( $table, [
+			'attachment_id' => $attachment_id,
+			'upload_token'  => null,
+		], [ 'id' => $id ] );
 
 		return new WP_REST_Response( [
 			'attachment_id' => $attachment_id,
