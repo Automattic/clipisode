@@ -15,7 +15,6 @@ const LABEL_OPTIONS = [
 	{ label: 'Asset', value: 'asset' },
 	{ label: 'Original', value: 'original' },
 	{ label: 'Intro', value: 'intro' },
-	{ label: 'Mux', value: 'mux' },
 	{ label: 'Trim', value: 'trim' },
 	{ label: 'Thumbnail', value: 'thumbnail' },
 ];
@@ -65,6 +64,7 @@ export default function MediaList() {
 		const params = new URLSearchParams();
 		if ( typeFilter ) params.set( 'type', typeFilter );
 		if ( labelFilter ) params.set( 'label', labelFilter );
+		params.set( 'exclude_label', 'clipisode' );
 
 		apiFetch< MediaItem[] >( { path: `/clipisode/v1/media?${ params }` } )
 			.then( setItems )

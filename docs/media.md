@@ -24,7 +24,7 @@ Additional issues:
 CREATE TABLE wp_clipisode_media (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   type VARCHAR(20) NOT NULL,           -- 'video', 'photo', 'audio'
-  label VARCHAR(40) NOT NULL,          -- role/variant: 'original', 'trim', 'thumbnail', 'intro', 'mux'
+  label VARCHAR(40) NOT NULL,          -- role/variant: 'original', 'trim', 'thumbnail', 'intro', 'clipisode', 'asset'
   storage VARCHAR(20) NOT NULL DEFAULT 'local',  -- 'local' (WP media library), 's3' (future)
   path TEXT NOT NULL,                  -- storage-relative reference (see below)
   parent_id BIGINT UNSIGNED DEFAULT NULL,          -- self-FK: trimmed/derived media points to its original

@@ -21,14 +21,14 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const [ savingSlug, setSavingSlug ] = useState< Record< number, boolean > >( {} );
 	const [ selectedReply, setSelectedReply ] = useState< Reply | null >( null );
 
-	type MuxState = 'idle' | 'connecting' | 'processing' | 'done' | 'error';
-	const [ muxState, setMuxState ] = useState< MuxState >( 'idle' );
-	const [ muxPhase, setMuxPhase ] = useState( '' );
-	const [ muxMessage, setMuxMessage ] = useState( '' );
-	const [ muxProgress, setMuxProgress ] = useState( 0 );
-	const [ muxError, setMuxError ] = useState( '' );
-	const [ muxOutputUrl, setMuxOutputUrl ] = useState< string | null >( null );
-	const [ muxOutputId, setMuxOutputId ] = useState< number | null >( null );
+	type RenderState = 'idle' | 'connecting' | 'processing' | 'done' | 'error';
+	const [ renderState, setRenderState ] = useState< RenderState >( 'idle' );
+	const [ renderPhase, setRenderPhase ] = useState( '' );
+	const [ renderMessage, setRenderMessage ] = useState( '' );
+	const [ renderProgress, setRenderProgress ] = useState( 0 );
+	const [ renderError, setRenderError ] = useState( '' );
+	const [ renderOutputUrl, setRenderOutputUrl ] = useState< string | null >( null );
+	const [ renderOutputId, setRenderOutputId ] = useState< number | null >( null );
 	const wsRef = useRef< WebSocket | null >( null );
 
 	const WS_URL = 'ws://127.0.0.1:63481';
@@ -39,19 +39,19 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 		return `${ now.getUTCFullYear() }${ p( now.getUTCMonth() + 1 ) }${ p( now.getUTCDate() ) }T${ p( now.getUTCHours() ) }${ p( now.getUTCMinutes() ) }${ p( now.getUTCSeconds() ) }Z`;
 	};
 
-	const startMuxing = async () => {
+	const startRendering = async () => {
 		if ( ! topic ) return;
 
 		const approved = replies.filter( ( r ) => r.status === 'approved' );
 		if ( approved.length === 0 ) return;
 
-		setMuxState( 'connecting' );
-		setMuxPhase( '' );
-		setMuxMessage( '' );
-		setMuxProgress( 0 );
-		setMuxError( '' );
-		setMuxOutputUrl( null );
-		setMuxOutputId( null );
+		setRenderState( 'connecting' );
+		setRenderPhase( '' );
+		setRenderMessage( '' );
+		setRenderProgress( 0 );
+		setRenderError( '' );
+		setRenderOutputUrl( null );
+		setRenderOutputId( null );
 
 		let output: Output;
 		try {
@@ -61,12 +61,12 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 				data: { topic_id: topic.id, name: 'All Replies' },
 			} );
 		} catch {
-			setMuxState( 'error' );
-			setMuxError( 'Failed to create output record.' );
+			setRenderState( 'error' );
+			setRenderError( 'Failed to create output record.' );
 			return;
 		}
 
-		setMuxOutputId( output.id );
+		setRenderOutputId( output.id );
 
 		const segments = [
 			...( topic.intro_video_url ? [ { url: topic.intro_video_url, order: 1 } ] : [] ),
@@ -100,9 +100,9 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 			const msg = JSON.parse( event.data );
 			switch ( msg.type ) {
 				case 'hello_ack':
-					setMuxState( 'processing' );
-					setMuxPhase( 'Starting' );
-					setMuxMessage( 'Initializing job...' );
+					setRenderState( 'processing' );
+					setRenderPhase( 'Starting' );
+					setRenderMessage( 'Initializing job...' );
 					ws.send( JSON.stringify( payload ) );
 					break;
 
@@ -113,40 +113,40 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 						joining: 'Joining',
 						done: 'Complete',
 					};
-					setMuxPhase( phaseLabels[ msg.phase ] || msg.phase );
-					setMuxMessage( msg.message || '' );
+					setRenderPhase( phaseLabels[ msg.phase ] || msg.phase );
+					setRenderMessage( msg.message || '' );
 					if ( msg.total > 0 ) {
-						setMuxProgress( ( msg.current / msg.total ) * 100 );
+						setRenderProgress( ( msg.current / msg.total ) * 100 );
 					}
 					break;
 				}
 
 				case 'job_done':
-					setMuxOutputUrl( msg.output_url || null );
-					setMuxState( 'done' );
+					setRenderOutputUrl( msg.output_url || null );
+					setRenderState( 'done' );
 					load();
 					break;
 
 				case 'job_error':
-					setMuxError( msg.message || 'Muxing failed.' );
-					setMuxState( 'error' );
+					setRenderError( msg.message || 'Rendering failed.' );
+					setRenderState( 'error' );
 					break;
 
 				case 'job_cancelled':
-					setMuxState( 'idle' );
+					setRenderState( 'idle' );
 					break;
 
 				case 'connection_rejected':
-					setMuxError( msg.reason || 'Connection rejected.' );
-					setMuxState( 'error' );
+					setRenderError( msg.reason || 'Connection rejected.' );
+					setRenderState( 'error' );
 					break;
 			}
 		};
 
 		ws.onclose = () => {
-			if ( muxState === 'connecting' ) {
-				setMuxError( 'Could not connect to muxing service.' );
-				setMuxState( 'error' );
+			if ( renderState === 'connecting' ) {
+				setRenderError( 'Could not connect to render service.' );
+				setRenderState( 'error' );
 			}
 		};
 
@@ -173,14 +173,14 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 		} );
 	};
 
-	const cancelMuxing = () => {
+	const cancelRendering = () => {
 		const ws = wsRef.current;
 		if ( ws && ws.readyState === WebSocket.OPEN ) {
 			ws.send( JSON.stringify( { type: 'cancel_job' } ) );
 		}
 		wsRef.current?.close();
 		wsRef.current = null;
-		setMuxState( 'idle' );
+		setRenderState( 'idle' );
 	};
 
 	const load = useCallback( () => {
@@ -513,23 +513,23 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 				) }
 			</div>
 
-			<div className="clipisode-section clipisode-mux-section">
+			<div className="clipisode-section clipisode-output-section">
 				<h2>Clipisode</h2>
 
-				{ topic.outputs && topic.outputs.length > 0 && muxState === 'idle' && (
-					<div className="clipisode-mux-outputs">
+				{ topic.outputs && topic.outputs.length > 0 && renderState === 'idle' && (
+					<div className="clipisode-output-list">
 						{ topic.outputs.map( ( o ) => (
-							<div key={ o.id } className="clipisode-mux-output">
-								<div className="clipisode-mux-output-header">
+							<div key={ o.id } className="clipisode-output-card">
+								<div className="clipisode-output-header">
 									<strong>{ o.name }</strong>
-									<span className="clipisode-mux-output-date">
+									<span className="clipisode-output-date">
 										{ new Date( o.created_at ).toLocaleString() }
 									</span>
 								</div>
 								{ o.url ? (
 									<>
 										<video src={ o.url } controls playsInline />
-										<div className="clipisode-mux-output-actions">
+										<div className="clipisode-output-actions">
 											<a
 												className="components-button is-secondary is-compact"
 												href={ o.url }
@@ -548,8 +548,8 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 										</div>
 									</>
 								) : (
-									<div className="clipisode-mux-output-actions">
-										<span className="clipisode-mux-pending">Processing...</span>
+									<div className="clipisode-output-actions">
+										<span className="clipisode-output-pending">Processing...</span>
 										<Button
 											variant="tertiary"
 											size="compact"
@@ -565,61 +565,61 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 					</div>
 				) }
 
-				{ muxState === 'idle' && (
+				{ renderState === 'idle' && (
 					<Button
 						variant="primary"
-						onClick={ startMuxing }
+						onClick={ startRendering }
 						disabled={ replies.filter( ( r ) => r.status === 'approved' ).length === 0 }
 					>
 						Generate Clipisode
 					</Button>
 				) }
 
-				{ muxState === 'connecting' && (
-					<div className="clipisode-mux-status">
+				{ renderState === 'connecting' && (
+					<div className="clipisode-output-status">
 						<Spinner />
-						<span>Connecting to muxing service...</span>
+						<span>Connecting to render service...</span>
 					</div>
 				) }
 
-				{ muxState === 'processing' && (
-					<div className="clipisode-mux-status">
-						<div className="clipisode-mux-phase">{ muxPhase }</div>
-						<div className="clipisode-mux-message">{ muxMessage }</div>
-						<div className="clipisode-progress-bar clipisode-mux-progress">
+				{ renderState === 'processing' && (
+					<div className="clipisode-output-status">
+						<div className="clipisode-output-phase">{ renderPhase }</div>
+						<div className="clipisode-output-message">{ renderMessage }</div>
+						<div className="clipisode-progress-bar clipisode-output-progress">
 							<div
 								className="clipisode-progress-fill"
-								style={ { width: `${ muxProgress }%` } }
+								style={ { width: `${ renderProgress }%` } }
 							/>
 						</div>
-						<Button variant="tertiary" isDestructive onClick={ cancelMuxing }>
+						<Button variant="tertiary" isDestructive onClick={ cancelRendering }>
 							Cancel
 						</Button>
 					</div>
 				) }
 
-				{ muxState === 'done' && (
-					<div className="clipisode-mux-status">
-						<div className="clipisode-mux-phase">Complete</div>
-						{ muxOutputUrl && (
+				{ renderState === 'done' && (
+					<div className="clipisode-output-status">
+						<div className="clipisode-output-phase">Complete</div>
+						{ renderOutputUrl && (
 							<>
-								<video src={ muxOutputUrl } controls playsInline />
-								<div className="clipisode-mux-output-actions">
+								<video src={ renderOutputUrl } controls playsInline />
+								<div className="clipisode-output-actions">
 									<a
 										className="components-button is-secondary is-compact"
-										href={ muxOutputUrl }
+										href={ renderOutputUrl }
 										download
 									>
 										Download
 									</a>
-									{ muxOutputId && (
+									{ renderOutputId && (
 										<Button
 											variant="tertiary"
 											size="compact"
 											isDestructive
 											onClick={ () => {
-												deleteOutput( muxOutputId, 'All Replies' );
-												setMuxState( 'idle' );
+												deleteOutput( renderOutputId, 'All Replies' );
+												setRenderState( 'idle' );
 											} }
 										>
 											Delete
@@ -628,19 +628,19 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 								</div>
 							</>
 						) }
-						{ ! muxOutputUrl && (
-							<Button variant="secondary" onClick={ () => setMuxState( 'idle' ) }>
+						{ ! renderOutputUrl && (
+							<Button variant="secondary" onClick={ () => setRenderState( 'idle' ) }>
 								OK
 							</Button>
 						) }
 					</div>
 				) }
 
-				{ muxState === 'error' && (
-					<div className="clipisode-mux-status clipisode-mux-error">
-						<div className="clipisode-mux-phase">Error</div>
-						<div className="clipisode-mux-message">{ muxError }</div>
-						<Button variant="secondary" onClick={ () => setMuxState( 'idle' ) }>
+				{ renderState === 'error' && (
+					<div className="clipisode-output-status clipisode-output-error">
+						<div className="clipisode-output-phase">Error</div>
+						<div className="clipisode-output-message">{ renderError }</div>
+						<Button variant="secondary" onClick={ () => setRenderState( 'idle' ) }>
 							Retry
 						</Button>
 					</div>

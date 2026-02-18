@@ -644,7 +644,7 @@ class Clipisode_REST_API {
 			Clipisode_Media::delete( (int) $output->media_id );
 		}
 
-		$result = Clipisode_Media::create( 'video', 'mux' );
+		$result = Clipisode_Media::create( 'video', 'clipisode' );
 		if ( is_wp_error( $result ) ) {
 			return new WP_REST_Response( [ 'message' => $result->get_error_message() ], 400 );
 		}
@@ -948,6 +948,12 @@ class Clipisode_REST_API {
 		if ( $label ) {
 			$where[]  = 'm.label = %s';
 			$values[] = sanitize_text_field( $label );
+		}
+
+		$exclude_label = $request->get_param( 'exclude_label' );
+		if ( $exclude_label ) {
+			$where[]  = 'm.label != %s';
+			$values[] = sanitize_text_field( $exclude_label );
 		}
 
 		$where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) : '';

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Interactive WebSocket server for testing Clipisode muxing integration."""
+"""Interactive WebSocket server for testing Clipisode rendering integration."""
 
 import asyncio
 import json
@@ -32,7 +32,7 @@ current_output_name = None
 def banner():
     print(f"""
 {BOLD}{CYAN}╔══════════════════════════════════════════════╗
-║  Clipisode Muxing Server  ·  ws://127.0.0.1:{PORT}  ║
+║  Clipisode Rendering Test Server  ·  ws://127.0.0.1:{PORT}  ║
 ╚══════════════════════════════════════════════╝{RESET}
 """)
 
@@ -209,7 +209,7 @@ async def handle_input(line):
         current_output_name = None
 
     elif cmd == "e":
-        message = rest.strip() or "Muxing failed (test error)"
+        message = rest.strip() or "Rendering failed (test error)"
         await send_msg({
             "type": "job_error",
             "job_id": current_job or "",
