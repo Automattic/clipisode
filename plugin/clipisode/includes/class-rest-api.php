@@ -184,6 +184,11 @@ class Clipisode_REST_API {
 				'callback'            => [ $this, 'list_media' ],
 				'permission_callback' => [ $this, 'check_permission' ],
 			],
+			[
+				'methods'             => 'POST',
+				'callback'            => [ $this, 'upload_media_asset' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
 		] );
 
 		// Replies.
@@ -962,6 +967,40 @@ class Clipisode_REST_API {
 		}
 
 		return new WP_REST_Response( $rows );
+	}
+
+	public function upload_media_asset( WP_REST_Request $request ): WP_REST_Response {
+		$files = $request->get_file_params();
+		if ( empty( $files['file'] ) ) {
+			return new WP_REST_Response( [ 'message' => 'No file provided.' ], 400 );
+		}
+
+		$file      = $files['file'];
+		$mime      = $file['type'] ?? '';
+		$mime_map  = [
+			'video/' => 'video',
+			'image/' => 'photo',
+			'audio/' => 'audio',
+		];
+
+		$type = null;
+		foreach ( $mime_map as $prefix => $media_type ) {
+			if ( strpos( $mime, $prefix ) === 0 ) {
+				$type = $media_type;
+				break;
+			}
+		}
+
+		if ( ! $type ) {
+			return new WP_REST_Response( [ 'message' => 'Unsupported file type.' ], 400 );
+		}
+
+		$result = Clipisode_Media::create( $type, 'asset', 'file' );
+		if ( is_wp_error( $result ) ) {
+			return new WP_REST_Response( [ 'message' => $result->get_error_message() ], 400 );
+		}
+
+		return new WP_REST_Response( $result, 201 );
 	}
 
 	private function resolve_media_usage( int $media_id ): ?array {
