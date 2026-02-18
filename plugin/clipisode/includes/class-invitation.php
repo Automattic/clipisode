@@ -15,7 +15,7 @@ class Clipisode_Invitation {
 
 	public function register_rewrite(): void {
 		add_rewrite_rule(
-			'^c/([a-zA-Z0-9]+)/?$',
+			'^invitation/([a-zA-Z0-9]+)/?$',
 			'index.php?clipisode_invite=$matches[1]',
 			'top'
 		);

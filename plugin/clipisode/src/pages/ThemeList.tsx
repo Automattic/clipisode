@@ -79,7 +79,7 @@ export default function ThemeList() {
 			</div>
 
 			<p style={ { color: '#646970', marginBottom: 24 } }>
-				Themes control the look and feel of the guest-facing invitation page at <code>/c/&#123;slug&#125;</code>.
+				Themes control the look and feel of the guest-facing invitation page at <code>/invitation/&#123;slug&#125;</code>.
 				Edit a theme in the block editor to rearrange elements or change styles.
 			</p>
 

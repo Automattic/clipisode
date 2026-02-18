@@ -191,7 +191,7 @@ All endpoints under `clipisode/v1`, requiring `manage_options` capability.
 
 ### Invitation Link Frontend
 
-Each invitation link resolves to a public-facing page at `/c/{slug}`. The page is device-responsive with client-side detection (`navigator.maxTouchPoints > 0 && window.innerWidth < 1280`).
+Each invitation link resolves to a public-facing page at `/invitation/{slug}`. The page is device-responsive with client-side detection (`navigator.maxTouchPoints > 0 && window.innerWidth < 1280`).
 
 **Desktop:** Two-column layout — intro video on the left, QR code of the current URL on the right. No recording flow; visitors are prompted to scan with their phone.
 

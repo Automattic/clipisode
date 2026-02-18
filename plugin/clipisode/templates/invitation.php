@@ -1,6 +1,6 @@
 <?php
 /**
- * Template for /c/{slug} — guest-facing invitation flow.
+ * Template for /invitation/{slug} — guest-facing invitation flow.
  *
  * Looks up the invitation link, resolves the topic's invitation CPT post,
  * injects the slug, and renders via do_blocks().
