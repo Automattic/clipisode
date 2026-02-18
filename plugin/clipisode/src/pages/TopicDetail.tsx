@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from '@wordpress/element';
+import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
 import { Button, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import ClipModal from '../components/ClipModal';
-import type { Topic, InvitationLink, Clip } from '../types';
+import type { Topic, InvitationLink, Clip, Output } from '../types';
 
 interface TopicDetailProps {
 	id: string;
@@ -17,6 +17,146 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const [ deleting, setDeleting ] = useState< boolean >( false );
 	const [ copiedId, setCopiedId ] = useState< number | null >( null );
 	const [ selectedClip, setSelectedClip ] = useState< Clip | null >( null );
+
+	type MuxState = 'idle' | 'connecting' | 'processing' | 'done' | 'error';
+	const [ muxState, setMuxState ] = useState< MuxState >( 'idle' );
+	const [ muxPhase, setMuxPhase ] = useState( '' );
+	const [ muxMessage, setMuxMessage ] = useState( '' );
+	const [ muxProgress, setMuxProgress ] = useState( 0 );
+	const [ muxError, setMuxError ] = useState( '' );
+	const [ muxOutputUrl, setMuxOutputUrl ] = useState< string | null >( null );
+	const wsRef = useRef< WebSocket | null >( null );
+
+	const WS_URL = 'ws://127.0.0.1:63481';
+
+	const generateJobId = () => {
+		const now = new Date();
+		const p = ( n: number, len = 2 ) => String( n ).padStart( len, '0' );
+		return `${ now.getUTCFullYear() }${ p( now.getUTCMonth() + 1 ) }${ p( now.getUTCDate() ) }T${ p( now.getUTCHours() ) }${ p( now.getUTCMinutes() ) }${ p( now.getUTCSeconds() ) }Z`;
+	};
+
+	const startMuxing = async () => {
+		if ( ! topic ) return;
+
+		const approved = clips.filter( ( c ) => c.status === 'approved' );
+		if ( approved.length === 0 ) return;
+
+		setMuxState( 'connecting' );
+		setMuxPhase( '' );
+		setMuxMessage( '' );
+		setMuxProgress( 0 );
+		setMuxError( '' );
+		setMuxOutputUrl( null );
+
+		let output: Output;
+		try {
+			output = await apiFetch< Output >( {
+				path: '/clipisode/v1/outputs',
+				method: 'POST',
+				data: { topic_id: topic.id, name: 'All Clips' },
+			} );
+		} catch {
+			setMuxState( 'error' );
+			setMuxError( 'Failed to create output record.' );
+			return;
+		}
+
+		const segments = [
+			...( topic.intro_video_url ? [ { url: topic.intro_video_url, order: 1 } ] : [] ),
+			...approved.map( ( c, i ) => ( {
+				url: c.video_url,
+				order: ( topic.intro_video_url ? 2 : 1 ) + i,
+			} ) ),
+		];
+
+		const restRoot = window.clipisodeAdmin?.rest_root || '/wp-json/';
+		const callbackUrl = `${ window.location.origin }${ restRoot }clipisode/v1/outputs/${ output.id }/upload`;
+
+		const jobId = generateJobId();
+		const topicSlug = topic.title.toLowerCase().replace( /[^a-z0-9]+/g, '-' ).replace( /^-|-$/g, '' );
+		const payload = {
+			type: 'start_job',
+			job_id: jobId,
+			output_name: `${ topicSlug }-all.mp4`,
+			callback_url: callbackUrl,
+			segments,
+		};
+
+		const ws = new WebSocket( WS_URL );
+		wsRef.current = ws;
+
+		ws.onopen = () => {
+			ws.send( JSON.stringify( { type: 'hello', client: 'clipisode-admin', version: 1 } ) );
+		};
+
+		ws.onmessage = ( event ) => {
+			const msg = JSON.parse( event.data );
+			switch ( msg.type ) {
+				case 'hello_ack':
+					setMuxState( 'processing' );
+					setMuxPhase( 'Starting' );
+					setMuxMessage( 'Initializing job...' );
+					ws.send( JSON.stringify( payload ) );
+					break;
+
+				case 'job_status': {
+					const phaseLabels: Record< string, string > = {
+						downloading: 'Downloading',
+						trimming: 'Trimming',
+						joining: 'Joining',
+						done: 'Complete',
+					};
+					setMuxPhase( phaseLabels[ msg.phase ] || msg.phase );
+					setMuxMessage( msg.message || '' );
+					if ( msg.total > 0 ) {
+						setMuxProgress( ( msg.current / msg.total ) * 100 );
+					}
+					break;
+				}
+
+				case 'job_done':
+					setMuxOutputUrl( msg.output_url || null );
+					setMuxState( 'done' );
+					load();
+					break;
+
+				case 'job_error':
+					setMuxError( msg.message || 'Muxing failed.' );
+					setMuxState( 'error' );
+					break;
+
+				case 'job_cancelled':
+					setMuxState( 'idle' );
+					break;
+
+				case 'connection_rejected':
+					setMuxError( msg.reason || 'Connection rejected.' );
+					setMuxState( 'error' );
+					break;
+			}
+		};
+
+		ws.onclose = () => {
+			if ( muxState === 'connecting' ) {
+				setMuxError( 'Could not connect to muxing service.' );
+				setMuxState( 'error' );
+			}
+		};
+
+		ws.onerror = () => {
+			ws.close();
+		};
+	};
+
+	const cancelMuxing = () => {
+		const ws = wsRef.current;
+		if ( ws && ws.readyState === WebSocket.OPEN ) {
+			ws.send( JSON.stringify( { type: 'cancel_job' } ) );
+		}
+		wsRef.current?.close();
+		wsRef.current = null;
+		setMuxState( 'idle' );
+	};
 
 	const load = useCallback( () => {
 		Promise.all( [
@@ -283,6 +423,103 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 							) ) }
 						</tbody>
 					</table>
+				) }
+			</div>
+
+			<div className="clipisode-section clipisode-mux-section">
+				<h2>Clipisode</h2>
+
+				{ topic.outputs && topic.outputs.length > 0 && muxState === 'idle' && (
+					<div className="clipisode-mux-outputs">
+						{ topic.outputs.map( ( o ) => (
+							<div key={ o.id } className="clipisode-mux-output">
+								<div className="clipisode-mux-output-header">
+									<strong>{ o.name }</strong>
+									<span className="clipisode-mux-output-date">
+										{ new Date( o.created_at ).toLocaleString() }
+									</span>
+								</div>
+								{ o.url ? (
+									<>
+										<video src={ o.url } controls playsInline />
+										<a
+											className="components-button is-secondary is-compact"
+											href={ o.url }
+											download={ `${ o.slug }.mp4` }
+										>
+											Download
+										</a>
+									</>
+								) : (
+									<span className="clipisode-mux-pending">Processing...</span>
+								) }
+							</div>
+						) ) }
+					</div>
+				) }
+
+				{ muxState === 'idle' && (
+					<Button
+						variant="primary"
+						onClick={ startMuxing }
+						disabled={ clips.filter( ( c ) => c.status === 'approved' ).length === 0 }
+					>
+						{ topic.outputs && topic.outputs.length > 0 ? 'Regenerate Clipisode' : 'Generate Clipisode' }
+					</Button>
+				) }
+
+				{ muxState === 'connecting' && (
+					<div className="clipisode-mux-status">
+						<Spinner />
+						<span>Connecting to muxing service...</span>
+					</div>
+				) }
+
+				{ muxState === 'processing' && (
+					<div className="clipisode-mux-status">
+						<div className="clipisode-mux-phase">{ muxPhase }</div>
+						<div className="clipisode-mux-message">{ muxMessage }</div>
+						<div className="clipisode-progress-bar clipisode-mux-progress">
+							<div
+								className="clipisode-progress-fill"
+								style={ { width: `${ muxProgress }%` } }
+							/>
+						</div>
+						<Button variant="tertiary" isDestructive onClick={ cancelMuxing }>
+							Cancel
+						</Button>
+					</div>
+				) }
+
+				{ muxState === 'done' && (
+					<div className="clipisode-mux-status">
+						<div className="clipisode-mux-phase">Complete</div>
+						{ muxOutputUrl && (
+							<>
+								<video src={ muxOutputUrl } controls playsInline />
+								<a
+									className="components-button is-secondary is-compact"
+									href={ muxOutputUrl }
+									download
+								>
+									Download
+								</a>
+							</>
+						) }
+						<Button variant="secondary" onClick={ () => setMuxState( 'idle' ) }>
+							Done
+						</Button>
+					</div>
+				) }
+
+				{ muxState === 'error' && (
+					<div className="clipisode-mux-status clipisode-mux-error">
+						<div className="clipisode-mux-phase">Error</div>
+						<div className="clipisode-mux-message">{ muxError }</div>
+						<Button variant="secondary" onClick={ () => setMuxState( 'idle' ) }>
+							Retry
+						</Button>
+					</div>
 				) }
 			</div>
 

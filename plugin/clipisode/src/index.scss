@@ -433,6 +433,100 @@
 			display: block;
 		}
 	}
+	// --- Muxing / Clipisode ---
+
+	.clipisode-mux-section {
+		h2 {
+			margin-bottom: 16px;
+		}
+	}
+
+	.clipisode-mux-outputs {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		margin-bottom: 16px;
+	}
+
+	.clipisode-mux-output {
+		background: #fff;
+		border: 1px solid #c3c4c7;
+		border-radius: 4px;
+		padding: 16px;
+
+		video {
+			width: 100%;
+			max-width: 480px;
+			border-radius: 4px;
+			background: #1d2327;
+			margin: 12px 0 8px;
+			display: block;
+		}
+	}
+
+	.clipisode-mux-output-header {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+
+		strong {
+			font-size: 14px;
+		}
+
+		.clipisode-mux-output-date {
+			font-size: 12px;
+			color: #646970;
+		}
+	}
+
+	.clipisode-mux-pending {
+		display: block;
+		padding: 12px 0;
+		color: #646970;
+		font-size: 13px;
+	}
+
+	.clipisode-mux-status {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 8px;
+		padding: 16px;
+		background: #fff;
+		border: 1px solid #c3c4c7;
+		border-radius: 4px;
+
+		video {
+			width: 100%;
+			max-width: 480px;
+			border-radius: 4px;
+			background: #1d2327;
+			display: block;
+		}
+	}
+
+	.clipisode-mux-phase {
+		font-weight: 600;
+		font-size: 14px;
+	}
+
+	.clipisode-mux-message {
+		font-size: 13px;
+		color: #646970;
+	}
+
+	.clipisode-mux-progress {
+		width: 100%;
+		max-width: 400px;
+	}
+
+	.clipisode-mux-error {
+		border-left: 4px solid #d63638;
+
+		.clipisode-mux-phase {
+			color: #d63638;
+		}
+	}
 }
 
 // --- Clip modal (portaled outside #clipisode-root) ---

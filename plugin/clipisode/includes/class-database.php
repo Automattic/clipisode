@@ -83,6 +83,20 @@ KEY topic_id (topic_id),
 KEY status (status)
 ) $charset;"
 		);
+
+		dbDelta(
+			"CREATE TABLE {$wpdb->prefix}clipisode_outputs (
+id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+topic_id BIGINT UNSIGNED DEFAULT NULL,
+name VARCHAR(255) NOT NULL,
+slug VARCHAR(255) NOT NULL,
+attachment_id BIGINT UNSIGNED DEFAULT NULL,
+created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+PRIMARY KEY  (id),
+UNIQUE KEY slug (slug),
+KEY topic_id (topic_id)
+) $charset;"
+		);
 	}
 
 	private static function seed(): void {

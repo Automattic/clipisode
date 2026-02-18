@@ -152,6 +152,23 @@ class Clipisode_REST_API {
 			],
 		] );
 
+		// Outputs.
+		register_rest_route( self::NAMESPACE, '/outputs', [
+			[
+				'methods'             => 'POST',
+				'callback'            => [ $this, 'create_output' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+		] );
+
+		register_rest_route( self::NAMESPACE, '/outputs/(?P<id>\d+)/upload', [
+			[
+				'methods'             => 'POST',
+				'callback'            => [ $this, 'upload_output' ],
+				'permission_callback' => '__return_true',
+			],
+		] );
+
 		// Clips.
 		register_rest_route( self::NAMESPACE, '/clips', [
 			[
@@ -267,6 +284,8 @@ class Clipisode_REST_API {
 	// --- Topics ---
 
 	private function enrich_topic( object $topic ): object {
+		global $wpdb;
+
 		if ( ! empty( $topic->brand_terms_id ) ) {
 			$brand_post = get_post( (int) $topic->brand_terms_id );
 			$topic->brand_terms_title = $brand_post ? $brand_post->post_title : null;
@@ -299,6 +318,22 @@ class Clipisode_REST_API {
 			$topic->invitation_title    = null;
 			$topic->invitation_edit_url = null;
 		}
+
+		$outputs_table = $wpdb->prefix . 'clipisode_outputs';
+		$raw_outputs   = $wpdb->get_results( $wpdb->prepare(
+			"SELECT * FROM $outputs_table WHERE topic_id = %d ORDER BY created_at DESC",
+			(int) $topic->id
+		) );
+
+		$topic->outputs = array_map( function ( $o ) {
+			return (object) [
+				'id'         => (int) $o->id,
+				'name'       => $o->name,
+				'slug'       => $o->slug,
+				'url'        => $o->attachment_id ? wp_get_attachment_url( (int) $o->attachment_id ) : null,
+				'created_at' => $o->created_at,
+			];
+		}, $raw_outputs );
 
 		return $topic;
 	}
@@ -457,11 +492,115 @@ class Clipisode_REST_API {
 			wp_delete_attachment( $video_id, true );
 		}
 
+		$output_attachments = $wpdb->get_col( $wpdb->prepare(
+			"SELECT attachment_id FROM {$wpdb->prefix}clipisode_outputs WHERE topic_id = %d AND attachment_id IS NOT NULL",
+			$id
+		) );
+		foreach ( $output_attachments as $att_id ) {
+			wp_delete_attachment( (int) $att_id, true );
+		}
+
+		$wpdb->delete( $wpdb->prefix . 'clipisode_outputs', [ 'topic_id' => $id ] );
 		$wpdb->delete( $wpdb->prefix . 'clipisode_clips', [ 'topic_id' => $id ] );
 		$wpdb->delete( $wpdb->prefix . 'clipisode_invitation_links', [ 'topic_id' => $id ] );
 		$wpdb->delete( $wpdb->prefix . 'clipisode_topics', [ 'id' => $id ] );
 
 		return new WP_REST_Response( null, 204 );
+	}
+
+	// --- Outputs ---
+
+	private function generate_unique_slug( string $base ): string {
+		global $wpdb;
+		$table = $wpdb->prefix . 'clipisode_outputs';
+		$slug  = sanitize_title( $base );
+
+		if ( ! $slug ) {
+			$slug = 'output';
+		}
+
+		$existing = $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM $table WHERE slug = %s",
+			$slug
+		) );
+
+		if ( ! $existing ) {
+			return $slug;
+		}
+
+		$i = 1;
+		while ( $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM $table WHERE slug = %s",
+			$slug . '-' . $i
+		) ) ) {
+			$i++;
+		}
+
+		return $slug . '-' . $i;
+	}
+
+	public function create_output( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
+		$table = $wpdb->prefix . 'clipisode_outputs';
+
+		$name     = sanitize_text_field( $request->get_param( 'name' ) );
+		$topic_id = $request->get_param( 'topic_id' );
+
+		if ( ! $name ) {
+			return new WP_REST_Response( [ 'message' => 'Name is required.' ], 400 );
+		}
+
+		$slug = $this->generate_unique_slug( $name );
+
+		$wpdb->insert( $table, [
+			'topic_id' => $topic_id ? (int) $topic_id : null,
+			'name'     => $name,
+			'slug'     => $slug,
+		] );
+
+		return new WP_REST_Response( [
+			'id'   => $wpdb->insert_id,
+			'name' => $name,
+			'slug' => $slug,
+		], 201 );
+	}
+
+	public function upload_output( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
+		$table = $wpdb->prefix . 'clipisode_outputs';
+		$id    = (int) $request['id'];
+
+		$output = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $id ) );
+		if ( ! $output ) {
+			return new WP_REST_Response( [ 'message' => 'Output not found.' ], 404 );
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+
+		$files = $request->get_file_params();
+		if ( empty( $files['video'] ) ) {
+			return new WP_REST_Response( [ 'message' => 'No video file provided.' ], 400 );
+		}
+
+		if ( $output->attachment_id ) {
+			wp_delete_attachment( (int) $output->attachment_id, true );
+		}
+
+		$attachment_id = media_handle_upload( 'video', 0 );
+		if ( is_wp_error( $attachment_id ) ) {
+			return new WP_REST_Response( [ 'message' => $attachment_id->get_error_message() ], 400 );
+		}
+
+		update_post_meta( $attachment_id, Clipisode_Media::META_KEY, '1' );
+
+		$wpdb->update( $table, [ 'attachment_id' => $attachment_id ], [ 'id' => $id ] );
+
+		return new WP_REST_Response( [
+			'attachment_id' => $attachment_id,
+			'url'           => wp_get_attachment_url( $attachment_id ),
+		] );
 	}
 
 	// --- Invitation Links ---

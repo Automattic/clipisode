@@ -17,8 +17,17 @@ export interface Topic {
 	clips_count: number;
 	links_count: number;
 	clicks: number;
+	outputs: Output[];
 	created_at: string;
 	updated_at: string;
+}
+
+export interface Output {
+	id: number;
+	name: string;
+	slug: string;
+	url: string | null;
+	created_at: string;
 }
 
 export interface Theme {
