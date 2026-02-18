@@ -177,6 +177,15 @@ class Clipisode_REST_API {
 			],
 		] );
 
+		// Media.
+		register_rest_route( self::NAMESPACE, '/media', [
+			[
+				'methods'             => 'GET',
+				'callback'            => [ $this, 'list_media' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+		] );
+
 		// Replies.
 		register_rest_route( self::NAMESPACE, '/replies', [
 			[
@@ -901,6 +910,113 @@ class Clipisode_REST_API {
 		Clipisode_Media::delete( $id );
 
 		return new WP_REST_Response( null, 204 );
+	}
+
+	// --- Media ---
+
+	public function list_media( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
+
+		$media_tbl   = $wpdb->prefix . 'clipisode_media';
+		$topics_tbl  = $wpdb->prefix . 'clipisode_topics';
+		$outputs_tbl = $wpdb->prefix . 'clipisode_outputs';
+		$replies_tbl = $wpdb->prefix . 'clipisode_replies';
+
+		$where  = [];
+		$values = [];
+
+		$type = $request->get_param( 'type' );
+		if ( $type ) {
+			$where[]  = 'm.type = %s';
+			$values[] = sanitize_text_field( $type );
+		}
+
+		$label = $request->get_param( 'label' );
+		if ( $label ) {
+			$where[]  = 'm.label = %s';
+			$values[] = sanitize_text_field( $label );
+		}
+
+		$where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) : '';
+
+		$query = "
+			SELECT m.*,
+				(SELECT COUNT(*) FROM $media_tbl c WHERE c.parent_id = m.id) AS children_count
+			FROM $media_tbl m
+			$where_sql
+			ORDER BY m.created_at DESC
+		";
+
+		if ( $values ) {
+			$query = $wpdb->prepare( $query, ...$values );
+		}
+
+		$rows = $wpdb->get_results( $query );
+
+		foreach ( $rows as $row ) {
+			$row->url = ( $row->storage === 'local' && $row->attachment_id )
+				? wp_get_attachment_url( (int) $row->attachment_id )
+				: null;
+
+			$row->used_by = $this->resolve_media_usage( (int) $row->id );
+		}
+
+		return new WP_REST_Response( $rows );
+	}
+
+	private function resolve_media_usage( int $media_id ): ?array {
+		global $wpdb;
+
+		$topic = $wpdb->get_row( $wpdb->prepare(
+			"SELECT id, title FROM {$wpdb->prefix}clipisode_topics WHERE intro_media_id = %d",
+			$media_id
+		) );
+		if ( $topic ) {
+			return [
+				'type'  => 'topic',
+				'id'    => (int) $topic->id,
+				'label' => $topic->title,
+				'page'  => 'clipisode',
+			];
+		}
+
+		$output = $wpdb->get_row( $wpdb->prepare(
+			"SELECT o.id, o.name, o.topic_id, t.title AS topic_title
+			 FROM {$wpdb->prefix}clipisode_outputs o
+			 LEFT JOIN {$wpdb->prefix}clipisode_topics t ON t.id = o.topic_id
+			 WHERE o.media_id = %d",
+			$media_id
+		) );
+		if ( $output ) {
+			return [
+				'type'        => 'output',
+				'id'          => (int) $output->id,
+				'label'       => $output->name,
+				'topic_id'    => $output->topic_id ? (int) $output->topic_id : null,
+				'topic_title' => $output->topic_title,
+				'page'        => 'clipisode',
+			];
+		}
+
+		$reply = $wpdb->get_row( $wpdb->prepare(
+			"SELECT r.id, r.name, r.topic_id, t.title AS topic_title
+			 FROM {$wpdb->prefix}clipisode_replies r
+			 LEFT JOIN {$wpdb->prefix}clipisode_topics t ON t.id = r.topic_id
+			 WHERE r.media_id = %d",
+			$media_id
+		) );
+		if ( $reply ) {
+			return [
+				'type'        => 'reply',
+				'id'          => (int) $reply->id,
+				'label'       => $reply->name,
+				'topic_id'    => $reply->topic_id ? (int) $reply->topic_id : null,
+				'topic_title' => $reply->topic_title,
+				'page'        => 'clipisode-replies',
+			];
+		}
+
+		return null;
 	}
 
 	// --- Themes (CPT) ---

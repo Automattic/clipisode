@@ -77,6 +77,31 @@ export interface Reply {
 	updated_at: string;
 }
 
+export interface MediaUsage {
+	type: 'topic' | 'output' | 'reply';
+	id: number;
+	label: string;
+	topic_id?: number | null;
+	topic_title?: string | null;
+	page: string;
+}
+
+export interface MediaItem {
+	id: number;
+	type: string;
+	label: string;
+	storage: string;
+	path: string;
+	parent_id: number | null;
+	attachment_id: number | null;
+	mime_type: string | null;
+	file_size: number | null;
+	children_count: number;
+	url: string | null;
+	used_by: MediaUsage | null;
+	created_at: string;
+}
+
 export interface TermsOption {
 	id: number;
 	title: string;

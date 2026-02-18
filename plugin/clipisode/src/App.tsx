@@ -2,6 +2,7 @@ import TopicList from './pages/TopicList';
 import TopicDetail from './pages/TopicDetail';
 import TopicForm from './pages/TopicForm';
 import ReplyList from './pages/ReplyList';
+import MediaList from './pages/MediaList';
 import ThemeList from './pages/ThemeList';
 import Settings from './pages/Settings';
 import useHashRoute from './hooks/useHashRoute';
@@ -14,6 +15,10 @@ export default function App() {
 		const params = new URLSearchParams( window.location.search );
 		const topicId = params.get( 'topic_id' );
 		return <ReplyList topicId={ topicId } />;
+	}
+
+	if ( page === 'clipisode-media' ) {
+		return <MediaList />;
 	}
 
 	if ( page === 'clipisode-themes' ) {
