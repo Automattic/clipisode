@@ -67,11 +67,17 @@ switch ( $type ) {
 		$custom_url = ( $topic && $topic->custom_terms_id ) ? get_permalink( (int) $topic->custom_terms_id ) : '';
 		if ( $brand_url ) {
 			echo "<div $wrapper><p class=\"ci-terms-link\">";
-			echo 'By participating you agree to the <a href="' . esc_url( $brand_url ) . '" target="_blank">terms</a>';
+			echo 'By participating you agree to the <a href="' . esc_url( $brand_url ) . '" class="ci-terms-open" data-terms-url="' . esc_url( $brand_url ) . '">terms</a>';
 			if ( $custom_url ) {
-				echo ' and <a href="' . esc_url( $custom_url ) . '" target="_blank">additional terms</a>';
+				$custom_title = get_the_title( (int) $topic->custom_terms_id ) ?: 'additional terms';
+				echo ' and <a href="' . esc_url( $custom_url ) . '" class="ci-terms-open" data-terms-url="' . esc_url( $custom_url ) . '">' . esc_html( strtolower( $custom_title ) ) . '</a>';
 			}
-			echo '.</p></div>';
+			echo '.</p>';
+			echo '<div class="ci-terms-modal" hidden>';
+			echo '<button class="ci-terms-close">&times;</button>';
+			echo '<div class="ci-terms-content"></div>';
+			echo '</div>';
+			echo '</div>';
 		}
 		break;
 

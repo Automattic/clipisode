@@ -170,6 +170,42 @@ function initFlow( root: HTMLElement ): void {
 		}
 	} );
 
+	// Terms modal.
+	const termsModal = root.querySelector< HTMLElement >( '.ci-terms-modal' );
+	const termsContent = root.querySelector< HTMLElement >( '.ci-terms-content' );
+	const termsClose = root.querySelector< HTMLElement >( '.ci-terms-close' );
+
+	root.querySelectorAll< HTMLAnchorElement >( '.ci-terms-open' ).forEach( ( link ) => {
+		link.addEventListener( 'click', async ( e ) => {
+			e.preventDefault();
+			if ( ! termsModal || ! termsContent ) return;
+
+			const url = link.dataset.termsUrl;
+			if ( ! url ) return;
+
+			termsContent.innerHTML = '<p style="opacity:0.5">Loading…</p>';
+			termsModal.hidden = false;
+
+			try {
+				const res = await fetch( url );
+				const html = await res.text();
+				const doc = new DOMParser().parseFromString( html, 'text/html' );
+				const body = doc.querySelector( '.entry-content' )
+					|| doc.querySelector( 'article' )
+					|| doc.querySelector( '.post-content' )
+					|| doc.querySelector( 'main' )
+					|| doc.body;
+				termsContent.innerHTML = body?.innerHTML || html;
+			} catch {
+				termsContent.innerHTML = '<p>Could not load terms. Please try again.</p>';
+			}
+		} );
+	} );
+
+	termsClose?.addEventListener( 'click', () => {
+		if ( termsModal ) termsModal.hidden = true;
+	} );
+
 	showStep( 'landing' );
 }
 

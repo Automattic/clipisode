@@ -82,6 +82,7 @@ if ( preg_match( '/<!-- wp:clipisode\/invitation-flow \{.*?"slug"/', $content ) 
 }
 
 // Render.
+show_admin_bar( false );
 $rendered = do_blocks( $content );
 
 ?>
