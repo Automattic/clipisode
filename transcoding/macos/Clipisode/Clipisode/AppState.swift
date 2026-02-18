@@ -58,7 +58,7 @@ final class AppState {
     
     /// Combine local video files and write the result to a specified output URL.
     /// Each input is used in full (no trimming). Progress is reflected in `isWorking`.
-    func runLocalJob(inputs: [URL], output: URL) {
+    func runLocalJob(inputs: [URL], names: [String] = [], output: URL) {
         guard !isWorking else { return }
         isWorking = true
         
@@ -80,8 +80,8 @@ final class AppState {
                     segmentFiles.append(segmentFile)
                 }
                 
-                // Compose segments with crossfade transitions
-                try await CompositionExporter.export(segments: segmentFiles, to: output)
+                // Compose segments with crossfade transitions and name overlays
+                try await CompositionExporter.export(segments: segmentFiles, names: names, to: output)
                 
                 // Tidy up scratch files
                 try? FileManager.default.removeItem(at: tempFolder)

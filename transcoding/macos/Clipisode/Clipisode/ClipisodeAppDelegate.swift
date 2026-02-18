@@ -24,7 +24,7 @@ final class ClipisodeAppDelegate: NSObject, NSApplicationDelegate {
         let output = downloads.appendingPathComponent("out.mp4")
 
         Task { @MainActor in
-            appState.runLocalJob(inputs: inputs, output: output)
+            appState.runLocalJob(inputs: inputs, names: ["Max", "Brian", "Christoph"], output: output)
         }
     }
 }

@@ -42,8 +42,8 @@ enum FFmpegRunner {
         
         // Normalize all segments to same specs for reliable concatenation
         args += [
-            // Video: scale to 1080p, pad for aspect ratio, normalize to 30fps
-            "-vf", "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,fps=30",
+            // Video: scale to 720×1280 portrait, pad for aspect ratio, normalize to 30fps
+            "-vf", "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,fps=30",
             "-r", "30",
             "-c:v", "libx264",
             "-preset", "fast",

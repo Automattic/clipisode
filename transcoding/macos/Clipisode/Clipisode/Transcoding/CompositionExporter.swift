@@ -4,14 +4,19 @@
 //
 
 import AVFoundation
+import AppKit
+import QuartzCore
 
 enum CompositionExporter {
 
-    private static let renderSize = CGSize(width: 1920, height: 1080)
+    private static let renderSize = CGSize(width: 720, height: 1280)
 
     /// Joins normalized segments with ~1 s crossfade + zoom transitions and exports to `output`.
+    /// If `names` is provided and matches the segment count, a blue gradient lower-third with each
+    /// person's name is composited over the corresponding clip, fading in and out.
     static func export(
         segments: [URL],
+        names: [String] = [],
         to output: URL,
         transitionDuration: TimeInterval = 1.0
     ) async throws {
@@ -71,14 +76,13 @@ enum CompositionExporter {
             }
         }
 
-        // MARK: Build video composition instructions (built-in compositor with layer instructions)
+        // MARK: Build video composition instructions
 
         var instructions: [AVMutableVideoCompositionInstruction] = []
 
         for i in 0..<placements.count {
             let p = placements[i]
 
-            // Solo (passthrough) region
             let soloStart = (i == 0) ? p.start : CMTimeAdd(p.start, transDur)
             let soloEnd = (i == placements.count - 1) ? p.end : CMTimeSubtract(p.end, transDur)
 
@@ -90,7 +94,6 @@ enum CompositionExporter {
                 instructions.append(inst)
             }
 
-            // Transition region
             if i < placements.count - 1 {
                 let nextP = placements[i + 1]
                 let transStart = CMTimeSubtract(p.end, transDur)
@@ -99,11 +102,9 @@ enum CompositionExporter {
                 let inst = AVMutableVideoCompositionInstruction()
                 inst.timeRange = transRange
 
-                // Top layer: incoming clip fades in
                 let toLayer = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTracks[nextP.trackIndex])
                 toLayer.setOpacityRamp(fromStartOpacity: 0, toEndOpacity: 1, timeRange: transRange)
 
-                // Bottom layer: outgoing clip with center-zoom push
                 let fromLayer = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTracks[p.trackIndex])
                 let endScale: CGFloat = 1.08
                 let cx = renderSize.width / 2
@@ -124,6 +125,39 @@ enum CompositionExporter {
         videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
         videoComposition.renderSize = renderSize
         videoComposition.instructions = instructions
+
+        // MARK: Name overlay (CoreAnimation)
+
+        if names.count == placements.count {
+            let totalSeconds = CMTimeGetSeconds(placements.last!.end)
+
+            let parentLayer = CALayer()
+            parentLayer.frame = CGRect(origin: .zero, size: renderSize)
+            parentLayer.isGeometryFlipped = true
+
+            let videoLayer = CALayer()
+            videoLayer.frame = parentLayer.bounds
+            parentLayer.addSublayer(videoLayer)
+
+            let overlayLayer = CALayer()
+            overlayLayer.frame = parentLayer.bounds
+            parentLayer.addSublayer(overlayLayer)
+
+            for (i, placement) in placements.enumerated() {
+                let badge = buildNameBadge(
+                    name: names[i],
+                    placementStart: CMTimeGetSeconds(placement.start),
+                    placementEnd: CMTimeGetSeconds(placement.end),
+                    totalDuration: totalSeconds
+                )
+                overlayLayer.addSublayer(badge)
+            }
+
+            videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(
+                postProcessingAsVideoLayer: videoLayer,
+                in: parentLayer
+            )
+        }
 
         // MARK: Audio crossfade
 
@@ -176,6 +210,113 @@ enum CompositionExporter {
         default:
             throw session.error ?? ExportError.unknownExportFailure
         }
+    }
+
+    // MARK: - Name Badge Builder
+
+    private static func buildNameBadge(
+        name: String,
+        placementStart: Double,
+        placementEnd: Double,
+        totalDuration: Double
+    ) -> CALayer {
+        let badgeHeight: CGFloat = 120
+        let fadeDuration: TimeInterval = 0.5
+        let delayAfterStart: TimeInterval = 0.8
+        let delayBeforeEnd: TimeInterval = 0.8
+
+        let badge = CALayer()
+        badge.frame = CGRect(x: 0, y: renderSize.height - badgeHeight, width: renderSize.width, height: badgeHeight)
+        badge.opacity = 0
+
+        // Blue gradient background: transparent at top → deep blue at bottom
+        let gradient = CAGradientLayer()
+        gradient.frame = badge.bounds
+        gradient.colors = [
+            CGColor(srgbRed: 0, green: 0.12, blue: 0.35, alpha: 0),
+            CGColor(srgbRed: 0, green: 0.12, blue: 0.35, alpha: 0.88),
+        ]
+        gradient.startPoint = CGPoint(x: 0.5, y: 0)
+        gradient.endPoint = CGPoint(x: 0.5, y: 1)
+        badge.addSublayer(gradient)
+
+        // Render name text into an image (CATextLayer doesn't render in offline export)
+        let textImage = renderTextImage(
+            name,
+            size: CGSize(width: renderSize.width - 72, height: 48),
+            font: NSFont.systemFont(ofSize: 32, weight: .medium),
+            color: .white
+        )
+        let textLayer = CALayer()
+        textLayer.frame = CGRect(x: 36, y: 40, width: renderSize.width - 72, height: 48)
+        textLayer.contents = textImage
+        textLayer.contentsGravity = .left
+        badge.addSublayer(textLayer)
+
+        // Keyframe opacity animation: hidden → fade in → visible → fade out → hidden
+        let fadeInStart = placementStart + delayAfterStart
+        let fadeInEnd = fadeInStart + fadeDuration
+        let fadeOutStart = placementEnd - delayBeforeEnd - fadeDuration
+        let fadeOutEnd = fadeOutStart + fadeDuration
+
+        let anim = CAKeyframeAnimation(keyPath: "opacity")
+        anim.beginTime = AVCoreAnimationBeginTimeAtZero
+        anim.duration = totalDuration
+        anim.isRemovedOnCompletion = false
+        anim.fillMode = .forwards
+        anim.calculationMode = .linear
+
+        anim.keyTimes = [
+            0,
+            NSNumber(value: max(fadeInStart, 0) / totalDuration),
+            NSNumber(value: fadeInEnd / totalDuration),
+            NSNumber(value: max(fadeOutStart, fadeInEnd) / totalDuration),
+            NSNumber(value: min(fadeOutEnd, totalDuration) / totalDuration),
+            1,
+        ]
+        anim.values = [0, 0, 1, 1, 0, 0] as [NSNumber]
+
+        badge.add(anim, forKey: "opacity")
+
+        return badge
+    }
+
+    private static func renderTextImage(
+        _ text: String,
+        size: CGSize,
+        font: NSFont,
+        color: NSColor
+    ) -> CGImage? {
+        let scale: CGFloat = 2
+        let pixelWidth = Int(size.width * scale)
+        let pixelHeight = Int(size.height * scale)
+
+        guard let context = CGContext(
+            data: nil,
+            width: pixelWidth,
+            height: pixelHeight,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
+        ) else { return nil }
+
+        context.scaleBy(x: scale, y: scale)
+
+        let gc = NSGraphicsContext(cgContext: context, flipped: false)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = gc
+
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: color,
+        ]
+        let attrStr = NSAttributedString(string: text, attributes: attrs)
+        attrStr.draw(in: CGRect(origin: .zero, size: size))
+
+        NSGraphicsContext.restoreGraphicsState()
+
+        return context.makeImage()
     }
 }
 
