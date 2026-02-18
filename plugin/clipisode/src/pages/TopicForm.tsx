@@ -51,8 +51,8 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 						custom_terms_id: topic.custom_terms_id ? String( topic.custom_terms_id ) : '',
 						invitation_id: topic.invitation_id ? String( topic.invitation_id ) : '',
 					} );
-					if ( topic.intro_video_id && topic.intro_video_url ) {
-						setVideo( { id: topic.intro_video_id, url: topic.intro_video_url } );
+					if ( topic.intro_media_id && topic.intro_video_url ) {
+						setVideo( { id: topic.intro_media_id, url: topic.intro_video_url } );
 					}
 				} else if ( themeList.length > 0 ) {
 					const defaultTheme = themeList.find( ( t ) => t.is_default );
@@ -82,7 +82,7 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 			hosted_by: form.hosted_by.trim(),
 			custom_terms_id: form.custom_terms_id || null,
 			invitation_id: form.invitation_id || null,
-			intro_video_id: video?.id || null,
+			intro_media_id: video?.id || null,
 		};
 
 		const request = isEdit

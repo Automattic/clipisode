@@ -11,7 +11,7 @@ function initFlow( root: HTMLElement ): void {
 		navigator.maxTouchPoints > 0 && window.innerWidth < 1280;
 
 	const stages = root.querySelectorAll< HTMLElement >( '[data-step]' );
-	let attachmentId: number | null = null;
+	let mediaId: number | null = null;
 	let uploadComplete = false;
 
 	function showStep( step: string ): void {
@@ -168,7 +168,7 @@ function initFlow( root: HTMLElement ): void {
 		xhr.addEventListener( 'load', () => {
 			if ( xhr.status >= 200 && xhr.status < 300 ) {
 				const result = JSON.parse( xhr.responseText );
-				attachmentId = result.attachment_id;
+				mediaId = result.id;
 				uploadComplete = true;
 				if ( statusText ) statusText.textContent = 'Upload complete ✓';
 				if ( progressFill ) progressFill.style.width = '100%';
@@ -217,7 +217,7 @@ function initFlow( root: HTMLElement ): void {
 						slug,
 						name,
 						social_handle: handleInput?.value.trim() || null,
-						attachment_id: attachmentId,
+						media_id: mediaId,
 						_clipisode_nonce: uploadNonce,
 					} ),
 				}

@@ -312,11 +312,9 @@ class Clipisode_REST_API {
 			$topic->custom_terms_url   = null;
 		}
 
-		if ( ! empty( $topic->intro_video_id ) ) {
-			$topic->intro_video_url = wp_get_attachment_url( (int) $topic->intro_video_id );
-		} else {
-			$topic->intro_video_url = null;
-		}
+		$topic->intro_video_url = ! empty( $topic->intro_media_id )
+			? Clipisode_Media::get_url( (int) $topic->intro_media_id )
+			: null;
 
 		if ( ! empty( $topic->invitation_id ) ) {
 			$inv_post = get_post( (int) $topic->invitation_id );
@@ -338,7 +336,7 @@ class Clipisode_REST_API {
 				'id'         => (int) $o->id,
 				'name'       => $o->name,
 				'slug'       => $o->slug,
-				'url'        => $o->attachment_id ? wp_get_attachment_url( (int) $o->attachment_id ) : null,
+				'url'        => $o->media_id ? Clipisode_Media::get_url( (int) $o->media_id ) : null,
 				'created_at' => $o->created_at,
 			];
 		}, $raw_outputs );
@@ -398,13 +396,13 @@ class Clipisode_REST_API {
 		$table = $wpdb->prefix . 'clipisode_topics';
 
 		$custom_terms_id = $request->get_param( 'custom_terms_id' );
-		$intro_video_id  = $request->get_param( 'intro_video_id' );
+		$intro_media_id  = $request->get_param( 'intro_media_id' );
 		$invitation_id   = $request->get_param( 'invitation_id' );
 		$brand_terms_id  = Clipisode_Post_Types::ensure_brand_terms();
 
 		$data = [
 			'title'           => sanitize_text_field( $request->get_param( 'title' ) ),
-			'intro_video_id'  => $intro_video_id ? (int) $intro_video_id : null,
+			'intro_media_id'  => $intro_media_id ? (int) $intro_media_id : null,
 			'hosted_by'       => sanitize_text_field( $request->get_param( 'hosted_by' ) ?? '' ),
 			'brand_terms_id'  => $brand_terms_id,
 			'custom_terms_id' => $custom_terms_id ? (int) $custom_terms_id : null,
@@ -440,23 +438,20 @@ class Clipisode_REST_API {
 				$fields[ $field ] = sanitize_text_field( $val );
 			}
 		}
-		if ( $request->has_param( 'intro_video_id' ) ) {
-			$new_video_id = $request->get_param( 'intro_video_id' );
-			$new_video_id = $new_video_id ? (int) $new_video_id : null;
+		if ( $request->has_param( 'intro_media_id' ) ) {
+			$new_media_id = $request->get_param( 'intro_media_id' );
+			$new_media_id = $new_media_id ? (int) $new_media_id : null;
 
-			$old_video_id = (int) $wpdb->get_var( $wpdb->prepare(
-				"SELECT intro_video_id FROM $table WHERE id = %d",
+			$old_media_id = (int) $wpdb->get_var( $wpdb->prepare(
+				"SELECT intro_media_id FROM $table WHERE id = %d",
 				$id
 			) );
 
-			if ( $old_video_id && $old_video_id !== $new_video_id ) {
-				$meta = get_post_meta( $old_video_id, Clipisode_Media::META_KEY, true );
-				if ( $meta ) {
-					wp_delete_attachment( $old_video_id, true );
-				}
+			if ( $old_media_id && $old_media_id !== $new_media_id ) {
+				Clipisode_Media::delete( $old_media_id );
 			}
 
-			$fields['intro_video_id'] = $new_video_id;
+			$fields['intro_media_id'] = $new_media_id;
 		}
 		if ( $request->has_param( 'custom_terms_id' ) ) {
 			$custom_terms_id = $request->get_param( 'custom_terms_id' );
@@ -492,22 +487,28 @@ class Clipisode_REST_API {
 		global $wpdb;
 		$id = (int) $request['id'];
 
-		$video_id = (int) $wpdb->get_var( $wpdb->prepare(
-			"SELECT intro_video_id FROM {$wpdb->prefix}clipisode_topics WHERE id = %d",
+		$intro_media_id = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT intro_media_id FROM {$wpdb->prefix}clipisode_topics WHERE id = %d",
 			$id
 		) );
-		if ( $video_id && get_post_meta( $video_id, Clipisode_Media::META_KEY, true ) ) {
-			wp_delete_attachment( $video_id, true );
+		if ( $intro_media_id ) {
+			Clipisode_Media::delete( $intro_media_id );
 		}
 
-		$output_attachments = $wpdb->get_col( $wpdb->prepare(
-			"SELECT attachment_id FROM {$wpdb->prefix}clipisode_outputs WHERE topic_id = %d AND attachment_id IS NOT NULL",
+		$output_media_ids = $wpdb->get_col( $wpdb->prepare(
+			"SELECT media_id FROM {$wpdb->prefix}clipisode_outputs WHERE topic_id = %d AND media_id IS NOT NULL",
 			$id
 		) );
-		foreach ( $output_attachments as $att_id ) {
-			if ( get_post_meta( (int) $att_id, Clipisode_Media::META_KEY, true ) ) {
-				wp_delete_attachment( (int) $att_id, true );
-			}
+		foreach ( $output_media_ids as $media_id ) {
+			Clipisode_Media::delete( (int) $media_id );
+		}
+
+		$reply_media_ids = $wpdb->get_col( $wpdb->prepare(
+			"SELECT media_id FROM {$wpdb->prefix}clipisode_replies WHERE topic_id = %d AND media_id IS NOT NULL",
+			$id
+		) );
+		foreach ( $reply_media_ids as $media_id ) {
+			Clipisode_Media::delete( (int) $media_id );
 		}
 
 		$wpdb->delete( $wpdb->prefix . 'clipisode_outputs', [ 'topic_id' => $id ] );
@@ -588,8 +589,8 @@ class Clipisode_REST_API {
 			return new WP_REST_Response( [ 'message' => 'Output not found.' ], 404 );
 		}
 
-		if ( $output->attachment_id ) {
-			wp_delete_attachment( (int) $output->attachment_id, true );
+		if ( $output->media_id ) {
+			Clipisode_Media::delete( (int) $output->media_id );
 		}
 
 		$wpdb->delete( $table, [ 'id' => $id ] );
@@ -612,34 +613,28 @@ class Clipisode_REST_API {
 			return new WP_REST_Response( [ 'message' => 'Invalid upload token.' ], 403 );
 		}
 
-		require_once ABSPATH . 'wp-admin/includes/image.php';
-		require_once ABSPATH . 'wp-admin/includes/file.php';
-		require_once ABSPATH . 'wp-admin/includes/media.php';
-
 		$files = $request->get_file_params();
 		if ( empty( $files['video'] ) ) {
 			return new WP_REST_Response( [ 'message' => 'No video file provided.' ], 400 );
 		}
 
-		if ( $output->attachment_id ) {
-			wp_delete_attachment( (int) $output->attachment_id, true );
+		if ( $output->media_id ) {
+			Clipisode_Media::delete( (int) $output->media_id );
 		}
 
-		$attachment_id = media_handle_upload( 'video', 0 );
-		if ( is_wp_error( $attachment_id ) ) {
-			return new WP_REST_Response( [ 'message' => $attachment_id->get_error_message() ], 400 );
+		$result = Clipisode_Media::create( 'video', 'mux' );
+		if ( is_wp_error( $result ) ) {
+			return new WP_REST_Response( [ 'message' => $result->get_error_message() ], 400 );
 		}
-
-		update_post_meta( $attachment_id, Clipisode_Media::META_KEY, '1' );
 
 		$wpdb->update( $table, [
-			'attachment_id' => $attachment_id,
-			'upload_token'  => null,
+			'media_id'     => $result['id'],
+			'upload_token' => null,
 		], [ 'id' => $id ] );
 
 		return new WP_REST_Response( [
-			'attachment_id' => $attachment_id,
-			'url'           => wp_get_attachment_url( $attachment_id ),
+			'id'  => $result['id'],
+			'url' => $result['url'],
 		] );
 	}
 
@@ -741,6 +736,7 @@ class Clipisode_REST_API {
 		global $wpdb;
 		$table     = $wpdb->prefix . 'clipisode_replies';
 		$topic_tbl = $wpdb->prefix . 'clipisode_topics';
+		$media_tbl = $wpdb->prefix . 'clipisode_media';
 
 		$where  = [];
 		$values = [];
@@ -779,7 +775,15 @@ class Clipisode_REST_API {
 			$query = $wpdb->prepare( $query, ...$values );
 		}
 
-		return new WP_REST_Response( $wpdb->get_results( $query ) );
+		$replies = $wpdb->get_results( $query );
+
+		foreach ( $replies as $reply ) {
+			$reply->video_url = $reply->media_id
+				? Clipisode_Media::get_url( (int) $reply->media_id )
+				: null;
+		}
+
+		return new WP_REST_Response( $replies );
 	}
 
 	public function get_reply( WP_REST_Request $request ): WP_REST_Response {
@@ -799,6 +803,10 @@ class Clipisode_REST_API {
 			return new WP_REST_Response( [ 'message' => 'Reply not found.' ], 404 );
 		}
 
+		$reply->video_url = $reply->media_id
+			? Clipisode_Media::get_url( (int) $reply->media_id )
+			: null;
+
 		return new WP_REST_Response( $reply );
 	}
 
@@ -817,16 +825,12 @@ class Clipisode_REST_API {
 
 		$wpdb->update( $table, $fields, [ 'id' => $id ] );
 
-		return $this->get_clip( $request );
+		return $this->get_reply( $request );
 	}
 
 	// --- Videos ---
 
 	public function upload_video( WP_REST_Request $request ): WP_REST_Response {
-		require_once ABSPATH . 'wp-admin/includes/image.php';
-		require_once ABSPATH . 'wp-admin/includes/file.php';
-		require_once ABSPATH . 'wp-admin/includes/media.php';
-
 		$files = $request->get_file_params();
 		if ( empty( $files['video'] ) ) {
 			return new WP_REST_Response( [ 'message' => 'No video file provided.' ], 400 );
@@ -845,24 +849,16 @@ class Clipisode_REST_API {
 			return new WP_REST_Response( [ 'message' => 'File too large. Maximum 80 MB.' ], 400 );
 		}
 
-		$attachment_id = media_handle_upload( 'video', 0 );
-
-		if ( is_wp_error( $attachment_id ) ) {
-			return new WP_REST_Response( [ 'message' => $attachment_id->get_error_message() ], 400 );
+		$result = Clipisode_Media::create( 'video', 'intro' );
+		if ( is_wp_error( $result ) ) {
+			return new WP_REST_Response( [ 'message' => $result->get_error_message() ], 400 );
 		}
 
-		update_post_meta( $attachment_id, Clipisode_Media::META_KEY, '1' );
-
-		return new WP_REST_Response( [
-			'id'  => $attachment_id,
-			'url' => wp_get_attachment_url( $attachment_id ),
-		] );
+		return new WP_REST_Response( $result );
 	}
 
 	public function sideload_video( WP_REST_Request $request ): WP_REST_Response {
-		require_once ABSPATH . 'wp-admin/includes/image.php';
 		require_once ABSPATH . 'wp-admin/includes/file.php';
-		require_once ABSPATH . 'wp-admin/includes/media.php';
 
 		$url = esc_url_raw( $request->get_param( 'url' ) );
 		if ( ! $url ) {
@@ -881,30 +877,28 @@ class Clipisode_REST_API {
 			'tmp_name' => $tmp,
 		];
 
-		$attachment_id = media_handle_sideload( $file_array, 0 );
-
-		if ( is_wp_error( $attachment_id ) ) {
+		$result = Clipisode_Media::create_from_sideload( 'video', 'intro', $file_array );
+		if ( is_wp_error( $result ) ) {
 			@unlink( $tmp );
-			return new WP_REST_Response( [ 'message' => $attachment_id->get_error_message() ], 400 );
+			return new WP_REST_Response( [ 'message' => $result->get_error_message() ], 400 );
 		}
 
-		update_post_meta( $attachment_id, Clipisode_Media::META_KEY, '1' );
-
-		return new WP_REST_Response( [
-			'id'  => $attachment_id,
-			'url' => wp_get_attachment_url( $attachment_id ),
-		] );
+		return new WP_REST_Response( $result );
 	}
 
 	public function delete_video( WP_REST_Request $request ): WP_REST_Response {
-		$id   = (int) $request['id'];
-		$meta = get_post_meta( $id, Clipisode_Media::META_KEY, true );
+		global $wpdb;
+		$id = (int) $request['id'];
 
-		if ( ! $meta ) {
+		$exists = $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM {$wpdb->prefix}clipisode_media WHERE id = %d", $id
+		) );
+
+		if ( ! $exists ) {
 			return new WP_REST_Response( [ 'message' => 'Not a Clipisode-managed video.' ], 403 );
 		}
 
-		wp_delete_attachment( $id, true );
+		Clipisode_Media::delete( $id );
 
 		return new WP_REST_Response( null, 204 );
 	}

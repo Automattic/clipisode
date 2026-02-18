@@ -47,4 +47,112 @@ class Clipisode_Media {
 		];
 		$query->set( 'meta_query', $meta_query );
 	}
+
+	/**
+	 * Create a media record from an uploaded file ($_FILES key).
+	 *
+	 * @return array{ id: int, url: string }|WP_Error
+	 */
+	public static function create( string $type, string $label, string $upload_key = 'video' ) {
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+
+		$attachment_id = media_handle_upload( $upload_key, 0 );
+		if ( is_wp_error( $attachment_id ) ) {
+			return $attachment_id;
+		}
+
+		update_post_meta( $attachment_id, self::META_KEY, '1' );
+
+		return self::insert_row( $type, $label, $attachment_id );
+	}
+
+	/**
+	 * Create a media record by sideloading from a remote URL.
+	 *
+	 * @return array{ id: int, url: string }|WP_Error
+	 */
+	public static function create_from_sideload( string $type, string $label, array $file_array ) {
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+
+		$attachment_id = media_handle_sideload( $file_array, 0 );
+		if ( is_wp_error( $attachment_id ) ) {
+			return $attachment_id;
+		}
+
+		update_post_meta( $attachment_id, self::META_KEY, '1' );
+
+		return self::insert_row( $type, $label, $attachment_id );
+	}
+
+	/**
+	 * Delete a media record and its children. Removes WP attachment for local storage.
+	 */
+	public static function delete( int $id ): void {
+		global $wpdb;
+		$table = $wpdb->prefix . 'clipisode_media';
+
+		$children = $wpdb->get_col( $wpdb->prepare(
+			"SELECT id FROM $table WHERE parent_id = %d", $id
+		) );
+		foreach ( $children as $child_id ) {
+			self::delete( (int) $child_id );
+		}
+
+		$media = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $id ) );
+		if ( ! $media ) {
+			return;
+		}
+
+		if ( $media->storage === 'local' && $media->attachment_id ) {
+			wp_delete_attachment( (int) $media->attachment_id, true );
+		}
+
+		$wpdb->delete( $table, [ 'id' => $id ] );
+	}
+
+	/**
+	 * Resolve a media ID to a public URL.
+	 */
+	public static function get_url( int $id ): ?string {
+		global $wpdb;
+		$media = $wpdb->get_row( $wpdb->prepare(
+			"SELECT storage, attachment_id FROM {$wpdb->prefix}clipisode_media WHERE id = %d", $id
+		) );
+		if ( ! $media ) {
+			return null;
+		}
+
+		if ( $media->storage === 'local' && $media->attachment_id ) {
+			return wp_get_attachment_url( (int) $media->attachment_id ) ?: null;
+		}
+
+		return null;
+	}
+
+	private static function insert_row( string $type, string $label, int $attachment_id ): array {
+		global $wpdb;
+
+		$path      = get_post_meta( $attachment_id, '_wp_attached_file', true );
+		$post      = get_post( $attachment_id );
+		$file_path = get_attached_file( $attachment_id );
+
+		$wpdb->insert( $wpdb->prefix . 'clipisode_media', [
+			'type'          => $type,
+			'label'         => $label,
+			'storage'       => 'local',
+			'path'          => $path,
+			'attachment_id' => $attachment_id,
+			'mime_type'     => $post->post_mime_type,
+			'file_size'     => $file_path ? filesize( $file_path ) : null,
+		] );
+
+		return [
+			'id'  => (int) $wpdb->insert_id,
+			'url' => wp_get_attachment_url( $attachment_id ),
+		];
+	}
 }

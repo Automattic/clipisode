@@ -17,10 +17,28 @@ class Clipisode_Database {
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
 		dbDelta(
+			"CREATE TABLE {$wpdb->prefix}clipisode_media (
+id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+type VARCHAR(20) NOT NULL,
+label VARCHAR(40) NOT NULL,
+storage VARCHAR(20) NOT NULL DEFAULT 'local',
+path TEXT NOT NULL,
+parent_id BIGINT UNSIGNED DEFAULT NULL,
+attachment_id BIGINT UNSIGNED DEFAULT NULL,
+mime_type VARCHAR(100) DEFAULT NULL,
+file_size BIGINT UNSIGNED DEFAULT NULL,
+created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+PRIMARY KEY  (id),
+KEY type (type),
+KEY parent_id (parent_id)
+) $charset;"
+		);
+
+		dbDelta(
 			"CREATE TABLE {$wpdb->prefix}clipisode_topics (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 title VARCHAR(255) NOT NULL,
-intro_video_id BIGINT UNSIGNED DEFAULT NULL,
+intro_media_id BIGINT UNSIGNED DEFAULT NULL,
 hosted_by VARCHAR(255),
 brand_terms_id BIGINT UNSIGNED NOT NULL,
 custom_terms_id BIGINT UNSIGNED DEFAULT NULL,
@@ -63,7 +81,7 @@ id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 topic_id BIGINT UNSIGNED NOT NULL,
 invitation_link_id BIGINT UNSIGNED,
 name VARCHAR(255) NOT NULL,
-video_url TEXT,
+media_id BIGINT UNSIGNED DEFAULT NULL,
 transcript TEXT,
 social_handle VARCHAR(255),
 social_network VARCHAR(50),
@@ -89,7 +107,7 @@ topic_id BIGINT UNSIGNED DEFAULT NULL,
 name VARCHAR(255) NOT NULL,
 slug VARCHAR(255) NOT NULL,
 upload_token VARCHAR(64) DEFAULT NULL,
-attachment_id BIGINT UNSIGNED DEFAULT NULL,
+media_id BIGINT UNSIGNED DEFAULT NULL,
 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 PRIMARY KEY  (id),
 UNIQUE KEY slug (slug),

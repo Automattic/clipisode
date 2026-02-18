@@ -75,10 +75,6 @@ class Clipisode_Invitation {
 			return new WP_REST_Response( [ 'message' => 'This invitation is no longer accepting replies.' ], 403 );
 		}
 
-		require_once ABSPATH . 'wp-admin/includes/image.php';
-		require_once ABSPATH . 'wp-admin/includes/file.php';
-		require_once ABSPATH . 'wp-admin/includes/media.php';
-
 		$files = $request->get_file_params();
 		if ( empty( $files['video'] ) ) {
 			return new WP_REST_Response( [ 'message' => 'No video file provided.' ], 400 );
@@ -97,18 +93,12 @@ class Clipisode_Invitation {
 			return new WP_REST_Response( [ 'message' => 'File too large. Maximum 80 MB.' ], 400 );
 		}
 
-		$attachment_id = media_handle_upload( 'video', 0 );
-
-		if ( is_wp_error( $attachment_id ) ) {
-			return new WP_REST_Response( [ 'message' => $attachment_id->get_error_message() ], 400 );
+		$result = Clipisode_Media::create( 'video', 'original' );
+		if ( is_wp_error( $result ) ) {
+			return new WP_REST_Response( [ 'message' => $result->get_error_message() ], 400 );
 		}
 
-		update_post_meta( $attachment_id, Clipisode_Media::META_KEY, '1' );
-
-		return new WP_REST_Response( [
-			'attachment_id' => $attachment_id,
-			'url'           => wp_get_attachment_url( $attachment_id ),
-		] );
+		return new WP_REST_Response( $result );
 	}
 
 	public function submit_reply( WP_REST_Request $request ): WP_REST_Response {
@@ -118,7 +108,7 @@ class Clipisode_Invitation {
 		$nonce         = sanitize_text_field( $request->get_param( '_clipisode_nonce' ) );
 		$name          = sanitize_text_field( $request->get_param( 'name' ) );
 		$social_handle = sanitize_text_field( $request->get_param( 'social_handle' ) ?? '' );
-		$attachment_id = (int) $request->get_param( 'attachment_id' );
+		$media_id      = (int) $request->get_param( 'media_id' );
 
 		if ( ! $slug || ! $name ) {
 			return new WP_REST_Response( [ 'message' => 'Slug and name are required.' ], 400 );
@@ -150,8 +140,6 @@ class Clipisode_Invitation {
 			return new WP_REST_Response( [ 'message' => 'Topic not found.' ], 404 );
 		}
 
-		$video_url = $attachment_id ? wp_get_attachment_url( $attachment_id ) : null;
-
 		$brand_revision_id  = null;
 		$custom_revision_id = null;
 		if ( $topic->brand_terms_id ) {
@@ -167,7 +155,7 @@ class Clipisode_Invitation {
 			'topic_id'                 => $topic->id,
 			'invitation_link_id'       => $link->id,
 			'name'                     => $name,
-			'video_url'                => $video_url,
+			'media_id'                 => $media_id ?: null,
 			'social_handle'            => $social_handle ?: null,
 			'social_network'           => 'instagram',
 			'status'                   => 'unapproved',

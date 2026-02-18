@@ -1,7 +1,7 @@
 export interface Topic {
 	id: number;
 	title: string;
-	intro_video_id: number | null;
+	intro_media_id: number | null;
 	intro_video_url: string | null;
 	hosted_by: string;
 	brand_terms_id: number;

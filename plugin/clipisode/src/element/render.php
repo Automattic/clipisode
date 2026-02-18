@@ -32,8 +32,8 @@ switch ( $type ) {
 
 	case 'video':
 		$url = '';
-		if ( $topic && $topic->intro_video_id ) {
-			$url = wp_get_attachment_url( (int) $topic->intro_video_id ) ?: '';
+		if ( $topic && $topic->intro_media_id ) {
+			$url = Clipisode_Media::get_url( (int) $topic->intro_media_id ) ?: '';
 		}
 		if ( $url ) {
 			echo "<div $wrapper>";
