@@ -57,6 +57,7 @@ export default function MediaList() {
 	const [ uploading, setUploading ] = useState( false );
 	const [ uploadProgress, setUploadProgress ] = useState( 0 );
 	const [ uploadError, setUploadError ] = useState< string | null >( null );
+	const [ deleting, setDeleting ] = useState< number | null >( null );
 	const fileInputRef = useRef< HTMLInputElement >( null );
 
 	const fetchMedia = useCallback( () => {
@@ -115,6 +116,13 @@ export default function MediaList() {
 		xhr.setRequestHeader( 'X-WP-Nonce', nonce );
 		xhr.send( formData );
 	}, [ fetchMedia ] );
+
+	const handleDelete = useCallback( ( id: number ) => {
+		setDeleting( id );
+		apiFetch( { path: `/clipisode/v1/media/${ id }`, method: 'DELETE' } )
+			.then( () => setItems( ( prev ) => prev.filter( ( m ) => m.id !== id ) ) )
+			.finally( () => setDeleting( null ) );
+	}, [] );
 
 	const onFileChange = useCallback( ( e: React.ChangeEvent< HTMLInputElement > ) => {
 		const file = e.target.files?.[ 0 ];
@@ -198,6 +206,7 @@ export default function MediaList() {
 							<th>Storage</th>
 							<th>Path</th>
 							<th>Created</th>
+							<th style={ { width: 60 } }></th>
 						</tr>
 					</thead>
 					<tbody>
@@ -244,6 +253,23 @@ export default function MediaList() {
 									</div>
 								</td>
 								<td>{ new Date( item.created_at ).toLocaleDateString() }</td>
+								<td>
+									{ item.label === 'asset' && (
+										<Button
+											variant="tertiary"
+											isDestructive
+											isBusy={ deleting === item.id }
+											disabled={ deleting === item.id }
+											onClick={ () => {
+												if ( window.confirm( 'Delete this asset permanently?' ) ) {
+													handleDelete( item.id );
+												}
+											} }
+										>
+											Delete
+										</Button>
+									) }
+								</td>
 							</tr>
 						) ) }
 					</tbody>

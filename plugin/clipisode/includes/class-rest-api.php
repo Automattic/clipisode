@@ -191,6 +191,14 @@ class Clipisode_REST_API {
 			],
 		] );
 
+		register_rest_route( self::NAMESPACE, '/media/(?P<id>\d+)', [
+			[
+				'methods'             => 'DELETE',
+				'callback'            => [ $this, 'delete_media_asset' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+		] );
+
 		// Replies.
 		register_rest_route( self::NAMESPACE, '/replies', [
 			[
@@ -1001,6 +1009,25 @@ class Clipisode_REST_API {
 		}
 
 		return new WP_REST_Response( $result, 201 );
+	}
+
+	public function delete_media_asset( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
+		$id    = (int) $request['id'];
+		$table = $wpdb->prefix . 'clipisode_media';
+
+		$media = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $id ) );
+		if ( ! $media ) {
+			return new WP_REST_Response( [ 'message' => 'Media not found.' ], 404 );
+		}
+
+		if ( $media->label !== 'asset' ) {
+			return new WP_REST_Response( [ 'message' => 'Only manually uploaded assets can be deleted from this page.' ], 403 );
+		}
+
+		Clipisode_Media::delete( $id );
+
+		return new WP_REST_Response( null, 204 );
 	}
 
 	private function resolve_media_usage( int $media_id ): ?array {
