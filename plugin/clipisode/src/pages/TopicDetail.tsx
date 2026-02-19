@@ -278,7 +278,8 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	};
 
 	const copyLinkUrl = ( link: InvitationLink ) => {
-		const url = `${ window.location.origin }/invitation/${ link.slug }`;
+		const prefix = window.clipisodeAdmin?.invitation_prefix || 'invitation';
+		const url = `${ window.location.origin }/${ prefix }/${ link.slug }`;
 		navigator.clipboard.writeText( url );
 		setCopiedId( link.id );
 		setTimeout( () => setCopiedId( ( prev ) => ( prev === link.id ? null : prev ) ), 3000 );

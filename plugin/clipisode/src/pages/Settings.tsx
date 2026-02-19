@@ -1,5 +1,5 @@
-import { useState, useEffect } from '@wordpress/element';
-import { Button, Card, CardBody, CardHeader, Spinner } from '@wordpress/components';
+import { useState, useEffect, useCallback } from '@wordpress/element';
+import { Button, Card, CardBody, CardHeader, Spinner, TextControl, Notice } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import type { BrandTerms, CustomTermsItem, Host } from '../types';
 
@@ -12,25 +12,52 @@ function formatDate( dateStr: string ): string {
 	} );
 }
 
+interface PluginSettings {
+	invitation_prefix: string;
+}
+
 export default function Settings(): JSX.Element {
 	const [ brandTerms, setBrandTerms ] = useState< BrandTerms | null >( null );
 	const [ customTerms, setCustomTerms ] = useState< CustomTermsItem[] >( [] );
 	const [ hosts, setHosts ] = useState< Host[] >( [] );
 	const [ loading, setLoading ] = useState< boolean >( true );
+	const [ invitationPrefix, setInvitationPrefix ] = useState( '' );
+	const [ savedPrefix, setSavedPrefix ] = useState( '' );
+	const [ savingPrefix, setSavingPrefix ] = useState( false );
+	const [ prefixNotice, setPrefixNotice ] = useState< string | null >( null );
 
 	useEffect( () => {
 		Promise.all( [
 			apiFetch< BrandTerms >( { path: '/clipisode/v1/terms/brand' } ),
 			apiFetch< CustomTermsItem[] >( { path: '/clipisode/v1/terms/custom' } ),
 			apiFetch< Host[] >( { path: '/clipisode/v1/hosts' } ),
+			apiFetch< PluginSettings >( { path: '/clipisode/v1/settings' } ),
 		] )
-			.then( ( [ brand, custom, h ] ) => {
+			.then( ( [ brand, custom, h, settings ] ) => {
 				setBrandTerms( brand );
 				setCustomTerms( custom );
 				setHosts( h );
+				setInvitationPrefix( settings.invitation_prefix );
+				setSavedPrefix( settings.invitation_prefix );
 			} )
 			.finally( () => setLoading( false ) );
 	}, [] );
+
+	const savePrefix = useCallback( () => {
+		setSavingPrefix( true );
+		setPrefixNotice( null );
+		apiFetch< PluginSettings >( {
+			path: '/clipisode/v1/settings',
+			method: 'PUT',
+			data: { invitation_prefix: invitationPrefix },
+		} )
+			.then( ( settings ) => {
+				setInvitationPrefix( settings.invitation_prefix );
+				setSavedPrefix( settings.invitation_prefix );
+				setPrefixNotice( 'Invitation prefix updated.' );
+			} )
+			.finally( () => setSavingPrefix( false ) );
+	}, [ invitationPrefix ] );
 
 	const deleteHost = ( id: number ) => {
 		apiFetch( { path: `/clipisode/v1/hosts/${ id }`, method: 'DELETE' } )
@@ -167,6 +194,41 @@ export default function Settings(): JSX.Element {
 
 			<div className="clipisode-settings-section">
 				<h2>General</h2>
+
+				<Card>
+					<CardHeader>
+						<strong>Invitation URL</strong>
+					</CardHeader>
+					<CardBody>
+						{ prefixNotice && (
+							<Notice status="success" isDismissible onDismiss={ () => setPrefixNotice( null ) }>
+								{ prefixNotice }
+							</Notice>
+						) }
+						<div style={ { display: 'flex', alignItems: 'flex-end', gap: 8 } }>
+							<TextControl
+								label="URL Prefix"
+								value={ invitationPrefix }
+								onChange={ setInvitationPrefix }
+								help={ `Invitation pages will be at: ${ window.location.origin }/${ invitationPrefix || 'invitation' }/{code}` }
+								__nextHasNoMarginBottom
+							/>
+							<Button
+								variant="primary"
+								size="compact"
+								onClick={ savePrefix }
+								isBusy={ savingPrefix }
+								disabled={ savingPrefix || invitationPrefix === savedPrefix }
+								style={ { marginBottom: 24 } }
+							>
+								Save
+							</Button>
+						</div>
+						<p style={ { margin: '8px 0 0', color: '#d63638', fontSize: 13 } }>
+							Changing this will break all previously shared invitation links.
+						</p>
+					</CardBody>
+				</Card>
 
 				<Card>
 					<CardHeader>

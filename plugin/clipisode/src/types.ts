@@ -137,6 +137,7 @@ declare global {
 			page: string;
 			rest_root: string;
 			nonce: string;
+			invitation_prefix: string;
 		};
 	}
 }

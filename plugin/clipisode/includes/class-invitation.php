@@ -4,6 +4,16 @@ defined( 'ABSPATH' ) || exit;
 
 class Clipisode_Invitation {
 
+	public static function get_prefix(): string {
+		$prefix = get_option( 'clipisode_invitation_prefix', 'invitation' );
+		return trim( $prefix, '/' );
+	}
+
+	public static function sanitize_prefix( string $value ): string {
+		$value = sanitize_title( trim( $value, '/' ) );
+		return $value ?: 'invitation';
+	}
+
 	public function register_blocks(): void {
 		register_block_type( CLIPISODE_PLUGIN_DIR . 'build/flow' );
 		register_block_type( CLIPISODE_PLUGIN_DIR . 'build/stage-desktop' );
@@ -14,8 +24,9 @@ class Clipisode_Invitation {
 	}
 
 	public function register_rewrite(): void {
+		$prefix = self::get_prefix();
 		add_rewrite_rule(
-			'^invitation/([a-zA-Z0-9]+)/?$',
+			'^' . preg_quote( $prefix, '/' ) . '/([a-zA-Z0-9]+)/?$',
 			'index.php?clipisode_invite=$matches[1]',
 			'top'
 		);
@@ -169,7 +180,6 @@ class Clipisode_Invitation {
 	}
 
 	public static function flush_rewrites(): void {
-		( new self() )->register_rewrite();
-		flush_rewrite_rules();
+		delete_option( 'rewrite_rules' );
 	}
 }

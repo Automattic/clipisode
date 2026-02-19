@@ -46,6 +46,20 @@ class Clipisode_REST_API {
 			],
 		] );
 
+		// Settings.
+		register_rest_route( self::NAMESPACE, '/settings', [
+			[
+				'methods'             => 'GET',
+				'callback'            => [ $this, 'get_settings' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+			[
+				'methods'             => 'PUT',
+				'callback'            => [ $this, 'update_settings' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+		] );
+
 		// Topics.
 		register_rest_route( self::NAMESPACE, '/topics', [
 			[
@@ -265,6 +279,30 @@ class Clipisode_REST_API {
 		], $posts );
 
 		return new WP_REST_Response( $terms );
+	}
+
+	// --- Settings ---
+
+	public function get_settings(): WP_REST_Response {
+		return new WP_REST_Response( [
+			'invitation_prefix' => Clipisode_Invitation::get_prefix(),
+		] );
+	}
+
+	public function update_settings( WP_REST_Request $request ): WP_REST_Response {
+		$data = $request->get_json_params();
+
+		if ( isset( $data['invitation_prefix'] ) ) {
+			$old = get_option( 'clipisode_invitation_prefix', 'invitation' );
+			$new = Clipisode_Invitation::sanitize_prefix( $data['invitation_prefix'] );
+			update_option( 'clipisode_invitation_prefix', $new );
+
+			if ( $old !== $new ) {
+				Clipisode_Invitation::flush_rewrites();
+			}
+		}
+
+		return $this->get_settings();
 	}
 
 	// --- Hosts ---

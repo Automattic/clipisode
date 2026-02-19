@@ -77,9 +77,10 @@ class Clipisode_Admin {
 		);
 
 		wp_localize_script( 'clipisode-admin', 'clipisodeAdmin', [
-			'page'      => isset( $_GET['page'] ) ? sanitize_text_field( $_GET['page'] ) : 'clipisode',
-			'rest_root' => esc_url_raw( rest_url() ),
-			'nonce'     => wp_create_nonce( 'wp_rest' ),
+			'page'              => isset( $_GET['page'] ) ? sanitize_text_field( $_GET['page'] ) : 'clipisode',
+			'rest_root'         => esc_url_raw( rest_url() ),
+			'nonce'             => wp_create_nonce( 'wp_rest' ),
+			'invitation_prefix' => Clipisode_Invitation::get_prefix(),
 		] );
 	}
 
