@@ -15,15 +15,17 @@ enum CompositionExporter {
         segments: [URL],
         names: [String] = [],
         effects: [Set<SegmentEffect>] = [],
+        ciFilters: [[CIFilterConfig]] = [],
         to output: URL,
         transitionDuration: TimeInterval = 1.0
     ) async throws {
         guard !segments.isEmpty else { return }
 
         let hasEffects = effects.contains { !$0.isEmpty }
+        let hasFilters = ciFilters.contains { !$0.isEmpty }
         let hasNames = !names.isEmpty
 
-        if segments.count == 1 && !hasEffects && !hasNames {
+        if segments.count == 1 && !hasEffects && !hasFilters && !hasNames {
             try FileManager.default.copyItem(at: segments[0], to: output)
             return
         }
@@ -105,7 +107,8 @@ enum CompositionExporter {
                 trackID: p.videoTrackID,
                 timeRange: CMTimeRange(start: p.start, duration: p.duration),
                 name: names.indices.contains(p.segmentIndex) ? names[p.segmentIndex] : nil,
-                effects: effects.indices.contains(p.segmentIndex) ? effects[p.segmentIndex] : []
+                effects: effects.indices.contains(p.segmentIndex) ? effects[p.segmentIndex] : [],
+                ciFilters: ciFilters.indices.contains(p.segmentIndex) ? ciFilters[p.segmentIndex] : []
             )
         }
 

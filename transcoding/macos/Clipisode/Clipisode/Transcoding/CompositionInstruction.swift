@@ -4,17 +4,69 @@
 //
 
 import AVFoundation
+import CoreImage
 
 enum SegmentEffect: Hashable {
     case faceTracking
     case particles
 }
 
+/// A named CIFilter with its parameters, applied per-frame in the compositor.
+/// When `endParameters` is provided, numeric values are interpolated from
+/// `parameters` → `endParameters` over the segment's duration using the
+/// chosen easing curve.
+struct CIFilterConfig {
+    enum Easing {
+        case linear
+        case easeIn
+        case easeOut
+        case easeInOut
+
+        func apply(_ t: Double) -> Double {
+            switch self {
+            case .linear:    return t
+            case .easeIn:    return 1 - cos(t * .pi / 2)
+            case .easeOut:   return sin(t * .pi / 2)
+            case .easeInOut: return -(cos(.pi * t) - 1) / 2
+            }
+        }
+    }
+
+    let name: String
+    let parameters: [String: Any]
+    let endParameters: [String: Any]?
+    let easing: Easing
+
+    init(name: String, parameters: [String: Any], endParameters: [String: Any]? = nil, easing: Easing = .easeInOut) {
+        self.name = name
+        self.parameters = parameters
+        self.endParameters = endParameters
+        self.easing = easing
+    }
+
+    /// - Parameter progress: 0…1 fraction through the segment duration.
+    func makeFilter(progress: Double = 0) -> CIFilter? {
+        guard let filter = CIFilter(name: name) else { return nil }
+        filter.setDefaults()
+
+        let t = easing.apply(min(max(progress, 0), 1))
+
+        for (key, startValue) in parameters {
+            if let endParams = endParameters,
+               let startNum = startValue as? Double,
+               let endNum = endParams[key] as? Double {
+                filter.setValue(startNum + (endNum - startNum) * t, forKey: key)
+            } else {
+                filter.setValue(startValue, forKey: key)
+            }
+        }
+        return filter
+    }
+}
+
 /// Carries per-segment metadata through to the custom `VideoCompositor`.
-/// A single instruction covers the entire composition timeline; the compositor
-/// determines which segments are active at each frame time.
 final class CompositionInstruction: NSObject, AVVideoCompositionInstructionProtocol {
-    var containsTweening: Bool = false
+    var containsTweening: Bool = true
     
 
     // MARK: AVVideoCompositionInstructionProtocol
@@ -33,6 +85,8 @@ final class CompositionInstruction: NSObject, AVVideoCompositionInstructionProto
         let timeRange: CMTimeRange
         let name: String?
         let effects: Set<SegmentEffect>
+        /// CIFilters applied to the video frame in order before rendering.
+        let ciFilters: [CIFilterConfig]
     }
 
     let segments: [Segment]

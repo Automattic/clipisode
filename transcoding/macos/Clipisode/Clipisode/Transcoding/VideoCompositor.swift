@@ -145,9 +145,13 @@ final class VideoCompositor: NSObject, AVVideoCompositing {
                 }
             }
 
+            let segProgress = segDuration > 0 ? localTime / segDuration : 0
+
             drawVideoFrame(
                 ctx: ctx,
                 sourceBuffer: sourceBuffer,
+                ciFilters: seg.ciFilters,
+                filterProgress: segProgress,
                 opacity: videoOpacity,
                 scale: videoScale,
                 renderSize: renderSize
@@ -205,11 +209,23 @@ final class VideoCompositor: NSObject, AVVideoCompositing {
     private func drawVideoFrame(
         ctx: CGContext,
         sourceBuffer: CVPixelBuffer,
+        ciFilters: [CIFilterConfig],
+        filterProgress: Double,
         opacity: CGFloat,
         scale: CGFloat,
         renderSize: CGSize
     ) {
-        let ciImage = CIImage(cvPixelBuffer: sourceBuffer)
+        var ciImage = CIImage(cvPixelBuffer: sourceBuffer)
+
+        // Apply CIFilter chain, interpolating animated parameters by progress.
+        for config in ciFilters {
+            guard let filter = config.makeFilter(progress: filterProgress) else { continue }
+            filter.setValue(ciImage, forKey: kCIInputImageKey)
+            if let output = filter.outputImage {
+                ciImage = output.cropped(to: ciImage.extent)
+            }
+        }
+
         guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return }
 
         let sourceW = CGFloat(cgImage.width)
@@ -217,7 +233,6 @@ final class VideoCompositor: NSObject, AVVideoCompositing {
         let targetW = renderSize.width * scale
         let targetH = renderSize.height * scale
 
-        // Aspect-fill: scale to cover the target area, then center.
         let fillScale = max(targetW / sourceW, targetH / sourceH)
         let drawW = sourceW * fillScale
         let drawH = sourceH * fillScale

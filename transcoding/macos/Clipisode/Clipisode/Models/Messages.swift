@@ -5,6 +5,23 @@
 
 import Foundation
 
+// MARK: - Render Request (simple JSON from remote client)
+
+struct RenderRequest: Decodable {
+    let callbackUrl: String
+    let videos: [String: VideoInput]
+
+    struct VideoInput: Decodable {
+        let url: String
+        let filename: String
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case callbackUrl = "callback_url"
+        case videos
+    }
+}
+
 // MARK: - Incoming Messages (Client → App)
 
 struct IncomingMessage: Decodable {

@@ -6,6 +6,7 @@
 import Foundation
 import SwiftUI
 import Observation
+import CoreImage
 
 /// Shared reference so the app delegate can run the launch render.
 enum AppStateHolder {
@@ -89,10 +90,42 @@ final class AppState {
                 if segmentFiles.count > 1 { effects[1] = [.faceTracking] }
                 if segmentFiles.count > 2 { effects[2] = [.particles] }
                 
+                // Per-segment CIFilters applied in the compositor's rendering pipeline.
+                var ciFilters: [[CIFilterConfig]] = Array(repeating: [], count: segmentFiles.count)
+                
+                if segmentFiles.count > 0 {
+                    // Segment 0: bloom glow that builds from crisp to dreamy
+                    ciFilters[0] = [
+                        CIFilterConfig(
+                            name: "CIBloom",
+                            parameters: ["inputRadius": 4.0, "inputIntensity": 0.0],
+                            endParameters: ["inputRadius": 25.0, "inputIntensity": 1.5]
+                        ),
+                    ]
+                }
+                if segmentFiles.count > 1 {
+                    // Segment 1: X-ray negative — inverted clinical look with face wireframe
+                    ciFilters[1] = [
+                        CIFilterConfig(name: "CIXRay", parameters: [:]),
+                    ]
+                }
+                if segmentFiles.count > 2 {
+                    // Segment 2: edge detection glow + sepia — neon outlines over warm tone
+                    ciFilters[2] = [
+                        CIFilterConfig(name: "CIEdges", parameters: [
+                            "inputIntensity": 5.0,
+                        ]),
+                        CIFilterConfig(name: "CISepiaTone", parameters: [
+                            "inputIntensity": 0.6,
+                        ]),
+                    ]
+                }
+                
                 try await CompositionExporter.export(
                     segments: segmentFiles,
                     names: names,
                     effects: effects,
+                    ciFilters: ciFilters,
                     to: output
                 )
                 
@@ -159,6 +192,13 @@ final class AppState {
     // MARK: - Message Handling
     
     private func handleMessage(_ data: Data) {
+        // Try the simple render request format first (no "type" field)
+        if let renderReq = try? JSONDecoder().decode(RenderRequest.self, from: data),
+           !renderReq.videos.isEmpty {
+            handleRenderRequest(renderReq)
+            return
+        }
+
         guard let base = try? JSONDecoder().decode(IncomingMessage.self, from: data) else {
             return
         }
@@ -186,6 +226,95 @@ final class AppState {
             
         default:
             break
+        }
+    }
+    
+    // MARK: - Render Request Handling
+    
+    private func handleRenderRequest(_ request: RenderRequest) {
+        guard !isWorking else {
+            print("⚠️ Already working, ignoring render request")
+            return
+        }
+        isWorking = true
+        
+        let videoCount = request.videos.count
+        print("📥 Render request received: \(videoCount) video(s), callback: \(request.callbackUrl)")
+        
+        Task {
+            do {
+                let jobId = UUID().uuidString
+                let tempDir = FileLocations.tempFolder(jobId)
+                let jobFolder = FileLocations.jobFolder(jobId)
+                try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+                try FileManager.default.createDirectory(at: jobFolder, withIntermediateDirectories: true)
+                
+                // 1. Download all videos to temp files
+                let sortedKeys = request.videos.keys.sorted()
+                var localFiles: [URL] = []
+                for (index, key) in sortedKeys.enumerated() {
+                    let video = request.videos[key]!
+                    guard let url = URL(string: video.url) else {
+                        throw JobError.downloadFailed("Invalid URL for video '\(key)': \(video.url)")
+                    }
+                    
+                    print("⬇️  Downloading [\(key)] (\(index + 1)/\(videoCount))...")
+                    let (tempURL, response) = try await URLSession.shared.download(from: url)
+                    
+                    guard let httpResponse = response as? HTTPURLResponse,
+                          (200...299).contains(httpResponse.statusCode) else {
+                        throw JobError.downloadFailed("HTTP error downloading '\(key)'")
+                    }
+                    
+                    let localFile = tempDir.appendingPathComponent("\(key)_\(video.filename)")
+                    try FileManager.default.moveItem(at: tempURL, to: localFile)
+                    localFiles.append(localFile)
+                    print("✅ Downloaded [\(key)] → \(localFile.lastPathComponent)")
+                }
+                
+                // 2. Render final video
+                let outputFile = jobFolder.appendingPathComponent("output.mp4")
+                print("🎬 Rendering \(localFiles.count) video(s) → \(outputFile.path)")
+                
+                try await CompositionExporter.export(
+                    segments: localFiles,
+                    to: outputFile
+                )
+                
+                print("✅ Render complete: \(outputFile.path)")
+                
+                // 3. Upload to callback URL
+                guard let callbackURL = URL(string: request.callbackUrl) else {
+                    throw JobError.validationFailed("Invalid callback URL: \(request.callbackUrl)")
+                }
+                
+                print("⬆️  Uploading to \(request.callbackUrl)...")
+                let fileData = try Data(contentsOf: outputFile)
+                var uploadRequest = URLRequest(url: callbackURL)
+                uploadRequest.httpMethod = "PUT"
+                uploadRequest.setValue("video/mp4", forHTTPHeaderField: "Content-Type")
+                uploadRequest.setValue("\(fileData.count)", forHTTPHeaderField: "Content-Length")
+                
+                let (_, uploadResponse) = try await URLSession.shared.upload(for: uploadRequest, from: fileData)
+                
+                guard let httpUpload = uploadResponse as? HTTPURLResponse,
+                      (200...299).contains(httpUpload.statusCode) else {
+                    let statusCode = (uploadResponse as? HTTPURLResponse)?.statusCode ?? -1
+                    throw JobError.validationFailed("Upload failed with HTTP \(statusCode)")
+                }
+                
+                print("✅ Upload complete (HTTP \((uploadResponse as! HTTPURLResponse).statusCode))")
+                
+                // 4. Cleanup temp files
+                try? FileManager.default.removeItem(at: tempDir)
+                
+                print("📂 Output path: \(outputFile.path)")
+                
+            } catch {
+                print("❌ Render request failed: \(error.localizedDescription)")
+            }
+            
+            isWorking = false
         }
     }
     
