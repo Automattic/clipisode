@@ -173,10 +173,14 @@ final class AppState {
             
         case "start_job":
             do {
-                let msg = try JSONDecoder().decode(StartJobMessage.self, from: data)
-                startRenderJob(msg)
+                let payload = try StartJobPayload.parse(data: data)
+                startRenderJob(payload: payload)
+            } catch let err as StartJobParseError {
+                switch err {
+                case .invalid(let msg): print("❌ start_job: \(msg)")
+                }
             } catch {
-                print("❌ Failed to decode start_job: \(error)")
+                print("❌ Failed to parse start_job: \(error)")
             }
             
         case "cancel_job":
@@ -190,71 +194,82 @@ final class AppState {
     
     // MARK: - Render Request Handling
     
-    private func startRenderJob(_ msg: StartJobMessage) {
+    private func startRenderJob(payload: StartJobPayload) {
         guard !isWorking else {
             webSocketServer?.send(ConnectionRejected(reason: "Already processing a job."))
             return
         }
         isWorking = true
-        
-        let jobId = msg.jobId
+
+        let jobId = payload.jobId
         currentJobId = jobId
-        let videoCount = msg.videos.count
-        print("🚀 Job \(jobId): \(videoCount) video(s), callback: \(msg.callbackUrl)")
-        
+        let videoCount = payload.videos.count
+        let useTheme = (payload.elements?.isEmpty == false)
+        print("🚀 Job \(jobId): \(videoCount) video(s), theme: \(useTheme), callback: \(payload.callbackUrl)")
+
         renderTask = Task {
             do {
                 let tempDir = FileLocations.tempFolder(jobId)
                 let jobFolder = FileLocations.jobFolder(jobId)
                 try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
                 try FileManager.default.createDirectory(at: jobFolder, withIntermediateDirectories: true)
-                
+
                 // 1. Download
-                let sortedKeys = msg.videos.keys.sorted()
+                let sortedKeys = payload.videos.keys.sorted()
                 var localFiles: [URL] = []
                 for (index, key) in sortedKeys.enumerated() {
                     try Task.checkCancellation()
-                    let video = msg.videos[key]!
+                    let video = payload.videos[key]!
                     guard let url = URL(string: video.url) else {
                         throw JobError.downloadFailed("Invalid URL for video '\(key)': \(video.url)")
                     }
-                    
+
                     sendStatus(jobId: jobId, phase: "downloading", current: index, total: videoCount,
                               message: "Downloading \(key) (\(index + 1)/\(videoCount))")
-                    
+
                     let (tempURL, response) = try await URLSession.shared.download(from: url)
-                    
+
                     guard let httpResponse = response as? HTTPURLResponse,
                           (200...299).contains(httpResponse.statusCode) else {
                         throw JobError.downloadFailed("HTTP error downloading '\(key)'")
                     }
-                    
+
                     let localFile = tempDir.appendingPathComponent("\(key)_\(video.filename)")
                     try FileManager.default.moveItem(at: tempURL, to: localFile)
                     localFiles.append(localFile)
                 }
-                
+
                 sendStatus(jobId: jobId, phase: "downloading", current: videoCount, total: videoCount,
                           message: "Downloads complete")
-                
+
                 // 2. Render
                 try Task.checkCancellation()
                 let outputFile = jobFolder.appendingPathComponent("output.mp4")
                 sendStatus(jobId: jobId, phase: "rendering", current: 0, total: 1,
                           message: "Rendering video...")
-                
-                try await CompositionExporter.export(
-                    segments: localFiles,
-                    to: outputFile
-                )
-                
+
+                if useTheme, let elements = payload.elements {
+                    let videosMap = Dictionary(uniqueKeysWithValues: zip(sortedKeys, localFiles))
+                    try await ThemeCompositionExporter.export(
+                        elements: elements,
+                        videos: videosMap,
+                        files: payload.files,
+                        to: outputFile
+                    )
+                } else {
+                    try await CompositionExporter.export(
+                        segments: localFiles,
+                        to: outputFile
+                    )
+                }
+
                 sendStatus(jobId: jobId, phase: "rendering", current: 1, total: 1,
                           message: "Render complete")
-                
+
                 // 3. Upload via multipart POST
                 try Task.checkCancellation()
-                guard let callbackURL = URL(string: msg.callbackUrl) else {
-                    throw JobError.validationFailed("Invalid callback URL: \(msg.callbackUrl)")
+                guard let callbackURL = URL(string: payload.callbackUrl) else {
+                    throw JobError.validationFailed("Invalid callback URL: \(payload.callbackUrl)")
                 }
                 
                 sendStatus(jobId: jobId, phase: "uploading", current: 0, total: 1,

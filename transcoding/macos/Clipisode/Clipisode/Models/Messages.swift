@@ -38,6 +38,36 @@ struct StartJobMessage: Decodable {
     }
 }
 
+enum StartJobParseError: Error {
+    case invalid(String)
+}
+
+/// Parsed start_job payload including optional theme elements. Use `parse(data:)` to read elements/files from raw JSON.
+struct StartJobPayload {
+    let jobId: String
+    let callbackUrl: String
+    let videos: [String: VideoInput]
+    let elements: [[String: Any]]?
+    let files: [String: String]
+
+    static func parse(data: Data) throws -> StartJobPayload {
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard let dict = json else { throw StartJobParseError.invalid("Invalid start_job JSON") }
+        guard let jobId = dict["job_id"] as? String else { throw StartJobParseError.invalid("Missing job_id") }
+        guard let callbackUrl = dict["callback_url"] as? String else { throw StartJobParseError.invalid("Missing callback_url") }
+        guard let videosDict = dict["videos"] as? [String: [String: Any]] else { throw StartJobParseError.invalid("Missing videos") }
+        var videos: [String: VideoInput] = [:]
+        for (key, v) in videosDict {
+            if let url = v["url"] as? String, let filename = v["filename"] as? String {
+                videos[key] = VideoInput(url: url, filename: filename)
+            }
+        }
+        let elements = dict["elements"] as? [[String: Any]]
+        let files = dict["files"] as? [String: String] ?? [:]
+        return StartJobPayload(jobId: jobId, callbackUrl: callbackUrl, videos: videos, elements: elements, files: files)
+    }
+}
+
 struct JobStatusRequest: Decodable {
     let type: String
     let jobId: String

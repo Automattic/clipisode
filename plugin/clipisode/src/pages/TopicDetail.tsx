@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
 import { Button, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import ReplyModal from '../components/ReplyModal';
+import { getElements } from '../standard-theme';
 import type { Topic, InvitationLink, Reply, Output } from '../types';
 
 interface TopicDetailProps {
@@ -100,6 +101,15 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 			job_id: jobId,
 			callback_url: callbackUrl,
 			videos,
+			elements: getElements({
+				id: topic.id.toString(),
+				title: topic.title,
+				clips: Object.entries(videos).map(([key, vid], i) => ({
+					id: key,
+					duration: 2, // TODO: use correct duration if available
+					displayName: vid.name || key,
+				}))
+			}),
 		};
 
 		const ws = new WebSocket( WS_URL );
