@@ -1,0 +1,24 @@
+{
+  "name": "@clipisode/react-native-video-composer",
+  "version": "1.26.1",
+  "description": "Compose underlay videos for Answers RN.",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clipisode/react-native-video-composer.git",
+    "baseUrl": "https://github.com/clipisode/react-native-video-composer"
+  },
+  "author": {
+    "name": "Max Schmeling",
+    "email": "max@clipisode.com"
+  },
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "react-native": "^0.61.4",
+    "typescript": "^3.8.3",
+    "@types/react-native": "^0.61.21"
+  }
+}
