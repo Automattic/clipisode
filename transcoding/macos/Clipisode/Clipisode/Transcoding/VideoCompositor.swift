@@ -8,6 +8,7 @@
 
 import AVFoundation
 import CoreImage
+import ImageIO
 
 final class VideoCompositor: NSObject, AVVideoCompositing {
 
@@ -150,6 +151,7 @@ final class VideoCompositor: NSObject, AVVideoCompositing {
             drawVideoFrame(
                 ctx: ctx,
                 sourceBuffer: sourceBuffer,
+                preferredTransform: seg.preferredTransform,
                 ciFilters: seg.ciFilters,
                 filterProgress: segProgress,
                 opacity: videoOpacity,
@@ -209,6 +211,7 @@ final class VideoCompositor: NSObject, AVVideoCompositing {
     private func drawVideoFrame(
         ctx: CGContext,
         sourceBuffer: CVPixelBuffer,
+        preferredTransform: CGAffineTransform,
         ciFilters: [CIFilterConfig],
         filterProgress: Double,
         opacity: CGFloat,
@@ -216,6 +219,10 @@ final class VideoCompositor: NSObject, AVVideoCompositing {
         renderSize: CGSize
     ) {
         var ciImage = CIImage(cvPixelBuffer: sourceBuffer)
+
+        if !preferredTransform.isIdentity {
+            ciImage = ciImage.oriented(Self.videoOrientation(from: preferredTransform))
+        }
 
         // Apply CIFilter chain, interpolating animated parameters by progress.
         for config in ciFilters {
@@ -243,6 +250,27 @@ final class VideoCompositor: NSObject, AVVideoCompositing {
         ctx.setAlpha(opacity)
         ctx.draw(cgImage, in: CGRect(x: drawX, y: drawY, width: drawW, height: drawH))
         ctx.restoreGState()
+    }
+
+    // MARK: - Orientation Helpers
+
+    private static func videoOrientation(from transform: CGAffineTransform) -> CGImagePropertyOrientation {
+        let angle = atan2(transform.b, transform.a)
+        let det = transform.a * transform.d - transform.b * transform.c
+        let mirrored = det < 0
+
+        if mirrored {
+            if abs(angle) < 0.1 { return .upMirrored }
+            if abs(angle - .pi / 2) < 0.1 { return .rightMirrored }
+            if abs(abs(angle) - .pi) < 0.1 { return .downMirrored }
+            if abs(angle + .pi / 2) < 0.1 { return .leftMirrored }
+        } else {
+            if abs(angle - .pi / 2) < 0.1 { return .right }
+            if abs(abs(angle) - .pi) < 0.1 { return .down }
+            if abs(angle + .pi / 2) < 0.1 { return .left }
+        }
+
+        return .up
     }
 
     // MARK: - Particle Cache

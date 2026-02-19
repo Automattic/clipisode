@@ -69,6 +69,8 @@ enum CompositionExporter {
         var placements: [Placement] = []
         var insertionTime = CMTime.zero
 
+        var segmentTransforms: [CGAffineTransform] = []
+
         for (index, url) in segments.enumerated() {
             let asset = AVURLAsset(url: url)
             let duration = try await asset.load(.duration)
@@ -76,6 +78,9 @@ enum CompositionExporter {
             guard let videoAssetTrack = try await asset.loadTracks(withMediaType: .video).first else {
                 throw ExportError.missingVideoTrack(url.lastPathComponent)
             }
+
+            let transform = try await videoAssetTrack.load(.preferredTransform)
+            segmentTransforms.append(transform)
 
             let range = CMTimeRange(start: .zero, duration: duration)
             try videoTracks[index].insertTimeRange(range, of: videoAssetTrack, at: insertionTime)
@@ -108,7 +113,8 @@ enum CompositionExporter {
                 timeRange: CMTimeRange(start: p.start, duration: p.duration),
                 name: names.indices.contains(p.segmentIndex) ? names[p.segmentIndex] : nil,
                 effects: effects.indices.contains(p.segmentIndex) ? effects[p.segmentIndex] : [],
-                ciFilters: ciFilters.indices.contains(p.segmentIndex) ? ciFilters[p.segmentIndex] : []
+                ciFilters: ciFilters.indices.contains(p.segmentIndex) ? ciFilters[p.segmentIndex] : [],
+                preferredTransform: segmentTransforms[p.segmentIndex]
             )
         }
 

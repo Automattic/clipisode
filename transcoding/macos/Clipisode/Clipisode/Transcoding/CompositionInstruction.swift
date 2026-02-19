@@ -87,6 +87,8 @@ final class CompositionInstruction: NSObject, AVVideoCompositionInstructionProto
         let effects: Set<SegmentEffect>
         /// CIFilters applied to the video frame in order before rendering.
         let ciFilters: [CIFilterConfig]
+        /// The source video track's preferred transform (rotation metadata).
+        let preferredTransform: CGAffineTransform
     }
 
     let segments: [Segment]
