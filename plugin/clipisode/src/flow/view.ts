@@ -31,6 +31,13 @@ function initFlow( root: HTMLElement ): void {
 			btn.classList.add( 'ci-hidden' );
 		} );
 
+		vid.addEventListener( 'click', () => {
+			if ( ! vid.paused ) {
+				vid.pause();
+				btn.classList.remove( 'ci-hidden' );
+			}
+		} );
+
 		vid.addEventListener( 'ended', () => {
 			btn.classList.remove( 'ci-hidden' );
 		} );
