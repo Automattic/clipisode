@@ -165,10 +165,12 @@ final class VideoCompositor: NSObject, AVVideoCompositing {
             let effectFadeOut = min((segDuration - localTime) / 0.5, 1.0)
             let effectAlpha = CGFloat(min(effectFadeIn, effectFadeOut))
 
-            if seg.effects.contains(.faceTracking) && effectAlpha > 0 {
+            if effectAlpha > 0 {
                 OverlayRenderer.drawFaceOverlay(
                     ctx: ctx,
                     sourceBuffer: sourceBuffer,
+                    preferredTransform: seg.preferredTransform,
+                    renderSize: renderSize,
                     localTime: localTime,
                     segmentDuration: segDuration,
                     alpha: effectAlpha
@@ -191,15 +193,13 @@ final class VideoCompositor: NSObject, AVVideoCompositing {
                 )
             }
 
-            if let name = seg.name {
-                OverlayRenderer.drawNameBadge(
-                    ctx: ctx,
-                    name: name,
-                    localTime: localTime,
-                    segmentDuration: segDuration,
-                    renderSize: renderSize
-                )
-            }
+            OverlayRenderer.drawNameBadge(
+                ctx: ctx,
+                name: seg.name ?? "Clipisode",
+                localTime: localTime,
+                segmentDuration: segDuration,
+                renderSize: renderSize
+            )
         }
 
         CVPixelBufferUnlockBaseAddress(destination, [])
@@ -254,7 +254,7 @@ final class VideoCompositor: NSObject, AVVideoCompositing {
 
     // MARK: - Orientation Helpers
 
-    private static func videoOrientation(from transform: CGAffineTransform) -> CGImagePropertyOrientation {
+    static func videoOrientation(from transform: CGAffineTransform) -> CGImagePropertyOrientation {
         let angle = atan2(transform.b, transform.a)
         let det = transform.a * transform.d - transform.b * transform.c
         let mirrored = det < 0

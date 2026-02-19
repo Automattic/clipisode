@@ -21,15 +21,6 @@ enum CompositionExporter {
     ) async throws {
         guard !segments.isEmpty else { return }
 
-        let hasEffects = effects.contains { !$0.isEmpty }
-        let hasFilters = ciFilters.contains { !$0.isEmpty }
-        let hasNames = !names.isEmpty
-
-        if segments.count == 1 && !hasEffects && !hasFilters && !hasNames {
-            try FileManager.default.copyItem(at: segments[0], to: output)
-            return
-        }
-
         let transDur = CMTime(seconds: transitionDuration, preferredTimescale: 600)
         let composition = AVMutableComposition()
 

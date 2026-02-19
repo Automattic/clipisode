@@ -30,29 +30,53 @@ enum OverlayRenderer {
     // MARK: - Face Tracking Wireframe
 
     /// Runs Vision face landmark detection on `sourceBuffer` and draws a neon
-    /// wireframe overlay into `ctx`. Coordinates from Vision (bottom-left origin)
-    /// map directly to the CGContext's coordinate system.
+    /// wireframe overlay into `ctx`. The `preferredTransform` is used to tell
+    /// Vision the correct orientation, and coordinates are mapped through the
+    /// same aspect-fill transform that `drawVideoFrame` uses.
     static func drawFaceOverlay(
         ctx: CGContext,
         sourceBuffer: CVPixelBuffer,
+        preferredTransform: CGAffineTransform,
+        renderSize: CGSize,
         localTime: Double,
         segmentDuration: Double,
         alpha: CGFloat
     ) {
+        let orientation = VideoCompositor.videoOrientation(from: preferredTransform)
+
         let request = VNDetectFaceLandmarksRequest()
-        try? VNImageRequestHandler(cvPixelBuffer: sourceBuffer, options: [:]).perform([request])
+        try? VNImageRequestHandler(
+            cvPixelBuffer: sourceBuffer,
+            orientation: orientation,
+            options: [:]
+        ).perform([request])
 
         guard let face = request.results?.first,
               let lm = face.landmarks else { return }
 
         let box = face.boundingBox
-        let w = CGFloat(CVPixelBufferGetWidth(sourceBuffer))
-        let h = CGFloat(CVPixelBufferGetHeight(sourceBuffer))
+        let rawW = CGFloat(CVPixelBufferGetWidth(sourceBuffer))
+        let rawH = CGFloat(CVPixelBufferGetHeight(sourceBuffer))
+
+        let videoW: CGFloat
+        let videoH: CGFloat
+        switch orientation {
+        case .left, .right, .leftMirrored, .rightMirrored:
+            videoW = rawH; videoH = rawW
+        default:
+            videoW = rawW; videoH = rawH
+        }
+
+        let fillScale = max(renderSize.width / videoW, renderSize.height / videoH)
+        let drawW = videoW * fillScale
+        let drawH = videoH * fillScale
+        let drawX = (renderSize.width - drawW) / 2
+        let drawY = (renderSize.height - drawH) / 2
 
         func px(_ pt: CGPoint) -> CGPoint {
             CGPoint(
-                x: (box.origin.x + pt.x * box.width) * w,
-                y: (box.origin.y + pt.y * box.height) * h
+                x: drawX + (box.origin.x + pt.x * box.width) * drawW,
+                y: drawY + (box.origin.y + pt.y * box.height) * drawH
             )
         }
 
@@ -157,10 +181,10 @@ enum OverlayRenderer {
         }
 
         // Scan line sweeping across the face
-        let faceMinX = box.origin.x * w - 30
-        let faceMaxX = (box.origin.x + box.width) * w + 30
-        let faceMinY = box.origin.y * h
-        let faceMaxY = (box.origin.y + box.height) * h
+        let faceMinX = drawX + box.origin.x * drawW - 30
+        let faceMaxX = drawX + (box.origin.x + box.width) * drawW + 30
+        let faceMinY = drawY + box.origin.y * drawH
+        let faceMaxY = drawY + (box.origin.y + box.height) * drawH
 
         let phase = localTime.truncatingRemainder(dividingBy: 2.0) / 2.0
         let scanY = faceMaxY - (faceMaxY - faceMinY) * CGFloat(phase)
