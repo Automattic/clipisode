@@ -6,7 +6,7 @@
 import AVFoundation
 import CoreImage
 
-enum SegmentEffect: Hashable {
+nonisolated enum SegmentEffect: Hashable, Sendable {
     case faceTracking
     case particles
 }

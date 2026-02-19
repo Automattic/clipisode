@@ -12,13 +12,9 @@ struct ClipisodeApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra(
-            "Menu Bar Example",
-            systemImage: "characters.uppercase"
-        ) {
+        MenuBarExtra("Clipisode", systemImage: "film") {
             SettingsView(appState: appState)
-                .frame(width: 300, height: 180)
         }
-        .menuBarExtraStyle(.menu)
+        .menuBarExtraStyle(.window)
     }
 }

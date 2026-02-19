@@ -26,7 +26,6 @@ CYAN = "\033[36m"
 active_ws = None
 current_job = None
 current_callback_url = None
-current_output_name = None
 
 
 def banner():
@@ -150,7 +149,7 @@ async def send_msg(data):
 
 
 async def handle_input(line):
-    global current_job, current_callback_url, current_output_name
+    global current_job, current_callback_url
     parts = line.strip().split(None, 1)
     if not parts:
         return
@@ -166,7 +165,7 @@ async def handle_input(line):
         tokens = rest.split(None, 3)
         if len(tokens) < 3:
             print(f"{RED}Usage: s <phase> <current> <total> [message]{RESET}")
-            print(f"{DIM}  Phases: downloading, trimming, joining{RESET}")
+            print(f"{DIM}  Phases: downloading, rendering, uploading{RESET}")
             return
         phase, current, total = tokens[0], tokens[1], tokens[2]
         message = tokens[3] if len(tokens) > 3 else f"{phase} {current}/{total}"
@@ -206,7 +205,6 @@ async def handle_input(line):
         })
         current_job = None
         current_callback_url = None
-        current_output_name = None
 
     elif cmd == "e":
         message = rest.strip() or "Rendering failed (test error)"
@@ -218,7 +216,6 @@ async def handle_input(line):
         })
         current_job = None
         current_callback_url = None
-        current_output_name = None
 
     elif cmd == "c":
         await send_msg({
@@ -227,7 +224,6 @@ async def handle_input(line):
         })
         current_job = None
         current_callback_url = None
-        current_output_name = None
 
     elif cmd == "r":
         raw = rest.strip()
@@ -267,7 +263,7 @@ async def input_loop():
 
 
 async def handler(ws):
-    global active_ws, current_job, current_callback_url, current_output_name
+    global active_ws, current_job, current_callback_url
     active_ws = ws
     addr = ws.remote_address
     print(f"\n{BOLD}{GREEN}● Client connected{RESET} {DIM}{addr}{RESET}")
@@ -280,8 +276,9 @@ async def handler(ws):
                 print(f"\n{YELLOW}[raw]{RESET} {raw}")
                 continue
 
-            msg_type = msg.get("type", "?")
-            log_in(msg_type, msg)
+            msg_type = msg.get("type")
+
+            log_in(msg_type or "?", msg)
 
             if msg_type == "hello":
                 ack = {"type": "hello_ack"}
@@ -291,18 +288,17 @@ async def handler(ws):
             elif msg_type == "start_job":
                 current_job = msg.get("job_id")
                 current_callback_url = msg.get("callback_url")
-                current_output_name = msg.get("output_name")
-                n = len(msg.get("segments", []))
-                print(f"\n{BOLD}{MAGENTA}⚡ Job started: {current_job} ({n} segments){RESET}")
+                videos = msg.get("videos", {})
+                print(f"\n{BOLD}{MAGENTA}⚡ Job started: {current_job} ({len(videos)} video(s)){RESET}")
                 print(f"  {DIM}callback:{RESET} {current_callback_url}")
-                print(f"  {DIM}output:  {RESET} {current_output_name}")
+                for key, info in videos.items():
+                    print(f"  {DIM}{key}:{RESET} {info.get('filename', '?')} → {info.get('url', '?')}")
                 show_prompt()
 
             elif msg_type == "cancel_job":
                 print(f"\n{YELLOW}Client cancelled job.{RESET}")
                 current_job = None
                 current_callback_url = None
-                current_output_name = None
 
     except websockets.ConnectionClosed:
         pass

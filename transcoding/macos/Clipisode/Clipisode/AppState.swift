@@ -17,13 +17,12 @@ enum AppStateHolder {
 @MainActor
 final class AppState {
     var isWorking = false
-    var currentJob: Job?
-    var completedJobs: [Job] = []
     var serverError: String?
     
     private var webSocketServer: WebSocketServer?
     private var httpServer: HTTPServer?
-    private var jobProcessor: JobProcessor?
+    private var renderTask: Task<Void, Never>?
+    private var currentJobId: String?
     
     var jobsFolder: URL { FileLocations.jobsFolder }
     
@@ -143,44 +142,16 @@ final class AppState {
     private func setupServers() {
         let ws = WebSocketServer()
         let http = HTTPServer()
-        let processor = JobProcessor()
         
         self.webSocketServer = ws
         self.httpServer = http
-        self.jobProcessor = processor
         
-        // Connect components
         ws.onMessage = { [weak self] message in
             Task { @MainActor in
                 self?.handleMessage(message)
             }
         }
         
-        processor.onStatusUpdate = { [weak self] jobId, phase, current, total, message in
-            Task { @MainActor in
-                self?.sendStatus(jobId: jobId, phase: phase, current: current, total: total, message: message)
-            }
-        }
-        
-        processor.onComplete = { [weak self] job in
-            Task { @MainActor in
-                self?.handleJobComplete(job)
-            }
-        }
-        
-        processor.onError = { [weak self] jobId, code, message in
-            Task { @MainActor in
-                self?.handleJobError(jobId: jobId, code: code, message: message)
-            }
-        }
-        
-        processor.onCancelled = { [weak self] jobId in
-            Task { @MainActor in
-                self?.handleJobCancelled(jobId: jobId)
-            }
-        }
-        
-        // Start servers
         do {
             try ws.start(port: 63481)
             try http.start(port: 63482, basePath: FileLocations.jobsFolder)
@@ -192,33 +163,21 @@ final class AppState {
     // MARK: - Message Handling
     
     private func handleMessage(_ data: Data) {
-        // Try the simple render request format first (no "type" field)
-        if let renderReq = try? JSONDecoder().decode(RenderRequest.self, from: data),
-           !renderReq.videos.isEmpty {
-            handleRenderRequest(renderReq)
-            return
-        }
-
         guard let base = try? JSONDecoder().decode(IncomingMessage.self, from: data) else {
             return
         }
         
         switch base.type {
         case "hello":
-            let ack = HelloAck()
-            webSocketServer?.send(ack)
+            webSocketServer?.send(HelloAck())
             
         case "start_job":
             do {
                 let msg = try JSONDecoder().decode(StartJobMessage.self, from: data)
-                startJob(msg)
+                startRenderJob(msg)
             } catch {
                 print("❌ Failed to decode start_job: \(error)")
             }
-            
-        case "job_status_request":
-            guard let msg = try? JSONDecoder().decode(JobStatusRequest.self, from: data) else { return }
-            handleStatusRequest(msg.jobId)
             
         case "cancel_job":
             guard let msg = try? JSONDecoder().decode(CancelJobMessage.self, from: data) else { return }
@@ -231,34 +190,38 @@ final class AppState {
     
     // MARK: - Render Request Handling
     
-    private func handleRenderRequest(_ request: RenderRequest) {
+    private func startRenderJob(_ msg: StartJobMessage) {
         guard !isWorking else {
-            print("⚠️ Already working, ignoring render request")
+            webSocketServer?.send(ConnectionRejected(reason: "Already processing a job."))
             return
         }
         isWorking = true
         
-        let videoCount = request.videos.count
-        print("📥 Render request received: \(videoCount) video(s), callback: \(request.callbackUrl)")
+        let jobId = msg.jobId
+        currentJobId = jobId
+        let videoCount = msg.videos.count
+        print("🚀 Job \(jobId): \(videoCount) video(s), callback: \(msg.callbackUrl)")
         
-        Task {
+        renderTask = Task {
             do {
-                let jobId = UUID().uuidString
                 let tempDir = FileLocations.tempFolder(jobId)
                 let jobFolder = FileLocations.jobFolder(jobId)
                 try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
                 try FileManager.default.createDirectory(at: jobFolder, withIntermediateDirectories: true)
                 
-                // 1. Download all videos to temp files
-                let sortedKeys = request.videos.keys.sorted()
+                // 1. Download
+                let sortedKeys = msg.videos.keys.sorted()
                 var localFiles: [URL] = []
                 for (index, key) in sortedKeys.enumerated() {
-                    let video = request.videos[key]!
+                    try Task.checkCancellation()
+                    let video = msg.videos[key]!
                     guard let url = URL(string: video.url) else {
                         throw JobError.downloadFailed("Invalid URL for video '\(key)': \(video.url)")
                     }
                     
-                    print("⬇️  Downloading [\(key)] (\(index + 1)/\(videoCount))...")
+                    sendStatus(jobId: jobId, phase: "downloading", current: index, total: videoCount,
+                              message: "Downloading \(key) (\(index + 1)/\(videoCount))")
+                    
                     let (tempURL, response) = try await URLSession.shared.download(from: url)
                     
                     guard let httpResponse = response as? HTTPURLResponse,
@@ -269,33 +232,48 @@ final class AppState {
                     let localFile = tempDir.appendingPathComponent("\(key)_\(video.filename)")
                     try FileManager.default.moveItem(at: tempURL, to: localFile)
                     localFiles.append(localFile)
-                    print("✅ Downloaded [\(key)] → \(localFile.lastPathComponent)")
                 }
                 
-                // 2. Render final video
+                sendStatus(jobId: jobId, phase: "downloading", current: videoCount, total: videoCount,
+                          message: "Downloads complete")
+                
+                // 2. Render
+                try Task.checkCancellation()
                 let outputFile = jobFolder.appendingPathComponent("output.mp4")
-                print("🎬 Rendering \(localFiles.count) video(s) → \(outputFile.path)")
+                sendStatus(jobId: jobId, phase: "rendering", current: 0, total: 1,
+                          message: "Rendering video...")
                 
                 try await CompositionExporter.export(
                     segments: localFiles,
                     to: outputFile
                 )
                 
-                print("✅ Render complete: \(outputFile.path)")
+                sendStatus(jobId: jobId, phase: "rendering", current: 1, total: 1,
+                          message: "Render complete")
                 
-                // 3. Upload to callback URL
-                guard let callbackURL = URL(string: request.callbackUrl) else {
-                    throw JobError.validationFailed("Invalid callback URL: \(request.callbackUrl)")
+                // 3. Upload via multipart POST
+                try Task.checkCancellation()
+                guard let callbackURL = URL(string: msg.callbackUrl) else {
+                    throw JobError.validationFailed("Invalid callback URL: \(msg.callbackUrl)")
                 }
                 
-                print("⬆️  Uploading to \(request.callbackUrl)...")
-                let fileData = try Data(contentsOf: outputFile)
-                var uploadRequest = URLRequest(url: callbackURL)
-                uploadRequest.httpMethod = "PUT"
-                uploadRequest.setValue("video/mp4", forHTTPHeaderField: "Content-Type")
-                uploadRequest.setValue("\(fileData.count)", forHTTPHeaderField: "Content-Length")
+                sendStatus(jobId: jobId, phase: "uploading", current: 0, total: 1,
+                          message: "Uploading to server...")
                 
-                let (_, uploadResponse) = try await URLSession.shared.upload(for: uploadRequest, from: fileData)
+                let fileData = try Data(contentsOf: outputFile)
+                let boundary = UUID().uuidString
+                var body = Data()
+                body.append("--\(boundary)\r\n".data(using: .utf8)!)
+                body.append("Content-Disposition: form-data; name=\"video\"; filename=\"output.mp4\"\r\n".data(using: .utf8)!)
+                body.append("Content-Type: video/mp4\r\n\r\n".data(using: .utf8)!)
+                body.append(fileData)
+                body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+                
+                var uploadReq = URLRequest(url: callbackURL)
+                uploadReq.httpMethod = "POST"
+                uploadReq.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+                
+                let (uploadData, uploadResponse) = try await URLSession.shared.upload(for: uploadReq, from: body)
                 
                 guard let httpUpload = uploadResponse as? HTTPURLResponse,
                       (200...299).contains(httpUpload.statusCode) else {
@@ -303,48 +281,34 @@ final class AppState {
                     throw JobError.validationFailed("Upload failed with HTTP \(statusCode)")
                 }
                 
-                print("✅ Upload complete (HTTP \((uploadResponse as! HTTPURLResponse).statusCode))")
+                var outputUrl = "http://127.0.0.1:63482/jobs/\(jobId)/output.mp4"
+                if let json = try? JSONSerialization.jsonObject(with: uploadData) as? [String: Any],
+                   let url = json["url"] as? String {
+                    outputUrl = url
+                }
                 
-                // 4. Cleanup temp files
+                // 4. Cleanup
                 try? FileManager.default.removeItem(at: tempDir)
                 
-                print("📂 Output path: \(outputFile.path)")
+                webSocketServer?.send(JobDoneMessage(jobId: jobId, outputUrl: outputUrl))
                 
+            } catch is CancellationError {
+                webSocketServer?.send(JobCancelledMessage(jobId: jobId))
+            } catch let error as JobError {
+                webSocketServer?.send(JobErrorMessage(jobId: jobId, code: error.code.rawValue, message: error.message))
             } catch {
-                print("❌ Render request failed: \(error.localizedDescription)")
+                webSocketServer?.send(JobErrorMessage(jobId: jobId, code: JobErrorCode.unknown.rawValue, message: error.localizedDescription))
             }
             
+            currentJobId = nil
+            renderTask = nil
             isWorking = false
         }
     }
     
-    private func startJob(_ msg: StartJobMessage) {
-        print("🚀 startJob called with jobId: \(msg.jobId), segments: \(msg.segments.count)")
-        guard currentJob == nil else {
-            print("⚠️ Already have a current job, ignoring")
-            return
-        }
-        
-        let job = Job(id: msg.jobId, segments: msg.segments)
-        currentJob = job
-        isWorking = true
-        
-        print("📋 Starting job processor...")
-        jobProcessor?.process(job)
-    }
-    
-    private func handleStatusRequest(_ jobId: String) {
-        if let job = currentJob, job.id == jobId {
-            sendStatus(jobId: jobId, phase: job.state.rawValue, current: 0, total: 1, message: "Processing...")
-        } else {
-            let msg = JobNotFoundMessage(jobId: jobId)
-            webSocketServer?.send(msg)
-        }
-    }
-    
     private func cancelJob(_ jobId: String) {
-        guard let job = currentJob, job.id == jobId else { return }
-        jobProcessor?.cancel()
+        guard currentJobId == jobId else { return }
+        renderTask?.cancel()
     }
     
     // MARK: - Job Callbacks
@@ -352,39 +316,5 @@ final class AppState {
     private func sendStatus(jobId: String, phase: String, current: Int, total: Int, message: String) {
         let msg = JobStatusMessage(jobId: jobId, phase: phase, current: current, total: total, message: message)
         webSocketServer?.send(msg)
-    }
-    
-    private func handleJobComplete(_ job: Job) {
-        var completed = job
-        completed.state = .done
-        completed.completedAt = Date()
-        
-        completedJobs.insert(completed, at: 0)
-        if completedJobs.count > 10 {
-            completedJobs = Array(completedJobs.prefix(10))
-        }
-        
-        let outputUrl = "http://127.0.0.1:63482/jobs/\(job.id)/output.mp4"
-        let msg = JobDoneMessage(jobId: job.id, outputUrl: outputUrl)
-        webSocketServer?.send(msg)
-        
-        currentJob = nil
-        isWorking = false
-    }
-    
-    private func handleJobError(jobId: String, code: JobErrorCode, message: String) {
-        let msg = JobErrorMessage(jobId: jobId, code: code.rawValue, message: message)
-        webSocketServer?.send(msg)
-        
-        currentJob = nil
-        isWorking = false
-    }
-    
-    private func handleJobCancelled(jobId: String) {
-        let msg = JobCancelledMessage(jobId: jobId)
-        webSocketServer?.send(msg)
-        
-        currentJob = nil
-        isWorking = false
     }
 }

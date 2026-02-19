@@ -33,6 +33,8 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 
 	const WS_URL = 'ws://127.0.0.1:63481';
 
+	const jobIdRef = useRef< string | null >( null );
+
 	const generateJobId = () => {
 		const now = new Date();
 		const p = ( n: number, len = 2 ) => String( n ).padStart( len, '0' );
@@ -68,25 +70,36 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 
 		setRenderOutputId( output.id );
 
-		const segments = [
-			...( topic.intro_video_url ? [ { url: topic.intro_video_url, order: 1 } ] : [] ),
-			...approved.map( ( c, i ) => ( {
-				url: c.video_url,
-				order: ( topic.intro_video_url ? 2 : 1 ) + i,
-			} ) ),
-		];
+		const videos: Record< string, { url: string; filename: string; name: string } > = {};
+
+		if ( topic.intro_video_url ) {
+			videos.intro = {
+				url: topic.intro_video_url,
+				filename: topic.intro_video_filename || 'intro.mp4',
+				name: topic.title,
+			};
+		}
+
+		approved.forEach( ( reply, i ) => {
+			const key = approved.length === 1 ? 'main' : `main_${ i + 1 }`;
+			videos[ key ] = {
+				url: reply.video_url,
+				filename: reply.video_filename || `reply_${ i + 1 }.mp4`,
+				name: reply.name,
+			};
+		} );
 
 		const restRoot = window.clipisodeAdmin?.rest_root || `${ window.location.origin }/wp-json/`;
 		const callbackUrl = `${ restRoot }clipisode/v1/outputs/${ output.id }/upload?token=${ output.upload_token }`;
 
 		const jobId = generateJobId();
-		const topicSlug = topic.title.toLowerCase().replace( /[^a-z0-9]+/g, '-' ).replace( /^-|-$/g, '' );
+		jobIdRef.current = jobId;
+
 		const payload = {
 			type: 'start_job',
 			job_id: jobId,
-			output_name: `${ topicSlug }-all.mp4`,
 			callback_url: callbackUrl,
-			segments,
+			videos,
 		};
 
 		const ws = new WebSocket( WS_URL );
@@ -102,15 +115,15 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 				case 'hello_ack':
 					setRenderState( 'processing' );
 					setRenderPhase( 'Starting' );
-					setRenderMessage( 'Initializing job...' );
+					setRenderMessage( 'Sending to render service...' );
 					ws.send( JSON.stringify( payload ) );
 					break;
 
 				case 'job_status': {
 					const phaseLabels: Record< string, string > = {
 						downloading: 'Downloading',
-						trimming: 'Trimming',
-						joining: 'Joining',
+						rendering: 'Rendering',
+						uploading: 'Uploading',
 						done: 'Complete',
 					};
 					setRenderPhase( phaseLabels[ msg.phase ] || msg.phase );
@@ -125,15 +138,24 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 					setRenderOutputUrl( msg.output_url || null );
 					setRenderState( 'done' );
 					load();
+					ws.close();
+					wsRef.current = null;
+					jobIdRef.current = null;
 					break;
 
 				case 'job_error':
 					setRenderError( msg.message || 'Rendering failed.' );
 					setRenderState( 'error' );
+					ws.close();
+					wsRef.current = null;
+					jobIdRef.current = null;
 					break;
 
 				case 'job_cancelled':
 					setRenderState( 'idle' );
+					ws.close();
+					wsRef.current = null;
+					jobIdRef.current = null;
 					break;
 
 				case 'connection_rejected':
@@ -176,10 +198,11 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const cancelRendering = () => {
 		const ws = wsRef.current;
 		if ( ws && ws.readyState === WebSocket.OPEN ) {
-			ws.send( JSON.stringify( { type: 'cancel_job' } ) );
+			ws.send( JSON.stringify( { type: 'cancel_job', job_id: jobIdRef.current } ) );
 		}
 		wsRef.current?.close();
 		wsRef.current = null;
+		jobIdRef.current = null;
 		setRenderState( 'idle' );
 	};
 

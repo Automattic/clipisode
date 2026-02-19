@@ -10,34 +10,45 @@ struct SettingsView: View {
     @State private var showClearConfirmation = false
     
     var body: some View {
-        Form {
-            Section("Server") {
-                LabeledContent("WebSocket Port", value: "63481")
-                LabeledContent("HTTP Port", value: "63482")
-                
-                if let error = appState.serverError {
-                    Text(error)
-                        .foregroundStyle(.red)
-                        .font(.caption)
-                }
-            }
-            
-            Section("Storage") {
-                LabeledContent("Output Folder") {
-                    Button("Open in Finder") {
-                        NSWorkspace.shared.open(appState.jobsFolder)
+        VStack(spacing: 0) {
+            Form {
+                Section("Server") {
+                    LabeledContent("WebSocket Port", value: "63481")
+                    LabeledContent("HTTP Port", value: "63482")
+                    
+                    if let error = appState.serverError {
+                        Text(error)
+                            .foregroundStyle(.red)
+                            .font(.caption)
                     }
                 }
                 
-                LabeledContent("Cache Size", value: appState.cacheSize)
-                
-                Button("Clear Cache...", role: .destructive) {
-                    showClearConfirmation = true
+                Section("Storage") {
+                    LabeledContent("Output Folder") {
+                        Button("Open in Finder") {
+                            NSWorkspace.shared.open(appState.jobsFolder)
+                        }
+                    }
+                    
+                    LabeledContent("Cache Size", value: appState.cacheSize)
+                    
+                    Button("Clear Cache...", role: .destructive) {
+                        showClearConfirmation = true
+                    }
                 }
             }
+            .formStyle(.grouped)
+            
+            Divider()
+            
+            Button("Quit Clipisode") {
+                NSApplication.shared.terminate(nil)
+            }
+            .keyboardShortcut("q")
+            .padding(.vertical, 8)
         }
-        .formStyle(.grouped)
-        .frame(width: 400, height: 280)
+        .frame(width: 320)
+        .fixedSize(horizontal: false, vertical: true)
         .confirmationDialog("Clear Cache?", isPresented: $showClearConfirmation) {
             Button("Clear", role: .destructive) {
                 clearCache()

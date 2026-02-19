@@ -5,21 +5,11 @@
 
 import Foundation
 
-// MARK: - Render Request (simple JSON from remote client)
+// MARK: - Video Input
 
-struct RenderRequest: Decodable {
-    let callbackUrl: String
-    let videos: [String: VideoInput]
-
-    struct VideoInput: Decodable {
-        let url: String
-        let filename: String
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case callbackUrl = "callback_url"
-        case videos
-    }
+struct VideoInput: Decodable {
+    let url: String
+    let filename: String
 }
 
 // MARK: - Incoming Messages (Client → App)
@@ -37,12 +27,14 @@ struct HelloMessage: Decodable {
 struct StartJobMessage: Decodable {
     let type: String
     let jobId: String
-    let segments: [Segment]
+    let callbackUrl: String
+    let videos: [String: VideoInput]
     
     enum CodingKeys: String, CodingKey {
         case type
         case jobId = "job_id"
-        case segments
+        case callbackUrl = "callback_url"
+        case videos
     }
 }
 

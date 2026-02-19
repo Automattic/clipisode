@@ -98,7 +98,7 @@ enum CompositionExporter {
             }
         }
 
-        let totalDuration = placements.last!.end
+        let _totalDuration = placements.last!.end
 
         // MARK: Build segment metadata for the compositor
 
@@ -199,19 +199,8 @@ enum CompositionExporter {
 
         session.videoComposition = videoComposition
         session.audioMix = audioMix
-        session.outputURL = output
-        session.outputFileType = .mp4
 
-        await session.export()
-
-        switch session.status {
-        case .completed:
-            return
-        case .cancelled:
-            throw CancellationError()
-        default:
-            throw session.error ?? ExportError.unknownExportFailure
-        }
+        try await session.export(to: output, as: .mp4)
     }
 }
 

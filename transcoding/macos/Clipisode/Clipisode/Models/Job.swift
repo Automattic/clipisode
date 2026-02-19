@@ -51,7 +51,7 @@ struct Job: Identifiable, Codable, Sendable {
 
 // MARK: - File Locations
 
-nonisolated(unsafe) enum FileLocations {
+nonisolated enum FileLocations {
     static var appSupport: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             .appendingPathComponent("Clipisode", isDirectory: true)

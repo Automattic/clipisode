@@ -338,6 +338,10 @@ class Clipisode_REST_API {
 			? Clipisode_Media::get_url( (int) $topic->intro_media_id )
 			: null;
 
+		$topic->intro_video_filename = ! empty( $topic->intro_media_id )
+			? Clipisode_Media::get_filename( (int) $topic->intro_media_id )
+			: null;
+
 		if ( ! empty( $topic->invitation_id ) ) {
 			$inv_post = get_post( (int) $topic->invitation_id );
 			$topic->invitation_title    = $inv_post ? $inv_post->post_title : null;
@@ -803,6 +807,9 @@ class Clipisode_REST_API {
 			$reply->video_url = $reply->media_id
 				? Clipisode_Media::get_url( (int) $reply->media_id )
 				: null;
+			$reply->video_filename = $reply->media_id
+				? Clipisode_Media::get_filename( (int) $reply->media_id )
+				: null;
 		}
 
 		return new WP_REST_Response( $replies );
@@ -827,6 +834,10 @@ class Clipisode_REST_API {
 
 		$reply->video_url = $reply->media_id
 			? Clipisode_Media::get_url( (int) $reply->media_id )
+			: null;
+
+		$reply->video_filename = $reply->media_id
+			? Clipisode_Media::get_filename( (int) $reply->media_id )
 			: null;
 
 		return new WP_REST_Response( $reply );

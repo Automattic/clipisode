@@ -3,6 +3,7 @@ export interface Topic {
 	title: string;
 	intro_media_id: number | null;
 	intro_video_url: string | null;
+	intro_video_filename: string | null;
 	hosted_by: string;
 	brand_terms_id: number;
 	brand_terms_title: string | null;
@@ -62,6 +63,7 @@ export interface Reply {
 	invitation_link_id: number | null;
 	name: string;
 	video_url: string;
+	video_filename: string | null;
 	transcript: string;
 	social_handle: string;
 	social_network: string;

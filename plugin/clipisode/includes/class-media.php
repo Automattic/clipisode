@@ -133,6 +133,23 @@ class Clipisode_Media {
 		return null;
 	}
 
+	public static function get_filename( int $id ): ?string {
+		global $wpdb;
+		$media = $wpdb->get_row( $wpdb->prepare(
+			"SELECT storage, attachment_id, path FROM {$wpdb->prefix}clipisode_media WHERE id = %d", $id
+		) );
+		if ( ! $media ) {
+			return null;
+		}
+
+		if ( $media->storage === 'local' && $media->attachment_id ) {
+			$file = get_attached_file( (int) $media->attachment_id );
+			return $file ? basename( $file ) : null;
+		}
+
+		return $media->path ? basename( $media->path ) : null;
+	}
+
 	private static function insert_row( string $type, string $label, int $attachment_id ): array {
 		global $wpdb;
 
