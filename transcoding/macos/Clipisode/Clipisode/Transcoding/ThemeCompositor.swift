@@ -88,10 +88,13 @@ final class ThemeCompositor: NSObject, AVVideoCompositing {
             guard timeSeconds >= startAt && timeSeconds <= endAt else { continue }
             guard let props = element["props"] as? [String: Any] else { continue }
 
+            let animations = element["animations"] as? [[String: Any]]
+            let finalProps = TweenHelper.tweenAll(props: props, animations: animations, time: time)
+
             ThemeElementRenderer.draw(
                 ctx: ctx,
                 element: element,
-                props: props,
+                props: finalProps,
                 at: time,
                 request: request,
                 videoTrackIdMap: instruction.videoTrackIdMap,
