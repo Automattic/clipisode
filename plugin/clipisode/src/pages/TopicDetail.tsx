@@ -4,6 +4,13 @@ import apiFetch from '@wordpress/api-fetch';
 import ReplyModal from '../components/ReplyModal';
 import type { Topic, InvitationLink, Reply } from '../types';
 
+function formatBytes( bytes: number | null ): string {
+	if ( ! bytes ) return '—';
+	if ( bytes < 1024 ) return `${ bytes } B`;
+	if ( bytes < 1048576 ) return `${ ( bytes / 1024 ).toFixed( 1 ) } KB`;
+	return `${ ( bytes / 1048576 ).toFixed( 1 ) } MB`;
+}
+
 interface TopicDetailProps {
 	id: string;
 	navigate: ( path: string | number ) => void;
@@ -383,45 +390,45 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 						) }
 					</div>
 
-					<div className="clipisode-section clipisode-output-section">
+					<div className="clipisode-section">
 						<div className="clipisode-section-header">
 							<h2>Clipisodes</h2>
 						</div>
 
-						{ topic.outputs && topic.outputs.length > 0 && (
-							<div className="clipisode-output-list">
-								{ topic.outputs.map( ( o ) => (
-									<div key={ o.id } className="clipisode-output-card">
-										<div className="clipisode-output-header">
-											<strong>{ o.name }</strong>
-											<span className="clipisode-output-date">
-												{ new Date( o.created_at ).toLocaleString() }
-											</span>
-										</div>
-										{ o.url ? (
-											<>
-												<video src={ o.url } controls playsInline />
-												<div className="clipisode-output-actions">
+						{ topic.outputs && topic.outputs.length > 0 ? (
+							<table className="clipisode-table">
+							<thead>
+								<tr>
+									<th>Name</th>
+									<th>Clips</th>
+									<th>Size</th>
+									<th>Created</th>
+									<th></th>
+								</tr>
+							</thead>
+								<tbody>
+									{ topic.outputs.map( ( o ) => (
+										<tr key={ o.id }>
+											<td>
+												{ o.url ? (
+													<a href={ o.url } target="_blank" rel="noopener noreferrer">
+														{ o.name }
+													</a>
+												) : o.name }
+											</td>
+											<td>{ o.clips_count || '—' }</td>
+										<td>{ formatBytes( o.file_size ) }</td>
+										<td>{ new Date( o.created_at ).toLocaleDateString() }</td>
+											<td className="clipisode-link-actions">
+												{ o.url && (
 													<a
-														className="components-button is-secondary is-compact"
+														className="components-button is-tertiary is-compact"
 														href={ o.url }
 														download={ `${ o.slug }.mp4` }
 													>
 														Download
 													</a>
-													<Button
-														variant="tertiary"
-														size="compact"
-														isDestructive
-														onClick={ () => deleteOutput( o.id, o.name ) }
-													>
-														Delete
-													</Button>
-												</div>
-											</>
-										) : (
-											<div className="clipisode-output-actions">
-												<span className="clipisode-output-pending">Processing...</span>
+												) }
 												<Button
 													variant="tertiary"
 													size="compact"
@@ -430,10 +437,14 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 												>
 													Delete
 												</Button>
-											</div>
-										) }
-									</div>
-								) ) }
+											</td>
+										</tr>
+									) ) }
+								</tbody>
+							</table>
+						) : (
+							<div className="clipisode-empty-section">
+								<p>No clipisodes yet.</p>
 							</div>
 						) }
 					</div>

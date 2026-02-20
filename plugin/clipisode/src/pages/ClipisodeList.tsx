@@ -50,9 +50,9 @@ export default function ClipisodeList() {
 				<table className="clipisode-table">
 					<thead>
 						<tr>
-							<th style={ { width: 80 } }>Preview</th>
 							<th>Name</th>
 							<th>Topic</th>
+							<th>Clips</th>
 							<th>Size</th>
 							<th>Created</th>
 						</tr>
@@ -70,18 +70,6 @@ export default function ClipisodeList() {
 								<tr key={ item.id }>
 									<td>
 										{ item.url ? (
-											<video
-												src={ item.url }
-												style={ { width: 64, height: 48, objectFit: 'cover', borderRadius: 4, background: '#000' } }
-												muted
-												preload="metadata"
-											/>
-										) : (
-											<span style={ { color: '#a7aaad', fontSize: 12 } }>—</span>
-										) }
-									</td>
-									<td>
-										{ item.url ? (
 											<a href={ item.url } target="_blank" rel="noopener noreferrer">
 												{ name }
 											</a>
@@ -92,6 +80,7 @@ export default function ClipisodeList() {
 											<a href={ topicLink }>{ topicTitle }</a>
 										) : topicTitle }
 									</td>
+									<td>{ usage?.clips_count || '—' }</td>
 									<td>{ formatBytes( item.file_size ) }</td>
 									<td>{ new Date( item.created_at ).toLocaleDateString() }</td>
 								</tr>

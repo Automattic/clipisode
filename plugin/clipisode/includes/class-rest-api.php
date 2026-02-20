@@ -402,19 +402,35 @@ class Clipisode_REST_API {
 			$topic->invitation_edit_url = null;
 		}
 
-		$outputs_table = $wpdb->prefix . 'clipisode_outputs';
-		$raw_outputs   = $wpdb->get_results( $wpdb->prepare(
-			"SELECT * FROM $outputs_table WHERE topic_id = %d ORDER BY created_at DESC",
+		$outputs_table  = $wpdb->prefix . 'clipisode_outputs';
+		$contents_table = $wpdb->prefix . 'clipisode_contents';
+		$media_table    = $wpdb->prefix . 'clipisode_media';
+
+		$raw_outputs = $wpdb->get_results( $wpdb->prepare(
+			"SELECT o.*,
+				COALESCE(c.clips_count, 0) AS clips_count,
+				m.file_size
+			FROM $outputs_table o
+			LEFT JOIN (
+				SELECT output_id, COUNT(*) AS clips_count
+				FROM $contents_table
+				GROUP BY output_id
+			) c ON c.output_id = o.id
+			LEFT JOIN $media_table m ON m.id = o.media_id
+			WHERE o.topic_id = %d
+			ORDER BY o.created_at DESC",
 			(int) $topic->id
 		) );
 
 		$topic->outputs = array_map( function ( $o ) {
 			return (object) [
-				'id'         => (int) $o->id,
-				'name'       => $o->name,
-				'slug'       => $o->slug,
-				'url'        => $o->media_id ? Clipisode_Media::get_url( (int) $o->media_id ) : null,
-				'created_at' => $o->created_at,
+				'id'          => (int) $o->id,
+				'name'        => $o->name,
+				'slug'        => $o->slug,
+				'url'         => $o->media_id ? Clipisode_Media::get_url( (int) $o->media_id ) : null,
+				'clips_count' => (int) $o->clips_count,
+				'file_size'   => $o->file_size ? (int) $o->file_size : null,
+				'created_at'  => $o->created_at,
 			];
 		}, $raw_outputs );
 
@@ -1164,9 +1180,15 @@ class Clipisode_REST_API {
 		}
 
 		$output = $wpdb->get_row( $wpdb->prepare(
-			"SELECT o.id, o.name, o.topic_id, t.title AS topic_title
+			"SELECT o.id, o.name, o.topic_id, t.title AS topic_title,
+				COALESCE(c.clips_count, 0) AS clips_count
 			 FROM {$wpdb->prefix}clipisode_outputs o
 			 LEFT JOIN {$wpdb->prefix}clipisode_topics t ON t.id = o.topic_id
+			 LEFT JOIN (
+				SELECT output_id, COUNT(*) AS clips_count
+				FROM {$wpdb->prefix}clipisode_contents
+				GROUP BY output_id
+			 ) c ON c.output_id = o.id
 			 WHERE o.media_id = %d",
 			$media_id
 		) );
@@ -1177,6 +1199,7 @@ class Clipisode_REST_API {
 				'label'       => $output->name,
 				'topic_id'    => $output->topic_id ? (int) $output->topic_id : null,
 				'topic_title' => $output->topic_title,
+				'clips_count' => (int) $output->clips_count,
 				'page'        => 'clipisode',
 			];
 		}

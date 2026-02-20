@@ -29,6 +29,8 @@ export interface Output {
 	slug: string;
 	upload_token?: string;
 	url: string | null;
+	clips_count: number;
+	file_size: number | null;
 	created_at: string;
 }
 
@@ -97,6 +99,7 @@ export interface MediaUsage {
 	label: string;
 	topic_id?: number | null;
 	topic_title?: string | null;
+	clips_count?: number;
 	page: string;
 }
 
@@ -151,7 +154,6 @@ declare global {
 			nonce: string;
 			invitation_prefix: string;
 			theme_assets: Record< string, { url: string; filename: string } >;
-			plugin_url: string;
 		};
 	}
 }

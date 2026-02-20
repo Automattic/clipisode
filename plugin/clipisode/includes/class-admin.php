@@ -95,7 +95,6 @@ class Clipisode_Admin {
 			'nonce'             => wp_create_nonce( 'wp_rest' ),
 			'invitation_prefix' => Clipisode_Invitation::get_prefix(),
 			'theme_assets'      => $theme_assets,
-			'plugin_url'        => CLIPISODE_PLUGIN_URL,
 		] );
 	}
 

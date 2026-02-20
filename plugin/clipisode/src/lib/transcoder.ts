@@ -7,14 +7,5 @@ export function generateJobId(): string {
 }
 
 export function getThemeAssets(): Record< string, { url: string; filename: string } > {
-	const pluginUrl = window.clipisodeAdmin?.plugin_url || '';
-	const files = [ 'icon.png', 'logo.png' ];
-	const assets: Record< string, { url: string; filename: string } > = {};
-	for ( const file of files ) {
-		assets[ file ] = {
-			url: `${ pluginUrl }src/standard-theme/assets/${ file }`,
-			filename: file,
-		};
-	}
-	return assets;
+	return window.clipisodeAdmin?.theme_assets ?? {};
 }

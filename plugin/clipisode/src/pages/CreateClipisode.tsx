@@ -445,7 +445,7 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 				<div className="clipisode-output-status">
 					<div className="clipisode-output-phase">Complete</div>
 					{ renderOutputUrl && (
-						<video src={ renderOutputUrl } controls playsInline style={ { maxWidth: '100%' } } />
+						<video src={ renderOutputUrl } controls playsInline style={ { maxWidth: '50%' } } />
 					) }
 					<div style={ { display: 'flex', gap: 8, marginTop: 12 } }>
 						<Button variant="secondary" onClick={ () => navigate( topicId ? String( topicId ) : 'media' ) }>
