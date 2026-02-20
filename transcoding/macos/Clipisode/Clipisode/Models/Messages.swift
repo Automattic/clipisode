@@ -47,6 +47,7 @@ struct StartJobPayload {
     let jobId: String
     let callbackUrl: String
     let videos: [String: VideoInput]
+    let assets: [String: VideoInput]
     let elements: [[String: Any]]?
     let files: [String: String]
 
@@ -62,9 +63,17 @@ struct StartJobPayload {
                 videos[key] = VideoInput(url: url, filename: filename)
             }
         }
+        var assets: [String: VideoInput] = [:]
+        if let assetsDict = dict["assets"] as? [String: [String: Any]] {
+            for (key, v) in assetsDict {
+                if let url = v["url"] as? String, let filename = v["filename"] as? String {
+                    assets[key] = VideoInput(url: url, filename: filename)
+                }
+            }
+        }
         let elements = dict["elements"] as? [[String: Any]]
         let files = dict["files"] as? [String: String] ?? [:]
-        return StartJobPayload(jobId: jobId, callbackUrl: callbackUrl, videos: videos, elements: elements, files: files)
+        return StartJobPayload(jobId: jobId, callbackUrl: callbackUrl, videos: videos, assets: assets, elements: elements, files: files)
     }
 }
 

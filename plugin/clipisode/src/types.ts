@@ -138,6 +138,7 @@ declare global {
 			rest_root: string;
 			nonce: string;
 			invitation_prefix: string;
+			theme_assets: Record< string, { url: string; filename: string } >;
 		};
 	}
 }
