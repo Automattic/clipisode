@@ -75,6 +75,10 @@ final class ThemeCompositor: NSObject, AVVideoCompositing {
         ctx.setFillColor(CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0))
         ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
 
+        // Flip to y-down so element coordinates (top-left origin) map directly.
+        ctx.translateBy(x: 0, y: CGFloat(height))
+        ctx.scaleBy(x: 1, y: -1)
+
         let time = request.compositionTime
         let timeSeconds = CMTimeGetSeconds(time)
 
