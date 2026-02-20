@@ -733,6 +733,7 @@ class Clipisode_REST_API {
 			$result = $wpdb->insert( $table, [
 				'topic_id' => (int) $request['topic_id'],
 				'slug'     => $slug,
+				'type'     => 'public',
 				'status'   => 'open',
 			] );
 			if ( $result !== false ) {
