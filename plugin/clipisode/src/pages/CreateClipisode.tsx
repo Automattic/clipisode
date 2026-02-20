@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
 import { Button, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import TrimModal from '../components/TrimModal';
+import { getElements } from '../standard-theme';
+import { WS_URL, generateJobId, getThemeAssets } from '../lib/transcoder';
 import type { Topic, Output, MediaItem } from '../types';
 
 interface CreateClipisodeProps {
@@ -24,8 +26,6 @@ interface ClipItem {
 }
 
 type RenderState = 'idle' | 'connecting' | 'processing' | 'done' | 'error';
-
-const WS_URL = 'ws://127.0.0.1:63481';
 
 function formatTime( seconds: number ): string {
 	const m = Math.floor( seconds / 60 );
@@ -155,12 +155,6 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 
 	const includedClips = clips.filter( ( c ) => c.included );
 
-	const generateJobId = () => {
-		const now = new Date();
-		const p = ( n: number, len = 2 ) => String( n ).padStart( len, '0' );
-		return `${ now.getUTCFullYear() }${ p( now.getUTCMonth() + 1 ) }${ p( now.getUTCDate() ) }T${ p( now.getUTCHours() ) }${ p( now.getUTCMinutes() ) }${ p( now.getUTCSeconds() ) }Z`;
-	};
-
 	const startRendering = async () => {
 		if ( includedClips.length === 0 ) return;
 
@@ -228,6 +222,16 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 			job_id: jobId,
 			callback_url: callbackUrl,
 			videos,
+			assets: getThemeAssets(),
+			elements: getElements( {
+				id: String( topicId || 0 ),
+				title: topic?.title || 'Clipisode',
+				clips: includedClips.map( ( clip, i ) => ( {
+					id: `clip_${ i }`,
+					duration: clip.trimEnd - clip.trimStart,
+					displayName: clip.name,
+				} ) ),
+			} ),
 		};
 
 		const ws = new WebSocket( WS_URL );

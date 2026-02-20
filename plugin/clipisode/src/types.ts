@@ -151,6 +151,7 @@ declare global {
 			nonce: string;
 			invitation_prefix: string;
 			theme_assets: Record< string, { url: string; filename: string } >;
+			plugin_url: string;
 		};
 	}
 }

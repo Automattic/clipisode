@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
+import { useState, useEffect, useCallback } from '@wordpress/element';
 import { Button, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import ReplyModal from '../components/ReplyModal';
-import { getElements } from '../standard-theme';
-import type { Topic, InvitationLink, Reply, Output } from '../types';
+import type { Topic, InvitationLink, Reply } from '../types';
 
 interface TopicDetailProps {
 	id: string;
@@ -23,171 +22,6 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const [ selectedReply, setSelectedReply ] = useState< Reply | null >( null );
 	const [ selectedReplyIds, setSelectedReplyIds ] = useState< Set< number > >( new Set() );
 
-	type RenderState = 'idle' | 'connecting' | 'processing' | 'done' | 'error';
-	const [ renderState, setRenderState ] = useState< RenderState >( 'idle' );
-	const [ renderPhase, setRenderPhase ] = useState( '' );
-	const [ renderMessage, setRenderMessage ] = useState( '' );
-	const [ renderProgress, setRenderProgress ] = useState( 0 );
-	const [ renderError, setRenderError ] = useState( '' );
-	const [ renderOutputUrl, setRenderOutputUrl ] = useState< string | null >( null );
-	const [ renderOutputId, setRenderOutputId ] = useState< number | null >( null );
-	const wsRef = useRef< WebSocket | null >( null );
-
-	const WS_URL = 'ws://127.0.0.1:63481';
-
-	const jobIdRef = useRef< string | null >( null );
-
-	const generateJobId = () => {
-		const now = new Date();
-		const p = ( n: number, len = 2 ) => String( n ).padStart( len, '0' );
-		return `${ now.getUTCFullYear() }${ p( now.getUTCMonth() + 1 ) }${ p( now.getUTCDate() ) }T${ p( now.getUTCHours() ) }${ p( now.getUTCMinutes() ) }${ p( now.getUTCSeconds() ) }Z`;
-	};
-
-	const startRendering = async () => {
-		if ( ! topic ) return;
-
-		const approved = replies.filter( ( r ) => r.status === 'approved' );
-		if ( approved.length === 0 ) return;
-
-		setRenderState( 'connecting' );
-		setRenderPhase( '' );
-		setRenderMessage( '' );
-		setRenderProgress( 0 );
-		setRenderError( '' );
-		setRenderOutputUrl( null );
-		setRenderOutputId( null );
-
-		let output: Output;
-		try {
-			output = await apiFetch< Output >( {
-				path: '/clipisode/v1/outputs',
-				method: 'POST',
-				data: { topic_id: topic.id, name: 'All Replies' },
-			} );
-		} catch {
-			setRenderState( 'error' );
-			setRenderError( 'Failed to create output record.' );
-			return;
-		}
-
-		setRenderOutputId( output.id );
-
-		const videos: Record< string, { url: string; filename: string; name: string } > = {};
-
-		if ( topic.intro_video_url ) {
-			videos.intro = {
-				url: topic.intro_video_url,
-				filename: topic.intro_video_filename || 'intro.mp4',
-				name: topic.title,
-			};
-		}
-
-		approved.forEach( ( reply, i ) => {
-			const key = approved.length === 1 ? 'main' : `main_${ i + 1 }`;
-			videos[ key ] = {
-				url: reply.video_url,
-				filename: reply.video_filename || `reply_${ i + 1 }.mp4`,
-				name: reply.name,
-			};
-		} );
-
-		const restRoot = window.clipisodeAdmin?.rest_root || `${ window.location.origin }/wp-json/`;
-		const callbackUrl = `${ restRoot }clipisode/v1/outputs/${ output.id }/upload?token=${ output.upload_token }`;
-
-		const jobId = generateJobId();
-		jobIdRef.current = jobId;
-
-		const payload = {
-			type: 'start_job',
-			job_id: jobId,
-			callback_url: callbackUrl,
-			videos,
-			elements: getElements({
-				id: topic.id.toString(),
-				title: topic.title,
-				clips: Object.entries(videos).map(([key, vid], i) => ({
-					id: key,
-					duration: 2, // TODO: use correct duration if available
-					displayName: vid.name || key,
-				}))
-			}),
-		};
-
-		const ws = new WebSocket( WS_URL );
-		wsRef.current = ws;
-
-		ws.onopen = () => {
-			ws.send( JSON.stringify( { type: 'hello', client: 'clipisode-admin', version: 1 } ) );
-		};
-
-		ws.onmessage = ( event ) => {
-			const msg = JSON.parse( event.data );
-			switch ( msg.type ) {
-				case 'hello_ack':
-					setRenderState( 'processing' );
-					setRenderPhase( 'Starting' );
-					setRenderMessage( 'Sending to render service...' );
-					ws.send( JSON.stringify( payload ) );
-					break;
-
-				case 'job_status': {
-					const phaseLabels: Record< string, string > = {
-						downloading: 'Downloading',
-						rendering: 'Rendering',
-						uploading: 'Uploading',
-						done: 'Complete',
-					};
-					setRenderPhase( phaseLabels[ msg.phase ] || msg.phase );
-					setRenderMessage( msg.message || '' );
-					if ( msg.total > 0 ) {
-						setRenderProgress( ( msg.current / msg.total ) * 100 );
-					}
-					break;
-				}
-
-				case 'job_done':
-					setRenderOutputUrl( msg.output_url || null );
-					setRenderState( 'done' );
-					load();
-					ws.close();
-					wsRef.current = null;
-					jobIdRef.current = null;
-					break;
-
-				case 'job_error':
-					setRenderError( msg.message || 'Rendering failed.' );
-					setRenderState( 'error' );
-					ws.close();
-					wsRef.current = null;
-					jobIdRef.current = null;
-					break;
-
-				case 'job_cancelled':
-					setRenderState( 'idle' );
-					ws.close();
-					wsRef.current = null;
-					jobIdRef.current = null;
-					break;
-
-				case 'connection_rejected':
-					setRenderError( msg.reason || 'Connection rejected.' );
-					setRenderState( 'error' );
-					break;
-			}
-		};
-
-		ws.onclose = () => {
-			if ( renderState === 'connecting' ) {
-				setRenderError( 'Could not connect to render service.' );
-				setRenderState( 'error' );
-			}
-		};
-
-		ws.onerror = () => {
-			ws.close();
-		};
-	};
-
 	const deleteOutput = ( outputId: number, name: string ) => {
 		if ( ! window.confirm( `Delete "${ name }"? The video will be permanently removed.` ) ) {
 			return;
@@ -204,17 +38,6 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 				};
 			} );
 		} );
-	};
-
-	const cancelRendering = () => {
-		const ws = wsRef.current;
-		if ( ws && ws.readyState === WebSocket.OPEN ) {
-			ws.send( JSON.stringify( { type: 'cancel_job', job_id: jobIdRef.current } ) );
-		}
-		wsRef.current?.close();
-		wsRef.current = null;
-		jobIdRef.current = null;
-		setRenderState( 'idle' );
 	};
 
 	const load = useCallback( () => {
@@ -562,10 +385,10 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 
 					<div className="clipisode-section clipisode-output-section">
 						<div className="clipisode-section-header">
-							<h2>Clipisode Output</h2>
+							<h2>Clipisodes</h2>
 						</div>
 
-						{ topic.outputs && topic.outputs.length > 0 && renderState === 'idle' && (
+						{ topic.outputs && topic.outputs.length > 0 && (
 							<div className="clipisode-output-list">
 								{ topic.outputs.map( ( o ) => (
 									<div key={ o.id } className="clipisode-output-card">
@@ -611,87 +434,6 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 										) }
 									</div>
 								) ) }
-							</div>
-						) }
-
-						{ renderState === 'idle' && (
-							<Button
-								variant="primary"
-								onClick={ startRendering }
-								disabled={ approvedCount === 0 }
-							>
-								Generate Clipisode
-							</Button>
-						) }
-
-						{ renderState === 'connecting' && (
-							<div className="clipisode-output-status">
-								<Spinner />
-								<span>Connecting to render service...</span>
-							</div>
-						) }
-
-						{ renderState === 'processing' && (
-							<div className="clipisode-output-status">
-								<div className="clipisode-output-phase">{ renderPhase }</div>
-								<div className="clipisode-output-message">{ renderMessage }</div>
-								<div className="clipisode-progress-bar clipisode-output-progress">
-									<div
-										className="clipisode-progress-fill"
-										style={ { width: `${ renderProgress }%` } }
-									/>
-								</div>
-								<Button variant="tertiary" isDestructive onClick={ cancelRendering }>
-									Cancel
-								</Button>
-							</div>
-						) }
-
-						{ renderState === 'done' && (
-							<div className="clipisode-output-status clipisode-output-done">
-								<div className="clipisode-output-phase">Complete</div>
-								{ renderOutputUrl && (
-									<>
-										<video src={ renderOutputUrl } controls playsInline />
-										<div className="clipisode-output-actions">
-											<a
-												className="components-button is-secondary is-compact"
-												href={ renderOutputUrl }
-												download
-											>
-												Download
-											</a>
-											{ renderOutputId && (
-												<Button
-													variant="tertiary"
-													size="compact"
-													isDestructive
-													onClick={ () => {
-														deleteOutput( renderOutputId, 'All Replies' );
-														setRenderState( 'idle' );
-													} }
-												>
-													Delete
-												</Button>
-											) }
-										</div>
-									</>
-								) }
-								{ ! renderOutputUrl && (
-									<Button variant="secondary" onClick={ () => setRenderState( 'idle' ) }>
-										OK
-									</Button>
-								) }
-							</div>
-						) }
-
-						{ renderState === 'error' && (
-							<div className="clipisode-output-status clipisode-output-error">
-								<div className="clipisode-output-phase">Error</div>
-								<div className="clipisode-output-message">{ renderError }</div>
-								<Button variant="secondary" onClick={ () => setRenderState( 'idle' ) }>
-									Retry
-								</Button>
 							</div>
 						) }
 					</div>
