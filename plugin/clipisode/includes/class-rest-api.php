@@ -482,6 +482,7 @@ class Clipisode_REST_API {
 		$wpdb->insert( $wpdb->prefix . 'clipisode_invitation_links', [
 			'topic_id' => $topic_id,
 			'slug'     => substr( bin2hex( random_bytes( 3 ) ), 0, 6 ),
+			'type'     => 'public',
 			'status'   => 'open',
 		] );
 

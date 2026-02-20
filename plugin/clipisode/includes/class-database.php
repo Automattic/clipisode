@@ -162,11 +162,11 @@ KEY topic_id (topic_id)
 
 		$links_table = $wpdb->prefix . 'clipisode_invitation_links';
 
-		$wpdb->insert( $links_table, [ 'topic_id' => $topic_1, 'slug' => 'd3137f', 'status' => 'open', 'clicks' => 2561 ] );
+		$wpdb->insert( $links_table, [ 'topic_id' => $topic_1, 'slug' => 'd3137f', 'type' => 'public', 'status' => 'open', 'clicks' => 2561 ] );
 		$link_1 = $wpdb->insert_id;
-		$wpdb->insert( $links_table, [ 'topic_id' => $topic_1, 'slug' => 'e2a2b1', 'status' => 'open', 'clicks' => 329 ] );
-		$wpdb->insert( $links_table, [ 'topic_id' => $topic_1, 'slug' => 'fb1be3', 'status' => 'open', 'clicks' => 1092 ] );
-		$wpdb->insert( $links_table, [ 'topic_id' => $topic_2, 'slug' => 'x9k4m2', 'status' => 'open', 'clicks' => 87 ] );
+		$wpdb->insert( $links_table, [ 'topic_id' => $topic_1, 'slug' => 'e2a2b1', 'type' => 'public', 'status' => 'open', 'clicks' => 329 ] );
+		$wpdb->insert( $links_table, [ 'topic_id' => $topic_1, 'slug' => 'fb1be3', 'type' => 'public', 'status' => 'open', 'clicks' => 1092 ] );
+		$wpdb->insert( $links_table, [ 'topic_id' => $topic_2, 'slug' => 'x9k4m2', 'type' => 'public', 'status' => 'open', 'clicks' => 87 ] );
 
 		$replies_table = $wpdb->prefix . 'clipisode_replies';
 
