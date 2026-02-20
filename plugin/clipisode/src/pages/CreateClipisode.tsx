@@ -89,7 +89,7 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 				id: `media-${ m.id }`,
 				mediaId: m.id,
 				role: ( t?.intro_media_id === m.id ? 'intro' : 'reply' ) as 'intro' | 'reply',
-				name: m.used_by?.label || m.label || m.path.split( '/' ).pop() || `media_${ m.id }`,
+				name: ( t?.intro_media_id === m.id && t?.hosted_by ) ? t.hosted_by : ( m.used_by?.label || m.label || m.path.split( '/' ).pop() || `media_${ m.id }` ),
 				url: m.url!,
 				filename: m.path.split( '/' ).pop() || `media_${ m.id }.mp4`,
 				duration: 0,
