@@ -132,7 +132,8 @@ export default function TrimModal( {
 		return () => window.removeEventListener( 'keydown', onKeyDown );
 	}, [ togglePlay, setInPoint, setOutPoint ] );
 
-	const trimmedDuration = trimEnd - trimStart;
+	const selectedDuration = trimEnd - trimStart;
+	const removedDuration = duration - selectedDuration;
 
 	return (
 		<Modal title={ `Trim: ${ name }` } onRequestClose={ onClose } isFullScreen>
@@ -170,13 +171,13 @@ export default function TrimModal( {
 					</Button>
 				</div>
 
-				<div className="clipisode-trim-info" style={ { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, color: '#646970', marginBottom: 16 } }>
+				<div className="clipisode-trim-info" style={ { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, color: '#646970', marginBottom: 12 } }>
 					<span>In: { formatTime( trimStart ) }</span>
+					<span>Trimmed: { formatTime( removedDuration ) } / { formatTime( duration ) }</span>
 					<span>Out: { formatTime( trimEnd ) }</span>
-					<span>Trimmed: { formatTime( trimmedDuration ) } / { formatTime( duration ) }</span>
 				</div>
 
-				<div className="clipisode-trim-actions" style={ { display: 'flex', gap: 8, justifyContent: 'flex-end' } }>
+				<div className="clipisode-trim-actions" style={ { display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 16 } }>
 					<Button variant="secondary" onClick={ () => {
 						const video = videoRef.current;
 						if ( ! video ) return;
