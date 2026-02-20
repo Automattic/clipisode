@@ -49,6 +49,9 @@ enum ThemeCompositionExporter {
             if let cgImage { frameMap[name] = cgImage }
         }
 
+        // Single audio track shared by all clips and the ending silence
+        let sharedAudioTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
+
         // Add video and audio tracks from "video" elements
         for element in elements where (element["type"] as? String) == "video" {
             guard let videoKey = element["videoKey"] as? String,
@@ -75,15 +78,14 @@ enum ThemeCompositionExporter {
             let range = CMTimeRange(start: .zero, duration: duration)
             try? compVideoTrack.insertTimeRange(range, of: videoTrack, at: startAtTime)
 
-            if let audioTrack = asset.tracks(withMediaType: .audio).first,
-               let compAudioTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
+            if let audioTrack = asset.tracks(withMediaType: .audio).first, let compAudioTrack = sharedAudioTrack {
                 try? compAudioTrack.insertTimeRange(range, of: audioTrack, at: startAtTime)
             }
         }
 
-        let compositionEnd = composition.duration
-        if CMTimeCompare(extendTo, compositionEnd) > 0 {
-            addSilentAudioTrack(from: compositionEnd, to: extendTo, in: composition)
+        // Extend the shared audio track with silence to cover the ending card
+        if let compAudioTrack = sharedAudioTrack, CMTimeCompare(extendTo, compAudioTrack.timeRange.end) > 0 {
+            appendSilence(to: compAudioTrack, until: extendTo)
         }
 
         let requiredTrackIDs = Array(Set(videoTrackIdMap.values))
@@ -137,10 +139,9 @@ enum ThemeCompositionExporter {
         return try? generator.copyCGImage(at: at, actualTime: &actualTime)
     }
 
-    /// Adds a silent audio track covering the gap between `from` and `to` so
-    /// the composition's media timeline extends past the last video clip,
-    /// allowing the compositor to render the ending card.
-    private static func addSilentAudioTrack(from start: CMTime, to end: CMTime, in composition: AVMutableComposition) {
+    /// Appends silence to an existing audio track so it extends to `until`.
+    private static func appendSilence(to track: AVMutableCompositionTrack, until end: CMTime) {
+        let start = track.timeRange.end
         let gap = CMTimeSubtract(end, start)
         guard CMTimeGetSeconds(gap) > 0 else { return }
 
@@ -149,19 +150,17 @@ enum ThemeCompositionExporter {
             .appendingPathExtension("wav")
         defer { try? FileManager.default.removeItem(at: tempURL) }
 
-        let chunkSeconds: Double = 10
-        generateSilentWav(seconds: chunkSeconds, at: tempURL)
+        generateSilentWav(seconds: CMTimeGetSeconds(gap), at: tempURL)
 
         let asset = AVURLAsset(url: tempURL)
-        guard let sourceTrack = asset.tracks(withMediaType: .audio).first,
-              let compTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { return }
+        guard let sourceTrack = asset.tracks(withMediaType: .audio).first else { return }
 
         let chunkDuration = sourceTrack.timeRange.duration
         var cursor = CMTime.zero
         while CMTimeCompare(cursor, gap) < 0 {
             let remaining = CMTimeSubtract(gap, cursor)
             let insert = CMTimeMinimum(chunkDuration, remaining)
-            try? compTrack.insertTimeRange(CMTimeRange(start: .zero, duration: insert), of: sourceTrack, at: CMTimeAdd(start, cursor))
+            try? track.insertTimeRange(CMTimeRange(start: .zero, duration: insert), of: sourceTrack, at: CMTimeAdd(start, cursor))
             cursor = CMTimeAdd(cursor, insert)
         }
     }
