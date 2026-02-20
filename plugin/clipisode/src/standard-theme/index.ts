@@ -13,7 +13,7 @@ export const getElements: GetElementsFn = (video) => {
   const titleDuration = 2.0;
   const endingDuration = 3.0;
 
-  return [
+  const elements = [
     ...background(video, {
       titleDuration,
       endingDuration,
@@ -32,4 +32,6 @@ export const getElements: GetElementsFn = (video) => {
       yoyoMin,
     }),
   ];
+
+  return elements;
 };

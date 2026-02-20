@@ -36,5 +36,171 @@
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "C98BE547-8E1E-4A11-B6B1-21C4B65BB354"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "Clipisode/Transcoding/ThemeCompositionExporter.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "144"
+            endingLineNumber = "144"
+            landmarkName = "addSilentAudioTrack(from:to:in:)"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "A5FFEC18-DB75-4A62-B19B-7DA5F65EEF62"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "Clipisode/Transcoding/ThemeCompositionExporter.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "86"
+            endingLineNumber = "86"
+            landmarkName = "export(elements:videos:files:to:)"
+            landmarkType = "7">
+            <Locations>
+               <Location
+                  uuid = "A5FFEC18-DB75-4A62-B19B-7DA5F65EEF62 - 715bd5b47b76e307"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "(1) suspend resume partial function for static Clipisode.ThemeCompositionExporter.export(elements: Swift.Array&lt;Swift.Dictionary&lt;Swift.String, Any&gt;&gt;, videos: Swift.Dictionary&lt;Swift.String, Foundation.URL&gt;, files: Swift.Dictionary&lt;Swift.String, Swift.String&gt;, to: Foundation.URL) async throws -&gt; ()"
+                  moduleName = "Clipisode.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/max/src/github/Automattic/clipisode/transcoding/macos/Clipisode/Clipisode/Transcoding/ThemeCompositionExporter.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "86"
+                  endingLineNumber = "86">
+               </Location>
+               <Location
+                  uuid = "A5FFEC18-DB75-4A62-B19B-7DA5F65EEF62 - 8206f236f86bad19"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "(3) suspend resume partial function for static Clipisode.ThemeCompositionExporter.export(elements: Swift.Array&lt;Swift.Dictionary&lt;Swift.String, Any&gt;&gt;, videos: Swift.Dictionary&lt;Swift.String, Foundation.URL&gt;, files: Swift.Dictionary&lt;Swift.String, Swift.String&gt;, to: Foundation.URL) async throws -&gt; ()"
+                  moduleName = "Clipisode.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/max/src/github/Automattic/clipisode/transcoding/macos/Clipisode/Clipisode/Transcoding/ThemeCompositionExporter.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "86"
+                  endingLineNumber = "86">
+               </Location>
+               <Location
+                  uuid = "A5FFEC18-DB75-4A62-B19B-7DA5F65EEF62 - 13cd92b1794c6f1b"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "(5) suspend resume partial function for static Clipisode.ThemeCompositionExporter.export(elements: Swift.Array&lt;Swift.Dictionary&lt;Swift.String, Any&gt;&gt;, videos: Swift.Dictionary&lt;Swift.String, Foundation.URL&gt;, files: Swift.Dictionary&lt;Swift.String, Swift.String&gt;, to: Foundation.URL) async throws -&gt; ()"
+                  moduleName = "Clipisode.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/max/src/github/Automattic/clipisode/transcoding/macos/Clipisode/Clipisode/Transcoding/ThemeCompositionExporter.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "86"
+                  endingLineNumber = "86">
+               </Location>
+               <Location
+                  uuid = "A5FFEC18-DB75-4A62-B19B-7DA5F65EEF62 - a488b333c6a1291d"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "(7) suspend resume partial function for static Clipisode.ThemeCompositionExporter.export(elements: Swift.Array&lt;Swift.Dictionary&lt;Swift.String, Any&gt;&gt;, videos: Swift.Dictionary&lt;Swift.String, Foundation.URL&gt;, files: Swift.Dictionary&lt;Swift.String, Swift.String&gt;, to: Foundation.URL) async throws -&gt; ()"
+                  moduleName = "Clipisode.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/max/src/github/Automattic/clipisode/transcoding/macos/Clipisode/Clipisode/Transcoding/ThemeCompositionExporter.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "86"
+                  endingLineNumber = "86">
+               </Location>
+               <Location
+                  uuid = "A5FFEC18-DB75-4A62-B19B-7DA5F65EEF62 - 447e21220ae2dd26"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "(10) suspend resume partial function for static Clipisode.ThemeCompositionExporter.export(elements: Swift.Array&lt;Swift.Dictionary&lt;Swift.String, Any&gt;&gt;, videos: Swift.Dictionary&lt;Swift.String, Foundation.URL&gt;, files: Swift.Dictionary&lt;Swift.String, Swift.String&gt;, to: Foundation.URL) async throws -&gt; ()"
+                  moduleName = "Clipisode.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/max/src/github/Automattic/clipisode/transcoding/macos/Clipisode/Clipisode/Transcoding/ThemeCompositionExporter.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "86"
+                  endingLineNumber = "86">
+               </Location>
+               <Location
+                  uuid = "A5FFEC18-DB75-4A62-B19B-7DA5F65EEF62 - 79e65839a9557c27"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "(11) suspend resume partial function for static Clipisode.ThemeCompositionExporter.export(elements: Swift.Array&lt;Swift.Dictionary&lt;Swift.String, Any&gt;&gt;, videos: Swift.Dictionary&lt;Swift.String, Foundation.URL&gt;, files: Swift.Dictionary&lt;Swift.String, Swift.String&gt;, to: Foundation.URL) async throws -&gt; ()"
+                  moduleName = "Clipisode.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/max/src/github/Automattic/clipisode/transcoding/macos/Clipisode/Clipisode/Transcoding/ThemeCompositionExporter.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "86"
+                  endingLineNumber = "86">
+               </Location>
+            </Locations>
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "471DB266-90F4-4195-AF9E-F8DE2202116F"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "Clipisode/Transcoding/ThemeCompositionExporter.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "30"
+            endingLineNumber = "30"
+            landmarkName = "export(elements:videos:files:to:)"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "220355BA-0212-4738-B880-F015519AB44D"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "Clipisode/Transcoding/ThemeCompositionExporter.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "156"
+            endingLineNumber = "156"
+            landmarkName = "addSilentAudioTrack(from:to:in:)"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "46426CE7-8C46-44DA-8A36-A5079E36D891"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "Clipisode/Transcoding/ThemeCompositionExporter.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "161"
+            endingLineNumber = "161"
+            landmarkName = "addSilentAudioTrack(from:to:in:)"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
    </Breakpoints>
 </Bucket>

@@ -26,7 +26,7 @@ export function background(
     type: "rect",
     name: "background",
     startAt: 0,
-    endAt: meta.titleDuration + durationOfAllClips + meta.endingDuration + 1,
+    endAt: meta.titleDuration + durationOfAllClips + meta.endingDuration,
     props: { color: "#000000", alpha: 1, ...cover },
   });
 

@@ -81,6 +81,11 @@ enum ThemeCompositionExporter {
             }
         }
 
+        let compositionEnd = composition.duration
+        if CMTimeCompare(extendTo, compositionEnd) > 0 {
+            addSilentAudioTrack(from: compositionEnd, to: extendTo, in: composition)
+        }
+
         let requiredTrackIDs = Array(Set(videoTrackIdMap.values))
         let timeRange = CMTimeRange(start: .zero, duration: extendTo)
         let instruction = ThemeCompositionInstruction(
@@ -130,5 +135,63 @@ enum ThemeCompositionExporter {
         generator.requestedTimeToleranceBefore = .zero
         var actualTime: CMTime = .invalid
         return try? generator.copyCGImage(at: at, actualTime: &actualTime)
+    }
+
+    /// Adds a silent audio track covering the gap between `from` and `to` so
+    /// the composition's media timeline extends past the last video clip,
+    /// allowing the compositor to render the ending card.
+    private static func addSilentAudioTrack(from start: CMTime, to end: CMTime, in composition: AVMutableComposition) {
+        let gap = CMTimeSubtract(end, start)
+        guard CMTimeGetSeconds(gap) > 0 else { return }
+
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("wav")
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        let chunkSeconds: Double = 10
+        generateSilentWav(seconds: chunkSeconds, at: tempURL)
+
+        let asset = AVURLAsset(url: tempURL)
+        guard let sourceTrack = asset.tracks(withMediaType: .audio).first,
+              let compTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { return }
+
+        let chunkDuration = sourceTrack.timeRange.duration
+        var cursor = CMTime.zero
+        while CMTimeCompare(cursor, gap) < 0 {
+            let remaining = CMTimeSubtract(gap, cursor)
+            let insert = CMTimeMinimum(chunkDuration, remaining)
+            try? compTrack.insertTimeRange(CMTimeRange(start: .zero, duration: insert), of: sourceTrack, at: CMTimeAdd(start, cursor))
+            cursor = CMTimeAdd(cursor, insert)
+        }
+    }
+
+    private static func generateSilentWav(seconds: Double, at url: URL) {
+        let sampleRate: UInt32 = 8000
+        let channels: UInt16 = 1
+        let bitsPerSample: UInt16 = 16
+        let numSamples = UInt32(Double(sampleRate) * seconds)
+        let dataSize = numSamples * UInt32(channels) * UInt32(bitsPerSample / 8)
+        let fileSize = 36 + dataSize
+
+        var d = Data(capacity: 44 + Int(dataSize))
+        func le<T: FixedWidthInteger>(_ v: T) { withUnsafeBytes(of: v.littleEndian) { d.append(contentsOf: $0) } }
+
+        d.append(contentsOf: [0x52, 0x49, 0x46, 0x46]) // RIFF
+        le(fileSize)
+        d.append(contentsOf: [0x57, 0x41, 0x56, 0x45]) // WAVE
+        d.append(contentsOf: [0x66, 0x6D, 0x74, 0x20]) // fmt
+        le(UInt32(16))
+        le(UInt16(1)) // PCM
+        le(channels)
+        le(sampleRate)
+        le(sampleRate * UInt32(channels) * UInt32(bitsPerSample / 8))
+        le(channels * (bitsPerSample / 8))
+        le(bitsPerSample)
+        d.append(contentsOf: [0x64, 0x61, 0x74, 0x61]) // data
+        le(dataSize)
+        d.append(Data(count: Int(dataSize)))
+
+        try? d.write(to: url)
     }
 }

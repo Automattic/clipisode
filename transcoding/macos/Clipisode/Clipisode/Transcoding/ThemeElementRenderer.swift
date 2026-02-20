@@ -146,10 +146,18 @@ enum ThemeElementRenderer {
         guard let frameImage = frameMap[elementName] else { return }
         let alpha = CGFloat(props["alpha"] as? Double ?? 1.0)
         let rect = rectFromProps(props)
+        let sourceW = CGFloat(frameImage.width)
+        let sourceH = CGFloat(frameImage.height)
+        let coverScale = max(rect.width / sourceW, rect.height / sourceH)
+        let drawW = sourceW * coverScale
+        let drawH = sourceH * coverScale
+        let drawRect = CGRect(x: rect.minX + (rect.width - drawW) / 2,
+                              y: rect.minY + (rect.height - drawH) / 2,
+                              width: drawW, height: drawH)
         ctx.saveGState()
         ctx.clip(to: rect)
         ctx.setAlpha(alpha)
-        drawImageRightSideUp(frameImage, in: rect, ctx: ctx)
+        drawImageRightSideUp(frameImage, in: drawRect, ctx: ctx)
         ctx.restoreGState()
     }
 
