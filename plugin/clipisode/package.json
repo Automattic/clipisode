@@ -8,7 +8,8 @@
 		"dev": "wp-scripts start",
 		"start": "wp-scripts start",
 		"lint:js": "wp-scripts lint-js",
-		"lint:css": "wp-scripts lint-style"
+		"lint:css": "wp-scripts lint-style",
+		"plugin": "wp-scripts plugin-zip"
 	},
 	"devDependencies": {
 		"@types/qrcode": "^1.5.6",
