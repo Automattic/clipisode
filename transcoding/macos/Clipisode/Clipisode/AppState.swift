@@ -204,8 +204,10 @@ final class AppState {
         let jobId = payload.jobId
         currentJobId = jobId
         let videoCount = payload.videos.count
+        let assetCount = payload.assets.count
+        let totalDownloads = videoCount + assetCount
         let useTheme = (payload.elements?.isEmpty == false)
-        print("🚀 Job \(jobId): \(videoCount) video(s), theme: \(useTheme), callback: \(payload.callbackUrl)")
+        print("🚀 Job \(jobId): \(videoCount) video(s), \(assetCount) asset(s), theme: \(useTheme), callback: \(payload.callbackUrl)")
 
         renderTask = Task {
             do {
@@ -214,7 +216,7 @@ final class AppState {
                 try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
                 try FileManager.default.createDirectory(at: jobFolder, withIntermediateDirectories: true)
 
-                // 1. Download
+                // 1. Download videos
                 let sortedKeys = payload.videos.keys.sorted()
                 var localFiles: [URL] = []
                 for (index, key) in sortedKeys.enumerated() {
@@ -224,8 +226,8 @@ final class AppState {
                         throw JobError.downloadFailed("Invalid URL for video '\(key)': \(video.url)")
                     }
 
-                    sendStatus(jobId: jobId, phase: "downloading", current: index, total: videoCount,
-                              message: "Downloading \(key) (\(index + 1)/\(videoCount))")
+                    sendStatus(jobId: jobId, phase: "downloading", current: index, total: totalDownloads,
+                              message: "Downloading \(key) (\(index + 1)/\(totalDownloads))")
 
                     let (tempURL, response) = try await URLSession.shared.download(from: url)
 
@@ -239,7 +241,33 @@ final class AppState {
                     localFiles.append(localFile)
                 }
 
-                sendStatus(jobId: jobId, phase: "downloading", current: videoCount, total: videoCount,
+                // 1b. Download assets
+                var assetFiles: [String: String] = payload.files
+                let sortedAssetKeys = payload.assets.keys.sorted()
+                for (index, key) in sortedAssetKeys.enumerated() {
+                    try Task.checkCancellation()
+                    let asset = payload.assets[key]!
+                    guard let url = URL(string: asset.url) else {
+                        throw JobError.downloadFailed("Invalid URL for asset '\(key)': \(asset.url)")
+                    }
+
+                    let progress = videoCount + index
+                    sendStatus(jobId: jobId, phase: "downloading", current: progress, total: totalDownloads,
+                              message: "Downloading asset \(key) (\(progress + 1)/\(totalDownloads))")
+
+                    let (tempURL, response) = try await URLSession.shared.download(from: url)
+
+                    guard let httpResponse = response as? HTTPURLResponse,
+                          (200...299).contains(httpResponse.statusCode) else {
+                        throw JobError.downloadFailed("HTTP error downloading asset '\(key)'")
+                    }
+
+                    let localFile = tempDir.appendingPathComponent("asset_\(key)_\(asset.filename)")
+                    try FileManager.default.moveItem(at: tempURL, to: localFile)
+                    assetFiles[key] = localFile.path
+                }
+
+                sendStatus(jobId: jobId, phase: "downloading", current: totalDownloads, total: totalDownloads,
                           message: "Downloads complete")
 
                 // 2. Render
@@ -253,7 +281,7 @@ final class AppState {
                     try await ThemeCompositionExporter.export(
                         elements: elements,
                         videos: videosMap,
-                        files: payload.files,
+                        files: assetFiles,
                         to: outputFile
                     )
                 } else {

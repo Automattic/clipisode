@@ -76,11 +76,25 @@ class Clipisode_Admin {
 			$asset['version']
 		);
 
+		$assets_dir = CLIPISODE_PLUGIN_DIR . 'src/standard-theme/assets/';
+		$assets_url = CLIPISODE_PLUGIN_URL . 'src/standard-theme/assets/';
+		$theme_assets = [];
+		if ( is_dir( $assets_dir ) ) {
+			foreach ( glob( $assets_dir . '*' ) as $file ) {
+				$filename = basename( $file );
+				$theme_assets[ $filename ] = [
+					'url'      => $assets_url . $filename,
+					'filename' => $filename,
+				];
+			}
+		}
+
 		wp_localize_script( 'clipisode-admin', 'clipisodeAdmin', [
 			'page'              => isset( $_GET['page'] ) ? sanitize_text_field( $_GET['page'] ) : 'clipisode',
 			'rest_root'         => esc_url_raw( rest_url() ),
 			'nonce'             => wp_create_nonce( 'wp_rest' ),
 			'invitation_prefix' => Clipisode_Invitation::get_prefix(),
+			'theme_assets'      => $theme_assets,
 		] );
 	}
 

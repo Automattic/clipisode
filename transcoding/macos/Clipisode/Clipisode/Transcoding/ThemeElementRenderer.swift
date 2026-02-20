@@ -3,7 +3,7 @@
 //  Clipisode
 //
 //  Draws theme elements (rect, gradient, video, frame, text, image) into a CGContext.
-//  Element coordinates use top-left origin; we convert to bottom-left for drawing.
+//  Expects a y-down (top-left origin) context — the caller flips the CTM before invoking.
 //
 
 import AVFoundation
@@ -18,18 +18,12 @@ enum ThemeElementRenderer {
     static let renderHeight: CGFloat = 1280
     static let renderWidth: CGFloat = 720
 
-    /// Transform from element coords (top-left origin) to context (bottom-left).
-    private static var coordinateTransform: CGAffineTransform {
-        CGAffineTransform(translationX: 0, y: renderHeight)
-            .scaledBy(x: 1, y: -1)
-    }
-
     static func rectFromProps(_ props: [String: Any]) -> CGRect {
         let x = props["x"] as? Double ?? 0
         let y = props["y"] as? Double ?? 0
         let w = props["width"] as? Double ?? 0
         let h = props["height"] as? Double ?? 0
-        return CGRect(x: x, y: y, width: w, height: h).applying(coordinateTransform)
+        return CGRect(x: x, y: y, width: w, height: h)
     }
 
     static func draw(
@@ -85,12 +79,6 @@ enum ThemeElementRenderer {
         let gVal = CGFloat(props["gVal"] as? Double ?? 152) / 255
         let bVal = CGFloat(props["bVal"] as? Double ?? 219) / 255
         let rect = rectFromProps(props)
-        let rectUntransformed = CGRect(
-            x: props["x"] as? Double ?? 0,
-            y: props["y"] as? Double ?? 0,
-            width: props["width"] as? Double ?? 720,
-            height: props["height"] as? Double ?? 1280
-        )
         let base = CGColor(srgbRed: rVal, green: gVal, blue: bVal, alpha: 1)
         let c0 = CGColor(srgbRed: rVal, green: gVal, blue: bVal, alpha: 0)
         let c1 = CGColor(srgbRed: rVal, green: gVal, blue: bVal, alpha: 0.8)
@@ -102,8 +90,8 @@ enum ThemeElementRenderer {
             colors: colors,
             locations: locations
         ) else { return }
-        let start = CGPoint(x: rectUntransformed.minX, y: rectUntransformed.maxY).applying(coordinateTransform)
-        let end = CGPoint(x: rectUntransformed.minX, y: rectUntransformed.minY).applying(coordinateTransform)
+        let start = CGPoint(x: rect.minX, y: rect.minY)
+        let end = CGPoint(x: rect.minX, y: rect.maxY)
         ctx.saveGState()
         ctx.clip(to: rect)
         ctx.setAlpha(alpha)
@@ -128,16 +116,22 @@ enum ThemeElementRenderer {
         let y = CGFloat(props["y"] as? Double ?? 0)
         let w = CGFloat(props["width"] as? Double ?? renderWidth)
         let h = CGFloat(props["height"] as? Double ?? renderHeight)
-        let rect = CGRect(x: x, y: y, width: w, height: h).applying(coordinateTransform)
+        let rect = CGRect(x: x, y: y, width: w, height: h)
         var ciImage = CIImage(cvPixelBuffer: sourceBuffer)
         if let transform = videoPreferredTransforms[elementName], !transform.isIdentity {
-            ciImage = ciImage.transformed(by: transform)
+            ciImage = ciImage.oriented(VideoCompositor.videoOrientation(from: transform))
         }
         let ciContext = CIContext()
         guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return }
+        let sourceW = CGFloat(cgImage.width)
+        let sourceH = CGFloat(cgImage.height)
+        let coverScale = max(w / sourceW, h / sourceH)
+        let drawW = sourceW * coverScale
+        let drawH = sourceH * coverScale
+        let drawRect = CGRect(x: x + (w - drawW) / 2, y: y + (h - drawH) / 2, width: drawW, height: drawH)
         ctx.saveGState()
         ctx.clip(to: rect)
-        ctx.draw(cgImage, in: rect)
+        drawImageRightSideUp(cgImage, in: drawRect, ctx: ctx)
         ctx.restoreGState()
     }
 
@@ -155,7 +149,7 @@ enum ThemeElementRenderer {
         ctx.saveGState()
         ctx.clip(to: rect)
         ctx.setAlpha(alpha)
-        ctx.draw(frameImage, in: rect)
+        drawImageRightSideUp(frameImage, in: rect, ctx: ctx)
         ctx.restoreGState()
     }
 
@@ -199,9 +193,14 @@ enum ThemeElementRenderer {
         let frameSize = CTFramesetterSuggestFrameSizeWithConstraints(framesetter, CFRange(location: 0, length: 0), nil, CGSize(width: w, height: h), nil)
         if originY == "bottom" { y = y - frameSize.height }
         else if originY == "center" { y = y - frameSize.height / 2 }
-        let framePath = CGPath(rect: CGRect(x: x, y: y, width: w, height: h).applying(coordinateTransform), transform: nil)
+        let textRect = CGRect(x: x, y: y, width: w, height: h)
+        let framePath = CGPath(rect: textRect, transform: nil)
         let frame = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), framePath, nil)
+        ctx.saveGState()
+        ctx.translateBy(x: 0, y: textRect.minY + textRect.maxY)
+        ctx.scaleBy(x: 1, y: -1)
         CTFrameDraw(frame, ctx)
+        ctx.restoreGState()
     }
 
     // MARK: - Image
@@ -215,11 +214,20 @@ enum ThemeElementRenderer {
         let rect = rectFromProps(props)
         ctx.saveGState()
         ctx.setAlpha(alpha)
-        ctx.draw(cgImage, in: rect)
+        drawImageRightSideUp(cgImage, in: rect, ctx: ctx)
         ctx.restoreGState()
     }
 
     // MARK: - Helpers
+
+    /// Draws a CGImage right-side up in a y-down (CTM-flipped) context.
+    private static func drawImageRightSideUp(_ image: CGImage, in rect: CGRect, ctx: CGContext) {
+        ctx.saveGState()
+        ctx.translateBy(x: 0, y: rect.minY + rect.maxY)
+        ctx.scaleBy(x: 1, y: -1)
+        ctx.draw(image, in: rect)
+        ctx.restoreGState()
+    }
 
     private static func hexToCGColor(_ hex: String, alpha: CGFloat) -> CGColor {
         var hex = hex
