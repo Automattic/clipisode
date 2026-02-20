@@ -10,6 +10,9 @@ export function titleCard(
   const firstClip = video.clips[0];
   const finalClip = video.clips[video.clips.length - 1];
 
+  const uniqueNames = new Set(video.clips.map((c) => c.displayName));
+  const showBothNames = uniqueNames.size === 2;
+
   return [
     {
       type: "rect",
@@ -91,7 +94,7 @@ export function titleCard(
       startAt: 0,
       endAt: meta.titleDuration,
       props: {
-        value: finalClip.displayName,
+        value: showBothNames ? finalClip.displayName : firstClip.displayName,
         color: "#FFFFFF",
         fontName: "OpenSans-Regular",
         fontSize: 36,
@@ -120,41 +123,45 @@ export function titleCard(
         },
       ],
     },
-    {
-      type: "text",
-      name: "title.guest",
-      startAt: 0,
-      endAt: meta.titleDuration,
-      props: {
-        value: "and " + firstClip.displayName,
-        color: "#FFFFFF",
-        fontName: "OpenSans-Regular",
-        fontSize: 36,
-        lineHeight: 36,
-        textAlign: TextAlign.Left,
-        x: 2 * meta.spacing,
-        y: 966,
-        width: meta.width - 6 * meta.spacing,
-        height: 54,
-        alpha: 1,
-      },
-      animations: [
-        {
-          startAt: meta.titleDuration - 0.5,
-          endAt: meta.titleDuration - 0.1,
-          field: "alpha",
-          from: 1.0,
-          to: 0.0,
-        },
-        {
-          startAt: meta.titleDuration - 0.1,
-          endAt: meta.titleDuration,
-          field: "alpha",
-          from: 0.0,
-          to: 0.0,
-        },
-      ],
-    },
+    ...(showBothNames
+      ? [
+          {
+            type: "text" as const,
+            name: "title.guest",
+            startAt: 0,
+            endAt: meta.titleDuration,
+            props: {
+              value: "and " + firstClip.displayName,
+              color: "#FFFFFF",
+              fontName: "OpenSans-Regular",
+              fontSize: 36,
+              lineHeight: 36,
+              textAlign: TextAlign.Left,
+              x: 2 * meta.spacing,
+              y: 966,
+              width: meta.width - 6 * meta.spacing,
+              height: 54,
+              alpha: 1,
+            },
+            animations: [
+              {
+                startAt: meta.titleDuration - 0.5,
+                endAt: meta.titleDuration - 0.1,
+                field: "alpha" as const,
+                from: 1.0,
+                to: 0.0,
+              },
+              {
+                startAt: meta.titleDuration - 0.1,
+                endAt: meta.titleDuration,
+                field: "alpha" as const,
+                from: 0.0,
+                to: 0.0,
+              },
+            ],
+          },
+        ]
+      : []),
     {
       type: "image",
       name: "title.logo",
