@@ -123,9 +123,15 @@ enum ThemeElementRenderer {
         }
         let ciContext = CIContext()
         guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return }
+        let sourceW = CGFloat(cgImage.width)
+        let sourceH = CGFloat(cgImage.height)
+        let coverScale = max(w / sourceW, h / sourceH)
+        let drawW = sourceW * coverScale
+        let drawH = sourceH * coverScale
+        let drawRect = CGRect(x: x + (w - drawW) / 2, y: y + (h - drawH) / 2, width: drawW, height: drawH)
         ctx.saveGState()
         ctx.clip(to: rect)
-        drawImageRightSideUp(cgImage, in: rect, ctx: ctx)
+        drawImageRightSideUp(cgImage, in: drawRect, ctx: ctx)
         ctx.restoreGState()
     }
 
