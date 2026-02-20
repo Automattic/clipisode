@@ -57,10 +57,22 @@ export interface InvitationLink {
 	created_at: string;
 }
 
+export interface ClipContent {
+	id: number;
+	output_id: number;
+	media_id: number;
+	position: number;
+	role: string;
+	trim_start: number;
+	trim_end: number;
+	duration: number;
+}
+
 export interface Reply {
 	id: number;
 	topic_id: number;
 	invitation_link_id: number | null;
+	media_id: number | null;
 	name: string;
 	video_url: string;
 	video_filename: string | null;

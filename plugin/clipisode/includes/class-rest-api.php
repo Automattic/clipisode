@@ -191,6 +191,19 @@ class Clipisode_REST_API {
 			],
 		] );
 
+		register_rest_route( self::NAMESPACE, '/outputs/(?P<id>\d+)/contents', [
+			[
+				'methods'             => 'GET',
+				'callback'            => [ $this, 'get_output_contents' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+			[
+				'methods'             => 'POST',
+				'callback'            => [ $this, 'create_output_contents' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+		] );
+
 		// Media.
 		register_rest_route( self::NAMESPACE, '/media', [
 			[
@@ -703,6 +716,45 @@ class Clipisode_REST_API {
 		] );
 	}
 
+	// --- Output Contents ---
+
+	public function get_output_contents( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
+		$table = $wpdb->prefix . 'clipisode_contents';
+		$id    = (int) $request['id'];
+
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT * FROM $table WHERE output_id = %d ORDER BY position ASC", $id
+		) );
+
+		return new WP_REST_Response( $rows );
+	}
+
+	public function create_output_contents( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
+		$table = $wpdb->prefix . 'clipisode_contents';
+		$id    = (int) $request['id'];
+
+		$contents = $request->get_param( 'contents' );
+		if ( ! is_array( $contents ) || empty( $contents ) ) {
+			return new WP_REST_Response( [ 'message' => 'Contents array is required.' ], 400 );
+		}
+
+		foreach ( $contents as $item ) {
+			$wpdb->insert( $table, [
+				'output_id'  => $id,
+				'media_id'   => (int) $item['media_id'],
+				'position'   => (int) $item['position'],
+				'role'       => sanitize_text_field( $item['role'] ),
+				'trim_start' => (float) $item['trim_start'],
+				'trim_end'   => (float) $item['trim_end'],
+				'duration'   => (float) $item['duration'],
+			] );
+		}
+
+		return $this->get_output_contents( $request );
+	}
+
 	// --- Invitation Links ---
 
 	public function list_invitation_links( WP_REST_Request $request ): WP_REST_Response {
@@ -1005,6 +1057,14 @@ class Clipisode_REST_API {
 		if ( $exclude_label ) {
 			$where[]  = 'm.label != %s';
 			$values[] = sanitize_text_field( $exclude_label );
+		}
+
+		$ids = $request->get_param( 'ids' );
+		if ( $ids ) {
+			$id_list  = array_map( 'intval', explode( ',', $ids ) );
+			$placeholders = implode( ',', array_fill( 0, count( $id_list ), '%d' ) );
+			$where[]  = "m.id IN ($placeholders)";
+			$values   = array_merge( $values, $id_list );
 		}
 
 		$where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) : '';

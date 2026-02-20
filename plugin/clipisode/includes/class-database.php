@@ -114,6 +114,22 @@ UNIQUE KEY slug (slug),
 KEY topic_id (topic_id)
 ) $charset;"
 		);
+
+		dbDelta(
+			"CREATE TABLE {$wpdb->prefix}clipisode_contents (
+id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+output_id BIGINT UNSIGNED NOT NULL,
+media_id BIGINT UNSIGNED NOT NULL,
+position INT UNSIGNED NOT NULL,
+role VARCHAR(20) NOT NULL,
+trim_start DECIMAL(10,3) NOT NULL,
+trim_end DECIMAL(10,3) NOT NULL,
+duration DECIMAL(10,3) NOT NULL,
+PRIMARY KEY  (id),
+KEY output_id (output_id),
+KEY media_id (media_id)
+) $charset;"
+		);
 	}
 
 	private static function seed(): void {

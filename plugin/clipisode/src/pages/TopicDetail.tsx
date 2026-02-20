@@ -21,6 +21,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const [ slugError, setSlugError ] = useState< Record< number, string > >( {} );
 	const [ savingSlug, setSavingSlug ] = useState< Record< number, boolean > >( {} );
 	const [ selectedReply, setSelectedReply ] = useState< Reply | null >( null );
+	const [ selectedReplyIds, setSelectedReplyIds ] = useState< Set< number > >( new Set() );
 
 	type RenderState = 'idle' | 'connecting' | 'processing' | 'done' | 'error';
 	const [ renderState, setRenderState ] = useState< RenderState >( 'idle' );
@@ -509,41 +510,81 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 				</h2>
 
 				{ replies.length > 0 && (
-					<table className="clipisode-table">
-						<thead>
-							<tr>
-								<th>Name</th>
-								<th>Tag</th>
-								<th>Status</th>
-								<th>Transcript</th>
-								<th>Created</th>
-							</tr>
-						</thead>
-						<tbody>
-							{ replies.slice( 0, 10 ).map( ( reply ) => (
-								<tr
-									key={ reply.id }
-									className="clickable"
-									onClick={ () => setSelectedReply( reply ) }
-									style={ { cursor: 'pointer' } }
-								>
-									<td>{ reply.name }</td>
-									<td>{ reply.tag || '—' }</td>
-									<td>
-										<span className={ `clipisode-status-badge ${ reply.status }` }>
-											{ reply.status.replace( '_', ' ' ) }
-										</span>
-									</td>
-									<td>
-										<div className="clipisode-transcript-preview">
-											{ reply.transcript || '—' }
-										</div>
-									</td>
-									<td>{ new Date( reply.created_at ).toLocaleDateString() }</td>
+					<>
+						<table className="clipisode-table">
+							<thead>
+								<tr>
+									<th style={ { width: 30 } }></th>
+									<th>Name</th>
+									<th>Tag</th>
+									<th>Status</th>
+									<th>Transcript</th>
+									<th>Created</th>
 								</tr>
-							) ) }
-						</tbody>
-					</table>
+							</thead>
+							<tbody>
+								{ replies.slice( 0, 10 ).map( ( reply ) => (
+									<tr
+										key={ reply.id }
+										className="clickable"
+										onClick={ () => setSelectedReply( reply ) }
+										style={ { cursor: 'pointer' } }
+									>
+										<td onClick={ ( e ) => e.stopPropagation() }>
+											{ reply.status === 'approved' && reply.media_id && (
+												<input
+													type="checkbox"
+													checked={ selectedReplyIds.has( reply.id ) }
+													onChange={ () => {
+														setSelectedReplyIds( ( prev ) => {
+															const next = new Set( prev );
+															if ( next.has( reply.id ) ) {
+																next.delete( reply.id );
+															} else {
+																next.add( reply.id );
+															}
+															return next;
+														} );
+													} }
+												/>
+											) }
+										</td>
+										<td>{ reply.name }</td>
+										<td>{ reply.tag || '—' }</td>
+										<td>
+											<span className={ `clipisode-status-badge ${ reply.status }` }>
+												{ reply.status.replace( '_', ' ' ) }
+											</span>
+										</td>
+										<td>
+											<div className="clipisode-transcript-preview">
+												{ reply.transcript || '—' }
+											</div>
+										</td>
+										<td>{ new Date( reply.created_at ).toLocaleDateString() }</td>
+									</tr>
+								) ) }
+							</tbody>
+						</table>
+						{ selectedReplyIds.size > 0 && (
+							<div style={ { marginTop: 12 } }>
+								<Button
+									variant="primary"
+									onClick={ () => {
+										const mediaIds = replies
+											.filter( ( r ) => selectedReplyIds.has( r.id ) && r.media_id )
+											.map( ( r ) => r.media_id );
+										if ( topic?.intro_media_id ) {
+											mediaIds.unshift( topic.intro_media_id );
+										}
+										navigate( `create-clipisode/${ id }/${ mediaIds.join( ',' ) }` );
+									} }
+								>
+									Create Clipisode ({ selectedReplyIds.size } clip{ selectedReplyIds.size !== 1 ? 's' : '' })
+								</Button>
+							</div>
+						) }
+					</>
 				) }
 			</div>
 

@@ -4,6 +4,7 @@ import TopicForm from './pages/TopicForm';
 import ReplyList from './pages/ReplyList';
 import MediaList from './pages/MediaList';
 import ClipisodeList from './pages/ClipisodeList';
+import CreateClipisode from './pages/CreateClipisode';
 import ThemeList from './pages/ThemeList';
 import Settings from './pages/Settings';
 import useHashRoute from './hooks/useHashRoute';
@@ -42,6 +43,17 @@ export default function App() {
 	const editMatch = route.match( /^(\d+)\/edit$/ );
 	if ( editMatch ) {
 		return <TopicForm id={ editMatch[ 1 ] } navigate={ navigate } />;
+	}
+
+	const createClipisodeWithTopicMatch = route.match( /^create-clipisode\/(\d+)\/([\d,]+)$/ );
+	const createClipisodeMatch = route.match( /^create-clipisode\/([\d,]+)$/ );
+	if ( createClipisodeWithTopicMatch ) {
+		const mediaIds = createClipisodeWithTopicMatch[ 2 ].split( ',' ).map( Number );
+		return <CreateClipisode topicId={ Number( createClipisodeWithTopicMatch[ 1 ] ) } mediaIds={ mediaIds } navigate={ navigate } />;
+	}
+	if ( createClipisodeMatch ) {
+		const mediaIds = createClipisodeMatch[ 1 ].split( ',' ).map( Number );
+		return <CreateClipisode mediaIds={ mediaIds } navigate={ navigate } />;
 	}
 
 	const detailMatch = route.match( /^(\d+)$/ );
