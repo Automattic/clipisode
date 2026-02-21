@@ -6,7 +6,27 @@ class Clipisode_Database {
 
 	public static function activate(): void {
 		self::create_tables();
+		self::ensure_default_host();
 		Clipisode_Post_Types::ensure_default_invitation();
+	}
+
+	private static function ensure_default_host(): void {
+		global $wpdb;
+		$table = $wpdb->prefix . 'clipisode_hosts';
+		$count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $table" );
+		if ( $count > 0 ) {
+			return;
+		}
+
+		$user = wp_get_current_user();
+		if ( ! $user || ! $user->ID ) {
+			return;
+		}
+
+		$wpdb->insert( $table, [
+			'name'       => $user->display_name,
+			'is_default' => 1,
+		] );
 	}
 
 	private static function create_tables(): void {
@@ -68,6 +88,7 @@ KEY topic_id (topic_id)
 			"CREATE TABLE {$wpdb->prefix}clipisode_hosts (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 name VARCHAR(255) NOT NULL,
+is_default TINYINT(1) NOT NULL DEFAULT 0,
 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 PRIMARY KEY  (id),
 UNIQUE KEY name (name)

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from '@wordpress/element';
-import { Button, Card, CardBody, CardHeader, Spinner, TextControl, Notice } from '@wordpress/components';
+import { Button, Card, CardBody, CardHeader, SelectControl, Spinner, TextControl, Notice } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import type { BrandTerms, CustomTermsItem, Host } from '../types';
 
@@ -64,6 +64,15 @@ export default function Settings(): JSX.Element {
 			.then( () => setHosts( ( prev ) => prev.filter( ( h ) => h.id !== id ) ) );
 	};
 
+	const setDefaultHost = ( value: string ) => {
+		const id = value ? Number( value ) : null;
+		apiFetch< Host[] >( {
+			path: '/clipisode/v1/hosts/default',
+			method: 'PUT',
+			data: { id },
+		} ).then( setHosts );
+	};
+
 	const newTermsUrl = 'post-new.php?post_type=clipisode_terms';
 
 	if ( loading ) {
@@ -89,31 +98,46 @@ export default function Settings(): JSX.Element {
 				{ hosts.length === 0 ? (
 					<p className="clipisode-empty-hint">No hosts yet. They are added automatically when you create a topic.</p>
 				) : (
-					<table className="clipisode-table">
-						<thead>
-							<tr>
-								<th>Name</th>
-								<th></th>
-							</tr>
-						</thead>
-						<tbody>
-							{ hosts.map( ( host ) => (
-								<tr key={ host.id }>
-									<td>{ host.name }</td>
-									<td style={ { textAlign: 'right' } }>
-										<Button
-											variant="tertiary"
-											isDestructive
-											size="compact"
-											onClick={ () => deleteHost( host.id ) }
-										>
-											Delete
-										</Button>
-									</td>
+					<>
+						<table className="clipisode-table">
+							<thead>
+								<tr>
+									<th>Name</th>
+									<th></th>
 								</tr>
-							) ) }
-						</tbody>
-					</table>
+							</thead>
+							<tbody>
+								{ hosts.map( ( host ) => (
+									<tr key={ host.id }>
+										<td>{ host.name }</td>
+										<td style={ { textAlign: 'right' } }>
+											<Button
+												variant="tertiary"
+												isDestructive
+												size="compact"
+												onClick={ () => deleteHost( host.id ) }
+											>
+												Delete
+											</Button>
+										</td>
+									</tr>
+								) ) }
+							</tbody>
+						</table>
+						<div style={ { maxWidth: 300, marginTop: 12 } }>
+							<SelectControl
+								label="Default Host"
+								value={ String( hosts.find( ( h ) => h.is_default )?.id ?? '' ) }
+								options={ [
+									{ label: '— None —', value: '' },
+									...hosts.map( ( h ) => ( { label: h.name, value: String( h.id ) } ) ),
+								] }
+								onChange={ setDefaultHost }
+								help="Pre-fills the host field when creating a new topic."
+								__nextHasNoMarginBottom
+							/>
+						</div>
+					</>
 				) }
 			</div>
 

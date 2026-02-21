@@ -15,5 +15,5 @@ npm run start    # watch mode
 - `includes/` — PHP: REST API, database, media handling, admin, post types
 - `src/` — TypeScript/React admin UI + SCSS
 - `src/flow/` — Invitation page frontend (vanilla TS, block renders)
-- `templates/` — PHP templates
+- `includes/invitation-page/` — Invitation page PHP templates
 - `build/` — Compiled output (gitignored)

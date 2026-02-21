@@ -54,13 +54,17 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 					if ( topic.intro_media_id && topic.intro_video_url ) {
 						setVideo( { id: topic.intro_media_id, url: topic.intro_video_url } );
 					}
-				} else if ( themeList.length > 0 ) {
-					const defaultTheme = themeList.find( ( t ) => t.is_default );
-					setForm( ( prev ) => ( {
-						...prev,
-						invitation_id: defaultTheme ? String( defaultTheme.id ) : String( themeList[ 0 ].id ),
-					} ) );
-				}
+			} else {
+				const defaultHost = hosts.find( ( h ) => h.is_default );
+				const defaultTheme = themeList.length > 0
+					? themeList.find( ( t ) => t.is_default ) || themeList[ 0 ]
+					: null;
+				setForm( ( prev ) => ( {
+					...prev,
+					...( defaultHost ? { hosted_by: defaultHost.name } : {} ),
+					...( defaultTheme ? { invitation_id: String( defaultTheme.id ) } : {} ),
+				} ) );
+			}
 			} )
 			.finally( () => setLoading( false ) );
 	}, [ id, isEdit ] );

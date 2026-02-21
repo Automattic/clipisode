@@ -46,6 +46,14 @@ class Clipisode_REST_API {
 			],
 		] );
 
+		register_rest_route( self::NAMESPACE, '/hosts/default', [
+			[
+				'methods'             => 'PUT',
+				'callback'            => [ $this, 'set_default_host' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+		] );
+
 		// Settings.
 		register_rest_route( self::NAMESPACE, '/settings', [
 			[
@@ -323,7 +331,17 @@ class Clipisode_REST_API {
 	public function list_hosts( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
 		$table = $wpdb->prefix . 'clipisode_hosts';
-		$hosts = $wpdb->get_results( "SELECT * FROM $table ORDER BY name ASC" );
+		$rows  = $wpdb->get_results( "SELECT * FROM $table ORDER BY name ASC" );
+
+		$hosts = array_map( function ( $row ) {
+			return [
+				'id'         => (int) $row->id,
+				'name'       => $row->name,
+				'is_default' => (bool) $row->is_default,
+				'created_at' => $row->created_at,
+			];
+		}, $rows );
+
 		return new WP_REST_Response( $hosts );
 	}
 
@@ -360,6 +378,20 @@ class Clipisode_REST_API {
 		global $wpdb;
 		$wpdb->delete( $wpdb->prefix . 'clipisode_hosts', [ 'id' => (int) $request['id'] ] );
 		return new WP_REST_Response( null, 204 );
+	}
+
+	public function set_default_host( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
+		$table = $wpdb->prefix . 'clipisode_hosts';
+		$id    = $request->get_param( 'id' );
+
+		$wpdb->update( $table, [ 'is_default' => 0 ], [ 'is_default' => 1 ] );
+
+		if ( $id ) {
+			$wpdb->update( $table, [ 'is_default' => 1 ], [ 'id' => (int) $id ] );
+		}
+
+		return $this->list_hosts( $request );
 	}
 
 	// --- Topics ---

@@ -90,7 +90,7 @@ class Clipisode_Post_Types {
 
 	public static function terms_template( string $template ): string {
 		if ( is_singular( 'clipisode_terms' ) ) {
-			return CLIPISODE_PLUGIN_DIR . 'templates/terms-single.php';
+			return CLIPISODE_PLUGIN_DIR . 'includes/invitation-page/terms-single.php';
 		}
 		return $template;
 	}
@@ -178,7 +178,7 @@ BLOCKS;
 			return $existing;
 		}
 
-		$template_path = CLIPISODE_PLUGIN_DIR . 'templates/default-brand-terms.html';
+		$template_path = CLIPISODE_PLUGIN_DIR . 'includes/invitation-page/default-brand-terms.html';
 		$content       = file_exists( $template_path )
 			? file_get_contents( $template_path )
 			: '<p>By submitting a video you grant the brand a perpetual, worldwide license to use your submission.</p>';
