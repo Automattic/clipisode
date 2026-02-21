@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
 import { Button, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import TrimModal from '../components/TrimModal';
-import { getElements } from '../standard-theme';
+import { getElements } from '../themes/standard';
 import { WS_URL, generateJobId, getThemeAssets } from '../lib/transcoder';
 import type { Topic, Output, MediaItem } from '../types';
 

@@ -16,10 +16,10 @@ class Clipisode_Invitation {
 
 	public function register_blocks(): void {
 		register_block_type( CLIPISODE_PLUGIN_DIR . 'build/flow' );
-		register_block_type( CLIPISODE_PLUGIN_DIR . 'build/stage-desktop' );
-		register_block_type( CLIPISODE_PLUGIN_DIR . 'build/stage-landing' );
-		register_block_type( CLIPISODE_PLUGIN_DIR . 'build/stage-record' );
-		register_block_type( CLIPISODE_PLUGIN_DIR . 'build/stage-thanks' );
+		register_block_type( CLIPISODE_PLUGIN_DIR . 'build/blocks/stage-desktop' );
+		register_block_type( CLIPISODE_PLUGIN_DIR . 'build/blocks/stage-landing' );
+		register_block_type( CLIPISODE_PLUGIN_DIR . 'build/blocks/stage-record' );
+		register_block_type( CLIPISODE_PLUGIN_DIR . 'build/blocks/stage-thanks' );
 		register_block_type( CLIPISODE_PLUGIN_DIR . 'build/element' );
 	}
 
