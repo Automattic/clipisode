@@ -76,8 +76,8 @@ class Clipisode_Admin {
 			$asset['version']
 		);
 
-		$assets_dir = CLIPISODE_PLUGIN_DIR . 'src/standard-theme/assets/';
-		$assets_url = CLIPISODE_PLUGIN_URL . 'src/standard-theme/assets/';
+		$assets_dir = CLIPISODE_PLUGIN_DIR . 'assets/themes/standard/';
+		$assets_url = CLIPISODE_PLUGIN_URL . 'assets/themes/standard/';
 		$theme_assets = [];
 		if ( is_dir( $assets_dir ) ) {
 			foreach ( glob( $assets_dir . '*' ) as $file ) {

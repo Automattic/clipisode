@@ -42,7 +42,7 @@ class Clipisode_Invitation {
 		if ( ! $slug ) {
 			return $template;
 		}
-		return CLIPISODE_PLUGIN_DIR . 'includes/invitation-page/invitation.php';
+		return CLIPISODE_PLUGIN_DIR . 'assets/templates/invitation.php';
 	}
 
 	public function register_routes(): void {

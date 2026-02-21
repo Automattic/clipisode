@@ -12,8 +12,9 @@ npm run start    # watch mode
 
 ## Structure
 
+- `assets/themes/` — Static theme assets (images) served at runtime
+- `assets/templates/` — PHP templates for invitation and terms pages
 - `includes/` — PHP: REST API, database, media handling, admin, post types
 - `src/` — TypeScript/React admin UI + SCSS
 - `src/flow/` — Invitation page frontend (vanilla TS, block renders)
-- `includes/invitation-page/` — Invitation page PHP templates
 - `build/` — Compiled output (gitignored)

@@ -9,8 +9,15 @@
 		"start": "wp-scripts start",
 		"lint:js": "wp-scripts lint-js",
 		"lint:css": "wp-scripts lint-style",
-		"plugin": "wp-scripts plugin-zip"
+		"plugin": "wp-scripts build && wp-scripts plugin-zip"
 	},
+	"files": [
+		"assets/",
+		"build/",
+		"includes/",
+		"clipisode.php",
+		"readme.txt"
+	],
 	"devDependencies": {
 		"@types/qrcode": "^1.5.6",
 		"@wordpress/scripts": "^31.4.0"
