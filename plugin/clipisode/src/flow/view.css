@@ -310,16 +310,39 @@ html, body {
 	display: none;
 }
 
+.ci-flow-root.ci-desktop {
+	background: #111122;
+	align-items: center;
+	justify-content: center;
+}
+
 .ci-flow-root.ci-desktop .ci-stage-desktop {
-	display: flex;
-	min-height: 100dvh;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	max-width: 900px;
+	width: 100%;
+	min-height: auto;
 	background: #1a1a2e;
 	color: #fff;
-	flex-direction: row;
-	justify-content: center;
-	align-items: center;
-	gap: 64px;
-	padding: 48px;
+	align-content: center;
+	justify-items: center;
+	column-gap: 40px;
+	padding: 40px;
+	border-radius: 20px;
+}
+
+.ci-stage-desktop > .ci-el-video {
+	grid-column: 1;
+	grid-row: 1 / 50;
+	align-self: center;
+}
+
+.ci-stage-desktop > .ci-el:not(.ci-el-video) {
+	grid-column: 2;
+}
+
+.ci-stage-desktop > .ci-el-terms {
+	display: none;
 }
 
 .ci-flow-root.ci-desktop .ci-stage-landing,
@@ -329,8 +352,8 @@ html, body {
 }
 
 .ci-stage-desktop .ci-video-wrap {
-	max-width: 400px;
-	flex-shrink: 0;
+	max-width: 100%;
+	width: 100%;
 }
 
 /* QR code element */
