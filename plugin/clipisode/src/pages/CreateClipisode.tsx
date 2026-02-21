@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
-import { Button, Spinner } from '@wordpress/components';
+import { Button, SelectControl, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import TrimModal from '../components/TrimModal';
-import { getElements } from '../themes/standard';
-import { WS_URL, generateJobId, getThemeAssets } from '../lib/transcoder';
+import { themeRegistry } from '../themes';
+import { WS_URL, generateJobId, getThemeAssets, getAvailableThemes } from '../lib/transcoder';
 import type { Topic, Output, MediaItem } from '../types';
 
 interface CreateClipisodeProps {
@@ -48,6 +48,8 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 	const [ clips, setClips ] = useState< ClipItem[] >( [] );
 	const [ loading, setLoading ] = useState( true );
 	const [ trimmingClip, setTrimmingClip ] = useState< ClipItem | null >( null );
+	const availableThemes = getAvailableThemes();
+	const [ selectedTheme, setSelectedTheme ] = useState( availableThemes[ 0 ]?.id || 'standard' );
 	const [ renderState, setRenderState ] = useState< RenderState >( 'idle' );
 	const [ renderPhase, setRenderPhase ] = useState( '' );
 	const [ renderMessage, setRenderMessage ] = useState( '' );
@@ -217,21 +219,24 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 			};
 		} );
 
+		const getElements = themeRegistry[ selectedTheme ];
+		const videoData = {
+			id: String( topicId || 0 ),
+			title: topic?.title || 'Clipisode',
+			clips: includedClips.map( ( clip, i ) => ( {
+				id: `clip_${ i }`,
+				duration: clip.trimEnd - clip.trimStart,
+				displayName: clip.name,
+			} ) ),
+		};
+
 		const payload = {
 			type: 'start_job',
 			job_id: jobId,
 			callback_url: callbackUrl,
 			videos,
-			assets: getThemeAssets(),
-			elements: getElements( {
-				id: String( topicId || 0 ),
-				title: topic?.title || 'Clipisode',
-				clips: includedClips.map( ( clip, i ) => ( {
-					id: `clip_${ i }`,
-					duration: clip.trimEnd - clip.trimStart,
-					displayName: clip.name,
-				} ) ),
-			} ),
+			assets: getThemeAssets( selectedTheme ),
+			elements: getElements( videoData ),
 		};
 
 		const ws = new WebSocket( WS_URL );
@@ -404,7 +409,14 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 						</table>
 					</div>
 
-					<div style={ { marginTop: 16 } }>
+					<div style={ { marginTop: 16, display: 'flex', alignItems: 'flex-end', gap: 16 } }>
+						<SelectControl
+							label="Theme"
+							value={ selectedTheme }
+							options={ availableThemes.map( ( t ) => ( { value: t.id, label: t.label } ) ) }
+							onChange={ setSelectedTheme }
+							__nextHasNoMarginBottom
+						/>
 						<Button
 							variant="primary"
 							onClick={ startRendering }

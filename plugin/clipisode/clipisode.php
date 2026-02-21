@@ -31,6 +31,20 @@ add_action( 'init', [ new Clipisode_Media(), 'register_hooks' ] );
 add_action( 'admin_menu', [ new Clipisode_Admin(), 'register_menus' ] );
 add_action( 'rest_api_init', [ new Clipisode_REST_API(), 'register_routes' ] );
 
+add_filter( 'clipisode_themes', function ( array $themes ): array {
+	$themes['standard'] = [
+		'label'     => 'Standard',
+		'asset_url' => CLIPISODE_PLUGIN_URL . 'assets/themes/standard/',
+		'asset_dir' => CLIPISODE_PLUGIN_DIR . 'assets/themes/standard/',
+	];
+	$themes['wpvip'] = [
+		'label'     => 'WP VIP',
+		'asset_url' => CLIPISODE_PLUGIN_URL . 'assets/themes/wpvip/',
+		'asset_dir' => CLIPISODE_PLUGIN_DIR . 'assets/themes/wpvip/',
+	];
+	return $themes;
+} );
+
 $clipisode_invitation = new Clipisode_Invitation();
 add_action( 'init', [ $clipisode_invitation, 'register_blocks' ] );
 add_action( 'init', [ $clipisode_invitation, 'register_rewrite' ] );
