@@ -8,6 +8,21 @@ import SwiftUI
 import Observation
 import CoreImage
 
+struct LastRender {
+    enum Result {
+        case success
+        case error(String)
+        case cancelled
+    }
+    
+    let startedAt: Date
+    let finishedAt: Date
+    let videoCount: Int
+    let result: Result
+    
+    var duration: TimeInterval { finishedAt.timeIntervalSince(startedAt) }
+}
+
 /// Shared reference so the app delegate can run the launch render.
 enum AppStateHolder {
     static weak var shared: AppState?
@@ -19,6 +34,7 @@ final class AppState {
     var isWorking = false
     var isConnected = false
     var serverError: String?
+    var lastRender: LastRender?
     
     private var webSocketServer: WebSocketServer?
     private var httpServer: HTTPServer?
@@ -214,6 +230,7 @@ final class AppState {
         let assetCount = payload.assets.count
         let totalDownloads = videoCount + assetCount
         let useTheme = (payload.elements?.isEmpty == false)
+        let jobStartedAt = Date()
         print("🚀 Job \(jobId): \(videoCount) video(s), \(assetCount) asset(s), theme: \(useTheme), callback: \(payload.callbackUrl)")
 
         renderTask = Task {
@@ -341,13 +358,17 @@ final class AppState {
                 try? FileManager.default.removeItem(at: tempDir)
                 
                 webSocketServer?.send(JobDoneMessage(jobId: jobId, outputUrl: outputUrl))
+                lastRender = LastRender(startedAt: jobStartedAt, finishedAt: Date(), videoCount: videoCount, result: .success)
                 
             } catch is CancellationError {
                 webSocketServer?.send(JobCancelledMessage(jobId: jobId))
+                lastRender = LastRender(startedAt: jobStartedAt, finishedAt: Date(), videoCount: videoCount, result: .cancelled)
             } catch let error as JobError {
                 webSocketServer?.send(JobErrorMessage(jobId: jobId, code: error.code.rawValue, message: error.message))
+                lastRender = LastRender(startedAt: jobStartedAt, finishedAt: Date(), videoCount: videoCount, result: .error(error.message))
             } catch {
                 webSocketServer?.send(JobErrorMessage(jobId: jobId, code: JobErrorCode.unknown.rawValue, message: error.localizedDescription))
+                lastRender = LastRender(startedAt: jobStartedAt, finishedAt: Date(), videoCount: videoCount, result: .error(error.localizedDescription))
             }
             
             currentJobId = nil

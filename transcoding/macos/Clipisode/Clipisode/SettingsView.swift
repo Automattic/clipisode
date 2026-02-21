@@ -29,6 +29,28 @@ struct SettingsView: View {
                         }
                 }
                 
+                if let render = appState.lastRender {
+                    Section("Last Render") {
+                        LabeledContent("Status") {
+                            switch render.result {
+                            case .success:
+                                Text("Success")
+                                    .foregroundStyle(.green)
+                            case .error(let message):
+                                Text(message)
+                                    .foregroundStyle(.red)
+                                    .lineLimit(2)
+                            case .cancelled:
+                                Text("Cancelled")
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                        LabeledContent("Videos", value: "\(render.videoCount)")
+                        LabeledContent("Duration", value: formatDuration(render.duration))
+                        LabeledContent("Completed", value: render.finishedAt.formatted(.relative(presentation: .named)))
+                    }
+                }
+                
                 Section("Server") {
                     LabeledContent("WebSocket Port", value: "63481")
                     LabeledContent("HTTP Port", value: "63482")
@@ -74,6 +96,14 @@ struct SettingsView: View {
         } message: {
             Text("This will delete all cached source files. Job outputs will not be affected.")
         }
+    }
+    
+    private func formatDuration(_ seconds: TimeInterval) -> String {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = seconds >= 3600 ? [.hour, .minute, .second] : [.minute, .second]
+        formatter.unitsStyle = .abbreviated
+        formatter.zeroFormattingBehavior = .pad
+        return formatter.string(from: seconds) ?? "\(Int(seconds))s"
     }
     
     private func clearCache() {
