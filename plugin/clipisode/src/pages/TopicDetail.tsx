@@ -56,6 +56,9 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 			setTopic( t );
 			setLinks( l );
 			setReplies( cl );
+			setSelectedReplyIds( new Set(
+				cl.filter( ( r ) => r.status === 'approved' && r.media_id ).map( ( r ) => r.id )
+			) );
 		} ).finally( () => setLoading( false ) );
 	}, [ id ] );
 
