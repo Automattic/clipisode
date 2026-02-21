@@ -220,23 +220,30 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 		} );
 
 		const getElements = themeRegistry[ selectedTheme ];
-		const videoData = {
-			id: String( topicId || 0 ),
-			title: topic?.title || 'Clipisode',
-			clips: includedClips.map( ( clip, i ) => ( {
-				id: `clip_${ i }`,
-				duration: clip.trimEnd - clip.trimStart,
-				displayName: clip.name,
-			} ) ),
-		};
+		let elements: unknown[] = [];
+		let assets: Record< string, { url: string; filename: string } > = {};
+
+		if ( getElements ) {
+			const videoData = {
+				id: String( topicId || 0 ),
+				title: topic?.title || 'Clipisode',
+				clips: includedClips.map( ( clip, i ) => ( {
+					id: `clip_${ i }`,
+					duration: clip.trimEnd - clip.trimStart,
+					displayName: clip.name,
+				} ) ),
+			};
+			elements = getElements( videoData );
+			assets = getThemeAssets( selectedTheme );
+		}
 
 		const payload = {
 			type: 'start_job',
 			job_id: jobId,
 			callback_url: callbackUrl,
 			videos,
-			assets: getThemeAssets( selectedTheme ),
-			elements: getElements( videoData ),
+			assets,
+			elements,
 		};
 
 		const ws = new WebSocket( WS_URL );
@@ -413,7 +420,10 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 						<SelectControl
 							label="Theme"
 							value={ selectedTheme }
-							options={ availableThemes.map( ( t ) => ( { value: t.id, label: t.label } ) ) }
+							options={ [
+								...availableThemes.map( ( t ) => ( { value: t.id, label: t.label } ) ),
+								{ value: 'none', label: 'No Theme' },
+							] }
 							onChange={ setSelectedTheme }
 							__nextHasNoMarginBottom
 						/>
