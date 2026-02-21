@@ -17,7 +17,8 @@ enum CompositionExporter {
         effects: [Set<SegmentEffect>] = [],
         ciFilters: [[CIFilterConfig]] = [],
         to output: URL,
-        transitionDuration: TimeInterval = 1.0
+        transitionDuration: TimeInterval = 1.0,
+        onProgress: (@Sendable (Float) -> Void)? = nil
     ) async throws {
         guard !segments.isEmpty else { return }
 
@@ -197,7 +198,23 @@ enum CompositionExporter {
         session.videoComposition = videoComposition
         session.audioMix = audioMix
 
+        let progressTask = onProgress.map { callback in
+            Task.detached {
+                var lastPercent = -1
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    let progress = session.progress
+                    let percent = Int(progress * 100)
+                    if percent != lastPercent {
+                        lastPercent = percent
+                        callback(progress)
+                    }
+                }
+            }
+        }
+
         try await session.export(to: output, as: .mp4)
+        progressTask?.cancel()
     }
 }
 

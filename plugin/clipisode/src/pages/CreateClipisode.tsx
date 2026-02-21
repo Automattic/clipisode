@@ -435,7 +435,10 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 					{ renderMessage && <div className="clipisode-output-message">{ renderMessage }</div> }
 					{ renderProgress > 0 && (
 						<div className="clipisode-output-progress">
-							<div className="clipisode-output-progress-bar" style={ { width: `${ renderProgress }%` } } />
+							<div className="clipisode-output-progress-track">
+								<div className="clipisode-output-progress-bar" style={ { width: `${ renderProgress }%` } } />
+							</div>
+							<span className="clipisode-output-progress-label">{ Math.round( renderProgress ) }%</span>
 						</div>
 					) }
 					<Button variant="tertiary" isDestructive onClick={ cancelRendering }>

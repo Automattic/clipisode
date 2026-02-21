@@ -297,8 +297,16 @@ final class AppState {
                 // 2. Render
                 try Task.checkCancellation()
                 let outputFile = jobFolder.appendingPathComponent("output.mp4")
-                sendStatus(jobId: jobId, phase: "rendering", current: 0, total: 1,
-                          message: "Rendering video...")
+                sendStatus(jobId: jobId, phase: "rendering", current: 0, total: 100,
+                          message: "Rendering video…")
+
+                let onProgress: @Sendable (Float) -> Void = { [weak self] progress in
+                    let percent = Int(progress * 100)
+                    Task { @MainActor in
+                        self?.sendStatus(jobId: jobId, phase: "rendering", current: percent, total: 100,
+                                        message: "Rendering video… \(percent)%")
+                    }
+                }
 
                 if useTheme, let elements = payload.elements {
                     let videosMap = Dictionary(uniqueKeysWithValues: zip(sortedKeys, localFiles))
@@ -306,16 +314,18 @@ final class AppState {
                         elements: elements,
                         videos: videosMap,
                         files: assetFiles,
-                        to: outputFile
+                        to: outputFile,
+                        onProgress: onProgress
                     )
                 } else {
                     try await CompositionExporter.export(
                         segments: localFiles,
-                        to: outputFile
+                        to: outputFile,
+                        onProgress: onProgress
                     )
                 }
 
-                sendStatus(jobId: jobId, phase: "rendering", current: 1, total: 1,
+                sendStatus(jobId: jobId, phase: "rendering", current: 100, total: 100,
                           message: "Render complete")
 
                 // 3. Upload via multipart POST

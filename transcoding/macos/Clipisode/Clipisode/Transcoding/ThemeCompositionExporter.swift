@@ -19,7 +19,8 @@ enum ThemeCompositionExporter {
         elements: [[String: Any]],
         videos: [String: URL],
         files: [String: String],
-        to output: URL
+        to output: URL,
+        onProgress: (@Sendable (Float) -> Void)? = nil
     ) async throws {
         let composition = AVMutableComposition()
         var videoTrackIdMap: [String: CMPersistentTrackID] = [:]
@@ -112,7 +113,24 @@ enum ThemeCompositionExporter {
             throw ExportError.exportSessionCreationFailed
         }
         session.videoComposition = videoComposition
+
+        let progressTask = onProgress.map { callback in
+            Task.detached {
+                var lastPercent = -1
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    let progress = session.progress
+                    let percent = Int(progress * 100)
+                    if percent != lastPercent {
+                        lastPercent = percent
+                        callback(progress)
+                    }
+                }
+            }
+        }
+
         try await session.export(to: output, as: .mp4)
+        progressTask?.cancel()
     }
 
     private static func assetFrame(asset: AVAsset, position: String) async -> CGImage? {

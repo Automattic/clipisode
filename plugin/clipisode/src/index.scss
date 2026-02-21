@@ -609,8 +609,33 @@
 	}
 
 	.clipisode-output-progress {
+		display: flex;
+		align-items: center;
+		gap: 10px;
 		width: 100%;
 		max-width: 400px;
+	}
+
+	.clipisode-output-progress-track {
+		flex: 1;
+		height: 8px;
+		background: #dcdcde;
+		border-radius: 4px;
+		overflow: hidden;
+	}
+
+	.clipisode-output-progress-bar {
+		height: 100%;
+		background: #2271b1;
+		border-radius: 4px;
+		transition: width 0.4s ease;
+	}
+
+	.clipisode-output-progress-label {
+		font-size: 12px;
+		font-weight: 600;
+		color: #1d2327;
+		white-space: nowrap;
 	}
 
 	.clipisode-output-done {
