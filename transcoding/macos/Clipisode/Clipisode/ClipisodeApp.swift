@@ -12,8 +12,13 @@ struct ClipisodeApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("Clipisode", systemImage: "film") {
+        MenuBarExtra {
             SettingsView(appState: appState)
+        } label: {
+            Image(systemName: appState.isConnected ? "film.fill" : "film")
+                .symbolRenderingMode(appState.isWorking ? .palette : .monochrome)
+                .foregroundStyle(appState.isWorking ? .green : .primary)
+                .symbolEffect(.pulse, isActive: appState.isWorking)
         }
         .menuBarExtraStyle(.window)
     }

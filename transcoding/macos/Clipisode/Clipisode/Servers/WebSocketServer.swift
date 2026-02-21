@@ -14,6 +14,7 @@ final class WebSocketServer: @unchecked Sendable {
     private let queue = DispatchQueue(label: "websocket-server")
     
     var onMessage: ((Data) -> Void)?
+    var onConnectionChange: ((Bool) -> Void)?
     
     func start(port: UInt16) throws {
         // Create WebSocket parameters
@@ -75,13 +76,16 @@ final class WebSocketServer: @unchecked Sendable {
             switch state {
             case .ready:
                 print("✅ WebSocket connection ready")
+                self?.onConnectionChange?(true)
                 self?.receiveMessage(connection)
             case .failed(let error):
                 print("❌ WebSocket connection failed: \(error)")
                 self?.activeConnection = nil
+                self?.onConnectionChange?(false)
             case .cancelled:
                 print("⚠️ WebSocket connection cancelled")
                 self?.activeConnection = nil
+                self?.onConnectionChange?(false)
             default:
                 break
             }
@@ -110,6 +114,7 @@ final class WebSocketServer: @unchecked Sendable {
                 case .close:
                     print("👋 Client sent close frame")
                     self?.activeConnection = nil
+                    self?.onConnectionChange?(false)
                     return
                 default:
                     break

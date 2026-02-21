@@ -17,6 +17,7 @@ enum AppStateHolder {
 @MainActor
 final class AppState {
     var isWorking = false
+    var isConnected = false
     var serverError: String?
     
     private var webSocketServer: WebSocketServer?
@@ -149,6 +150,12 @@ final class AppState {
         ws.onMessage = { [weak self] message in
             Task { @MainActor in
                 self?.handleMessage(message)
+            }
+        }
+        
+        ws.onConnectionChange = { [weak self] connected in
+            Task { @MainActor in
+                self?.isConnected = connected
             }
         }
         
