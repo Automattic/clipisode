@@ -57,7 +57,27 @@ export default function MediaList() {
 	const [ uploadProgress, setUploadProgress ] = useState( 0 );
 	const [ uploadError, setUploadError ] = useState< string | null >( null );
 	const [ deleting, setDeleting ] = useState< number | null >( null );
+	const [ selectedIds, setSelectedIds ] = useState< Set< number > >( new Set() );
 	const fileInputRef = useRef< HTMLInputElement >( null );
+
+	const isSelectable = ( item: MediaItem ) => item.type === 'video' && !! item.url;
+
+	const toggleSelection = ( id: number ) => {
+		setSelectedIds( ( prev ) => {
+			const next = new Set( prev );
+			if ( next.has( id ) ) {
+				next.delete( id );
+			} else {
+				next.add( id );
+			}
+			return next;
+		} );
+	};
+
+	const createClipisode = () => {
+		const mediaIds = items.filter( ( i ) => selectedIds.has( i.id ) ).map( ( i ) => i.id );
+		window.location.href = `admin.php?page=clipisode#/create-clipisode/${ mediaIds.join( ',' ) }`;
+	};
 
 	const fetchMedia = useCallback( () => {
 		setLoading( true );
@@ -154,6 +174,11 @@ export default function MediaList() {
 				>
 					{ uploading ? `Uploading… ${ uploadProgress }%` : 'Upload Media Asset' }
 				</Button>
+				{ selectedIds.size > 0 && (
+					<Button variant="primary" onClick={ createClipisode }>
+						Create Clipisode ({ selectedIds.size } clip{ selectedIds.size !== 1 ? 's' : '' })
+					</Button>
+				) }
 				<input
 					ref={ fileInputRef }
 					type="file"
@@ -195,6 +220,7 @@ export default function MediaList() {
 				<table className="clipisode-table">
 					<thead>
 						<tr>
+							<th style={ { width: 30 } }></th>
 							<th style={ { width: 80 } }>Preview</th>
 							<th>Type</th>
 							<th>Label</th>
@@ -212,6 +238,15 @@ export default function MediaList() {
 					<tbody>
 						{ items.map( ( item ) => (
 							<tr key={ item.id }>
+								<td>
+									{ isSelectable( item ) ? (
+										<input
+											type="checkbox"
+											checked={ selectedIds.has( item.id ) }
+											onChange={ () => toggleSelection( item.id ) }
+										/>
+									) : null }
+								</td>
 								<td>
 									{ item.url && item.type === 'video' ? (
 										<video
