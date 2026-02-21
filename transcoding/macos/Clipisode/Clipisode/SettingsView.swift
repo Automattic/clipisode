@@ -4,14 +4,31 @@
 //
 
 import SwiftUI
+import ServiceManagement
 
 struct SettingsView: View {
     let appState: AppState
     @State private var showClearConfirmation = false
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     
     var body: some View {
         VStack(spacing: 0) {
             Form {
+                Section("General") {
+                    Toggle("Launch at Login", isOn: $launchAtLogin)
+                        .onChange(of: launchAtLogin) { _, newValue in
+                            do {
+                                if newValue {
+                                    try SMAppService.mainApp.register()
+                                } else {
+                                    try SMAppService.mainApp.unregister()
+                                }
+                            } catch {
+                                launchAtLogin = SMAppService.mainApp.status == .enabled
+                            }
+                        }
+                }
+                
                 Section("Server") {
                     LabeledContent("WebSocket Port", value: "63481")
                     LabeledContent("HTTP Port", value: "63482")
