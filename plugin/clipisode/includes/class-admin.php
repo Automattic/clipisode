@@ -11,7 +11,7 @@ class Clipisode_Admin {
 			'manage_options',
 			'clipisode',
 			[ $this, 'render_page' ],
-			'dashicons-video-alt3',
+			CLIPISODE_PLUGIN_URL . 'assets/images/clipisode.png',
 			30
 		);
 
@@ -25,6 +25,7 @@ class Clipisode_Admin {
 		add_action( "admin_print_styles-$hook", [ $this, 'enqueue_assets' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'maybe_enqueue' ] );
 		add_action( 'admin_init', [ $this, 'redirect_cpt_list' ] );
+		add_action( 'admin_head', [ $this, 'menu_icon_css' ] );
 	}
 
 	public function redirect_cpt_list(): void {
@@ -106,5 +107,17 @@ class Clipisode_Admin {
 
 	public function render_page(): void {
 		echo '<div id="clipisode-root"></div>';
+	}
+
+	public function menu_icon_css(): void {
+		?>
+		<style>
+			#toplevel_page_clipisode .wp-menu-image img {
+				width: 20px;
+				height: 20px;
+				padding: 7px 0 0;
+			}
+		</style>
+		<?php
 	}
 }
