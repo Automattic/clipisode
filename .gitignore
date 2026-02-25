@@ -5,3 +5,7 @@ _tmp/
 
 .cursor/
 *xcuserdata*
+
+# PHP testing
+vendor/
+composer.lock

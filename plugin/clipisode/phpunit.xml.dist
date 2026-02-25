@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<phpunit
+	bootstrap="tests/phpunit/bootstrap.php"
+	backupGlobals="true"
+	colors="true"
+>
+	<testsuites>
+		<testsuite name="Clipisode Test Suite">
+			<directory suffix="Test.php">./tests/phpunit/</directory>
+		</testsuite>
+	</testsuites>
+	<coverage>
+		<include>
+			<directory suffix=".php">./includes</directory>
+			<file>./clipisode.php</file>
+		</include>
+	</coverage>
+</phpunit>

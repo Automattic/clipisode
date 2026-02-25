@@ -184,7 +184,25 @@ See `docs/transcode.md` for the full WebSocket protocol spec.
 
 ### Plugin
 
-No automated test suite yet. Manual testing via the local WP site at `https://mcp.local/`.
+**PHP (PHPUnit):**
+
+```bash
+cd plugin/clipisode
+composer install
+composer test
+```
+
+Tests live in `tests/phpunit/`. No database required — uses stubs.
+
+**JavaScript (Jest):**
+
+```bash
+cd plugin/clipisode
+npm run test:js           # Run once
+npm run test:js:watch     # Watch mode
+```
+
+Tests live in `tests/js/` with `.test.ts` suffix.
 
 ### macOS App
 
