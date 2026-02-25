@@ -1,10 +1,6 @@
 # Clipisode
 
-A WordPress plugin and macOS transcoding app for collecting, curating, and publishing user-generated video content.
-
-## What This Project Does
-
-Clipisode lets brands/creators create video prompts ("topics"), share invitation links with their audience, collect video replies, and render finished videos ("clipisodes") that combine an intro with selected replies. The WordPress plugin handles content management and the public-facing invitation flow; the macOS app handles video composition and rendering.
+WordPress plugin + macOS transcoder for collecting, curating, and publishing user-generated video content. Brands create video prompts ("topics"), share invitation links, collect video replies, and render finished "clipisodes" combining intro + replies.
 
 ## Repository Structure
 
@@ -18,43 +14,22 @@ clipisode/
 
 ## Tech Stack
 
-### WordPress Plugin (`plugin/clipisode/`)
+**Plugin:** PHP 8.1+, WordPress 6.5+, React 18, TypeScript, SCSS, webpack via `@wordpress/scripts`, Gutenberg blocks, custom tables + CPTs via REST API.
 
-| Layer | Tech |
-|-------|------|
-| Backend | PHP 8.1+, WordPress 6.5+ |
-| Frontend | React 18, TypeScript, SCSS |
-| Build | webpack via `@wordpress/scripts` |
-| Blocks | Gutenberg block editor |
-| Data | Custom tables + CPTs via REST API |
-
-### macOS App (`transcoding/macos/Clipisode/`)
-
-| Layer | Tech |
-|-------|------|
-| Language | Swift 5, SwiftUI |
-| Video | AVFoundation, Core Image, Vision |
-| Networking | Network.framework (WebSocket + HTTP servers) |
-| Binary | Bundled static FFmpeg |
-| Target | macOS 15.7+, menu bar app |
+**macOS App:** Swift 5, SwiftUI, AVFoundation, Core Image, Vision, Network.framework (WebSocket + HTTP servers), bundled FFmpeg, macOS 15.7+, menu bar app.
 
 ## Commands
 
-### Plugin Development
-
+### Plugin
 ```bash
 cd plugin/clipisode
-
 npm install          # Install dependencies
 npm run build        # Production build
 npm run dev          # Watch mode
-npm run plugin       # Build + create zip for distribution
+npm run plugin       # Build + create zip
 ```
 
 ### Local WordPress Database
-
-The local WP site runs via Local. To access MySQL directly:
-
 ```bash
 mysql -h localhost -P 3306 -u root -proot
 ```
@@ -77,42 +52,38 @@ python3 tools/websocket/echo.py
 
 ## Architecture
 
-### Plugin Overview
+### Plugin
 
-The plugin uses custom database tables for core entities (topics, replies, outputs, media) and WordPress CPTs for content that benefits from the block editor (invitation themes, legal terms).
+Custom database tables for core entities, WordPress CPTs for block-editor content.
 
-**Key PHP classes:**
+**PHP classes:**
+- `Clipisode_Admin` — Admin menus, React app entry point
+- `Clipisode_REST_API` — All admin REST endpoints
+- `Clipisode_Invitation` — Public invitation pages, video upload endpoints
+- `Clipisode_Database` — Table creation and schema
+- `Clipisode_Media` — Video storage abstraction
+- `Clipisode_Post_Types` — CPT registration
 
-| Class | Purpose |
-|-------|---------|
-| `Clipisode_Admin` | Admin menus, React app entry point |
-| `Clipisode_REST_API` | All admin REST endpoints |
-| `Clipisode_Invitation` | Public invitation pages, video upload endpoints |
-| `Clipisode_Database` | Table creation and schema |
-| `Clipisode_Media` | Video storage abstraction |
-| `Clipisode_Post_Types` | CPT registration |
+**Tables:** `clipisode_topics`, `clipisode_replies`, `clipisode_outputs`, `clipisode_contents`, `clipisode_media`, `clipisode_hosts`, `clipisode_invitation_links`
 
-**Database tables:** `clipisode_topics`, `clipisode_replies`, `clipisode_outputs`, `clipisode_contents`, `clipisode_media`, `clipisode_hosts`, `clipisode_invitation_links`
+**Blocks:** Invitation pages use nested Gutenberg blocks (`clipisode/invitation-flow` → stage blocks → `clipisode/element` blocks). Themes saved as CPT posts with block markup.
 
-**Block editor:** Invitation pages are built with nested Gutenberg blocks (`clipisode/invitation-flow` contains stage blocks, each containing `clipisode/element` blocks). Themes are saved as CPT posts with block markup.
+### macOS App
 
-### macOS App Overview
-
-The app runs two local servers:
-- **WebSocket (port 63481)** — receives render jobs from the browser, sends progress updates
-- **HTTP (port 63482)** — serves rendered videos with Range support for browser playback
+Two local servers:
+- **WebSocket (port 63481)** — receives render jobs, sends progress
+- **HTTP (port 63482)** — serves rendered videos with Range support
 
 **Render pipeline:**
 1. Browser sends `start_job` with video URLs and callback URL
 2. App downloads source videos
-3. Composites using AVFoundation with optional theme elements, CIFilter effects, face tracking overlays
-4. Uploads result to WordPress via callback URL
-5. Sends `job_done` with the final video URL
+3. Composites with AVFoundation (theme elements, CIFilter effects, face tracking)
+4. Uploads result to WordPress callback URL
+5. Sends `job_done` with final video URL
 
-See `docs/transcode.md` for the full WebSocket protocol spec.
+See `docs/transcode.md` for full WebSocket protocol.
 
-### How They Connect
-
+### Connection Flow
 ```
 ┌─────────────────┐      WebSocket      ┌─────────────────┐
 │  WP Admin UI    │◄──────────────────► │  macOS App      │
@@ -127,34 +98,29 @@ See `docs/transcode.md` for the full WebSocket protocol spec.
 └─────────────────┘                    └─────────────────┘
 ```
 
-## Coding Standards
+## Coding Standards — CRITICAL
 
-**CRITICAL — Read These First:**
-
-- **No fallback code. No legacy code. No workarounds. Ever.** If something doesn't work due to the environment, tell the user the root cause and let them fix it. Do not code around it.
+- **No fallback code. No legacy code. No workarounds. Ever.** Tell user the root cause; don't code around it.
 - **Production code only.** No MVPs, no "good enough for now."
-- **Do not add unrequested features.** No extra validation, behavior, or "improvements" that weren't asked for.
-- **Fix bugs at the source.** When you find a bug, fix it. Do not change inputs/parameters to avoid triggering it.
-- **Ask when uncertain.** If you don't know how to do something, ask. Do not guess or assume.
-- **Wait for confirmation.** If the user asks "right?" or any confirming question, answer and wait before proceeding.
-- **No dead code.** Do not keep commented-out code or unused imports.
-- **No narrating comments.** Comments should explain *why*, not *what*.
+- **Do not add unrequested features.** No extra validation or "improvements."
+- **Fix bugs at the source.** Don't change inputs to avoid triggering them.
+- **Ask when uncertain.** Do not guess or assume.
+- **Wait for confirmation.** If user asks "right?", answer and wait before proceeding.
+- **No dead code.** No commented-out code or unused imports.
+- **No narrating comments.** Comments explain *why*, not *what*.
 
-### PHP Style
-
-- Use WordPress coding standards
+### PHP
+- WordPress coding standards
 - Prefix functions/classes with `Clipisode_` or `clipisode_`
-- Use `sanitize_*()` on input, `esc_*()` on output
-- All REST endpoints require capability checks or nonce verification
+- `sanitize_*()` on input, `esc_*()` on output
+- REST endpoints require capability checks or nonce verification
 
-### TypeScript/React Style
-
+### TypeScript/React
 - Functional components with hooks
-- Use `@wordpress/api-fetch` for REST calls
-- Use `@wordpress/components` for UI consistency with WP admin
+- `@wordpress/api-fetch` for REST calls
+- `@wordpress/components` for UI consistency
 
-### Swift Style
-
+### Swift
 - Swift Concurrency (`async/await`, `@MainActor`)
 - `@Observable` for state management
 - No third-party dependencies — Apple frameworks only
@@ -162,25 +128,22 @@ See `docs/transcode.md` for the full WebSocket protocol spec.
 ## Common Pitfalls
 
 **Plugin:**
-
 - **NEVER edit WordPress core files.** Use hooks and filters.
 - **When deleting data via MySQL**, always update foreign key references (e.g., `invitation_id` on topics) in the same operation.
 - **When creating a new Gutenberg block**, register it in PHP (`class-invitation.php`), not just the JS/build side.
 - **Media is abstracted** — don't access `wp_posts` attachments directly. Use `Clipisode_Media` methods.
 
 **macOS App:**
-
-- **It's a menu bar app** — no dock icon. Look for the film icon in the menu bar.
-- **Debug mode disables sandbox** — Release builds are sandboxed with network entitlements.
-- **Files are auto-cleaned** — sources and jobs older than 30 days are deleted automatically.
-- **Ports are hardcoded** — WebSocket on 63481, HTTP on 63482. Don't change these without updating the plugin.
+- **Menu bar app** — no dock icon. Look for film icon in menu bar.
+- **Debug disables sandbox** — Release builds are sandboxed with network entitlements.
+- **Auto-cleanup** — sources/jobs older than 30 days deleted automatically.
+- **Hardcoded ports** — WebSocket 63481, HTTP 63482. Don't change without updating plugin.
 
 **Both:**
+- **WebSocket protocol documented** — see `docs/transcode.md` before changing messages.
+- **Video keys = composition order** — `intro` → `main` or `main_1` → `main_2` (alphabetical).
 
-- **The WebSocket protocol is documented** — see `docs/transcode.md` before changing message formats.
-- **Video keys determine composition order** — `intro` → `main` or `main_1` → `main_2` etc. (alphabetical sort).
-
-## Testing
+## Test Files
 
 ### Plugin
 
@@ -214,21 +177,20 @@ Xcode test targets exist (`ClipisodeTests`, `ClipisodeUITests`) but coverage is 
 
 | What | Where |
 |------|-------|
-| Admin pages | `plugin/clipisode/src/pages/` |
-| REST endpoints | `plugin/clipisode/includes/class-rest-api.php` |
-| Block definitions | `plugin/clipisode/src/blocks/`, `src/element/`, `src/flow/` |
-| Types | `plugin/clipisode/src/types.ts` |
-| Database schema | `plugin/clipisode/includes/class-database.php` |
+| Admin pages | `src/pages/` |
+| REST endpoints | `includes/class-rest-api.php` |
+| Blocks | `src/blocks/`, `src/element/`, `src/flow/` |
+| Types | `src/types.ts` |
+| Schema | `includes/class-database.php` |
 
 ### macOS App
-
 | What | Where |
 |------|-------|
-| App state/job orchestration | `Clipisode/AppState.swift` |
-| WebSocket messages | `Clipisode/Models/Messages.swift` |
-| Video composition | `Clipisode/Transcoding/CompositionExporter.swift` |
-| Theme rendering | `Clipisode/Transcoding/ThemeCompositor.swift` |
-| Face effects | `Clipisode/Transcoding/OverlayRenderer.swift`, `FaceDetector.swift` |
+| App state/jobs | `AppState.swift` |
+| WebSocket messages | `Models/Messages.swift` |
+| Video composition | `Transcoding/CompositionExporter.swift` |
+| Theme rendering | `Transcoding/ThemeCompositor.swift` |
+| Face effects | `Transcoding/OverlayRenderer.swift`, `FaceDetector.swift` |
 
 ## Documentation
 
@@ -238,7 +200,4 @@ Xcode test targets exist (`ClipisodeTests`, `ClipisodeUITests`) but coverage is 
 - `docs/prd.md` — Product requirements
 - `docs/mux.md` — Mux integration notes
 
-## Directory-Specific Notes
-
-Additional context lives in:
-- `plugin/AGENTS.md` — Plugin-specific rules and local MySQL access
+See also: `plugin/AGENTS.md` for plugin-specific notes.
