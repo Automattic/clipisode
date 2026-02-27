@@ -45,6 +45,17 @@ add_filter( 'clipisode_themes', function ( array $themes ): array {
 	return $themes;
 } );
 
+add_action( 'enqueue_block_editor_assets', function (): void {
+	$screen = get_current_screen();
+	if ( ! $screen || $screen->post_type !== 'clipisode_invite' ) {
+		return;
+	}
+	wp_add_inline_script(
+		'wp-edit-post',
+		'wp.domReady(function(){wp.data.dispatch("core/edit-post").__experimentalSetPreviewDeviceType("Mobile");});'
+	);
+} );
+
 $clipisode_invitation = new Clipisode_Invitation();
 add_action( 'init', [ $clipisode_invitation, 'register_blocks' ] );
 add_action( 'init', [ $clipisode_invitation, 'register_rewrite' ] );
