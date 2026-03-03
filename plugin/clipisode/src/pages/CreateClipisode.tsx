@@ -60,6 +60,7 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 	const jobIdRef = useRef< string | null >( null );
 	const dragItem = useRef< number | null >( null );
 	const dragOver = useRef< number | null >( null );
+	const dupCounter = useRef( 0 );
 
 	useEffect( () => {
 		const warn = ( e: BeforeUnloadEvent ) => {
@@ -129,6 +130,22 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 			prev.map( ( c ) => ( c.id === trimmingClip.id ? { ...c, trimStart: start, trimEnd: end } : c ) )
 		);
 		setTrimmingClip( null );
+	};
+
+	const duplicateClip = ( clip: ClipItem, index: number ) => {
+		dupCounter.current += 1;
+		const dup: ClipItem = {
+			...clip,
+			id: `${ clip.id }-dup-${ dupCounter.current }`,
+			trimStart: 0,
+			trimEnd: clip.duration,
+			included: true,
+		};
+		setClips( ( prev ) => {
+			const next = [ ...prev ];
+			next.splice( index + 1, 0, dup );
+			return next;
+		} );
 	};
 
 	const handleDragStart = ( index: number ) => {
@@ -408,6 +425,13 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 												onClick={ () => setTrimmingClip( clip ) }
 											>
 												Trim
+											</Button>
+											<Button
+												variant="tertiary"
+												size="compact"
+												onClick={ () => duplicateClip( clip, index ) }
+											>
+												Duplicate
 											</Button>
 										</td>
 									</tr>
