@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
 import { Button, SelectControl, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
+import { crop, copy, trash } from '@wordpress/icons';
 import TrimModal from '../components/TrimModal';
 import { themeRegistry } from '../themes';
 import { WS_URL, generateJobId, getThemeAssets, getAvailableThemes } from '../lib/transcoder';
@@ -146,6 +147,11 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 			next.splice( index + 1, 0, dup );
 			return next;
 		} );
+	};
+
+	const removeClip = ( id: string ) => {
+		if ( ! window.confirm( 'Remove this clip from the list?' ) ) return;
+		setClips( ( prev ) => prev.filter( ( c ) => c.id !== id ) );
 	};
 
 	const handleDragStart = ( index: number ) => {
@@ -377,7 +383,6 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 							<thead>
 								<tr>
 									<th style={ { width: 30 } }></th>
-									<th style={ { width: 30 } }></th>
 									<th>Name</th>
 									<th>Role</th>
 									<th>Duration</th>
@@ -394,16 +399,8 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 										onDragEnter={ () => handleDragEnter( index ) }
 										onDragEnd={ handleDragEnd }
 										onDragOver={ ( e ) => e.preventDefault() }
-										style={ { opacity: clip.included ? 1 : 0.4 } }
-									>
-										<td>
-											<input
-												type="checkbox"
-												checked={ clip.included }
-												onChange={ () => toggleIncluded( clip.id ) }
-											/>
-										</td>
-										<td style={ { cursor: 'grab', userSelect: 'none' } }>&#x2630;</td>
+								>
+									<td style={ { cursor: 'grab', userSelect: 'none', fontSize: 18, textAlign: 'center' } }>&#x2630;</td>
 										<td>{ clip.name }</td>
 										<td>
 											<span className={ `clipisode-status-badge ${ clip.role === 'intro' ? 'approved' : '' }` }>
@@ -419,20 +416,25 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 										</td>
 										<td>
 											<Button
-												variant="tertiary"
+												icon={ crop }
+												label="Trim"
 												size="compact"
 												disabled={ clip.duration <= 0 }
 												onClick={ () => setTrimmingClip( clip ) }
-											>
-												Trim
-											</Button>
+											/>
 											<Button
-												variant="tertiary"
+												icon={ copy }
+												label="Duplicate"
 												size="compact"
 												onClick={ () => duplicateClip( clip, index ) }
-											>
-												Duplicate
-											</Button>
+											/>
+											<Button
+												icon={ trash }
+												label="Remove"
+												size="compact"
+												isDestructive
+												onClick={ () => removeClip( clip.id ) }
+											/>
 										</td>
 									</tr>
 								) ) }
