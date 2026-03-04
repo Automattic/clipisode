@@ -564,6 +564,7 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 			{ showAddMedia && (
 				<AddMediaModal
 					existingMediaIds={ clips.map( ( c ) => c.mediaId ) }
+					topicId={ topicId }
 					onAdd={ handleAddMedia }
 					onClose={ () => setShowAddMedia( false ) }
 				/>

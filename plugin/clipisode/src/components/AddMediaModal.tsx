@@ -5,6 +5,7 @@ import type { MediaItem } from '../types';
 
 interface AddMediaModalProps {
 	existingMediaIds: number[];
+	topicId?: number;
 	onAdd: ( items: MediaItem[] ) => void;
 	onClose: () => void;
 }
@@ -24,11 +25,12 @@ function formatBytes( bytes: number | null ): string {
 	return `${ ( bytes / 1048576 ).toFixed( 1 ) } MB`;
 }
 
-export default function AddMediaModal( { existingMediaIds, onAdd, onClose }: AddMediaModalProps ) {
+export default function AddMediaModal( { existingMediaIds, topicId, onAdd, onClose }: AddMediaModalProps ) {
 	const [ items, setItems ] = useState< MediaItem[] >( [] );
 	const [ loading, setLoading ] = useState( true );
 	const [ selectedIds, setSelectedIds ] = useState< Set< number > >( new Set() );
 	const [ labelFilter, setLabelFilter ] = useState( '' );
+	const [ thisTopicOnly, setThisTopicOnly ] = useState( false );
 
 	const existingSet = new Set( existingMediaIds );
 
@@ -72,6 +74,16 @@ export default function AddMediaModal( { existingMediaIds, onAdd, onClose }: Add
 					__nextHasNoMarginBottom
 					style={ { maxWidth: 150 } }
 				/>
+				{ topicId && (
+					<label style={ { display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, whiteSpace: 'nowrap' } }>
+						<input
+							type="checkbox"
+							checked={ thisTopicOnly }
+							onChange={ ( e ) => setThisTopicOnly( e.target.checked ) }
+						/>
+						This topic
+					</label>
+				) }
 				<span style={ { fontSize: 13, color: '#646970' } }>
 					{ items.length } item{ items.length !== 1 ? 's' : '' }
 				</span>
@@ -94,7 +106,17 @@ export default function AddMediaModal( { existingMediaIds, onAdd, onClose }: Add
 						</tr>
 					</thead>
 					<tbody>
-						{ items.filter( ( item ) => ! existingSet.has( item.id ) ).map( ( item ) => (
+						{ items.filter( ( item ) => {
+						if ( existingSet.has( item.id ) ) return false;
+						if ( thisTopicOnly && topicId ) {
+							const u = item.used_by;
+							if ( ! u ) return false;
+							if ( u.type === 'topic' && u.id === topicId ) return true;
+							if ( u.type === 'reply' && u.topic_id === topicId ) return true;
+							return false;
+						}
+						return true;
+					} ).map( ( item ) => (
 							<tr key={ item.id }>
 								<td>
 									<input
