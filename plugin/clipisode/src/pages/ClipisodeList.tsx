@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from '@wordpress/element';
-import { Spinner } from '@wordpress/components';
+import { Modal, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import type { MediaItem } from '../types';
 
@@ -13,6 +13,7 @@ function formatBytes( bytes: number | null ): string {
 export default function ClipisodeList() {
 	const [ items, setItems ] = useState< MediaItem[] >( [] );
 	const [ loading, setLoading ] = useState( true );
+	const [ previewItem, setPreviewItem ] = useState< { name: string; url: string } | null >( null );
 
 	const fetchClipisodes = useCallback( () => {
 		setLoading( true );
@@ -68,13 +69,17 @@ export default function ClipisodeList() {
 
 							return (
 								<tr key={ item.id }>
-									<td>
-										{ item.url ? (
-											<a href={ item.url } target="_blank" rel="noopener noreferrer">
-												{ name }
-											</a>
-										) : name }
-									</td>
+								<td>
+									{ item.url ? (
+										<button
+											type="button"
+											style={ { background: 'none', border: 'none', padding: 0, color: '#2271b1', cursor: 'pointer', font: 'inherit', textAlign: 'left' } }
+											onClick={ () => setPreviewItem( { name, url: item.url! } ) }
+										>
+											{ name }
+										</button>
+									) : name }
+								</td>
 									<td>
 										{ topicLink ? (
 											<a href={ topicLink }>{ topicTitle }</a>
@@ -88,6 +93,21 @@ export default function ClipisodeList() {
 						} ) }
 					</tbody>
 				</table>
+			) }
+			{ previewItem && (
+				<Modal
+					title={ previewItem.name }
+					onRequestClose={ () => setPreviewItem( null ) }
+					style={ { maxWidth: '90vw', maxHeight: '90vh' } }
+				>
+					<video
+						src={ previewItem.url }
+						controls
+						autoPlay
+						playsInline
+						style={ { display: 'block', maxWidth: '100%', maxHeight: 'calc(90vh - 120px)', borderRadius: 4 } }
+					/>
+				</Modal>
 			) }
 		</>
 	);

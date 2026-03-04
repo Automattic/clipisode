@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from '@wordpress/element';
-import { Button, Spinner } from '@wordpress/components';
+import { Button, Modal, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import ReplyModal from '../components/ReplyModal';
 import type { Topic, InvitationLink, Reply } from '../types';
@@ -28,6 +28,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const [ savingSlug, setSavingSlug ] = useState< Record< number, boolean > >( {} );
 	const [ selectedReply, setSelectedReply ] = useState< Reply | null >( null );
 	const [ selectedReplyIds, setSelectedReplyIds ] = useState< Set< number > >( new Set() );
+	const [ previewOutput, setPreviewOutput ] = useState< { name: string; url: string } | null >( null );
 
 	const deleteOutput = ( outputId: number, name: string ) => {
 		if ( ! window.confirm( `Delete "${ name }"? The video will be permanently removed.` ) ) {
@@ -414,9 +415,13 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 										<tr key={ o.id }>
 											<td>
 												{ o.url ? (
-													<a href={ o.url } target="_blank" rel="noopener noreferrer">
+													<button
+														type="button"
+														style={ { background: 'none', border: 'none', padding: 0, color: '#2271b1', cursor: 'pointer', font: 'inherit', textAlign: 'left' } }
+														onClick={ () => setPreviewOutput( { name: o.name, url: o.url! } ) }
+													>
 														{ o.name }
-													</a>
+													</button>
 												) : o.name }
 											</td>
 											<td>{ o.clips_count || '—' }</td>
@@ -516,6 +521,22 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 					onClose={ () => setSelectedReply( null ) }
 					onUpdated={ onReplyUpdated }
 				/>
+			) }
+
+			{ previewOutput && (
+				<Modal
+					title={ previewOutput.name }
+					onRequestClose={ () => setPreviewOutput( null ) }
+					style={ { maxWidth: '90vw', maxHeight: '90vh' } }
+				>
+					<video
+						src={ previewOutput.url }
+						controls
+						autoPlay
+						playsInline
+						style={ { display: 'block', maxWidth: '100%', maxHeight: 'calc(90vh - 120px)', borderRadius: 4 } }
+					/>
+				</Modal>
 			) }
 		</>
 	);
