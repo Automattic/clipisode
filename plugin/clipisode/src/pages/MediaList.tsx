@@ -166,8 +166,9 @@ export default function MediaList() {
 
 	return (
 		<>
-			<div className="clipisode-page-header">
-				<h1>Media</h1>
+		<div className="clipisode-page-header">
+			<h1>Media</h1>
+			<div style={ { display: 'flex', gap: 8, marginLeft: 'auto' } }>
 				<Button
 					variant="primary"
 					onClick={ () => fileInputRef.current?.click() }
@@ -176,19 +177,22 @@ export default function MediaList() {
 				>
 					{ uploading ? `Uploading… ${ uploadProgress }%` : 'Upload Media Asset' }
 				</Button>
-				{ selectedIds.size > 0 && (
-					<Button variant="primary" onClick={ createClipisode }>
-						Create Clipisode ({ selectedIds.size } clip{ selectedIds.size !== 1 ? 's' : '' })
-					</Button>
-				) }
-				<input
-					ref={ fileInputRef }
-					type="file"
-					accept="video/*,image/*,audio/*"
-					onChange={ onFileChange }
-					style={ { display: 'none' } }
-				/>
+				<Button
+					variant="primary"
+					onClick={ createClipisode }
+					disabled={ selectedIds.size === 0 }
+				>
+					Create Clipisode{ selectedIds.size > 0 ? ` (${ selectedIds.size } clip${ selectedIds.size !== 1 ? 's' : '' })` : '' }
+				</Button>
 			</div>
+			<input
+				ref={ fileInputRef }
+				type="file"
+				accept="video/*,image/*,audio/*"
+				onChange={ onFileChange }
+				style={ { display: 'none' } }
+			/>
+		</div>
 
 			{ uploadError && (
 				<div className="clipisode-video-error" style={ { marginBottom: 12 } }>
@@ -211,9 +215,9 @@ export default function MediaList() {
 				__nextHasNoMarginBottom
 				__next40pxDefaultSize
 			/>
-				<span style={ { fontSize: 13, color: '#646970', alignSelf: 'center' } }>
-					{ items.length } item{ items.length !== 1 ? 's' : '' }
-				</span>
+			<span style={ { fontSize: 13, color: '#646970', alignSelf: 'center', marginLeft: 'auto' } }>
+				{ items.length } item{ items.length !== 1 ? 's' : '' }
+			</span>
 			</div>
 
 			{ items.length === 0 ? (
