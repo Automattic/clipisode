@@ -83,12 +83,13 @@ export default function ReplyModal( { reply, onClose, onUpdated }: ReplyModalPro
 					</div>
 				) }
 
-				<TextControl
-					label="Tag"
-					value={ tag }
-					onChange={ setTag }
-					__nextHasNoMarginBottom
-				/>
+			<TextControl
+				label="Tag"
+				value={ tag }
+				onChange={ setTag }
+				__nextHasNoMarginBottom
+				__next40pxDefaultSize
+			/>
 
 				<div className="clipisode-modal-actions">
 					<Button

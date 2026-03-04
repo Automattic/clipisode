@@ -197,18 +197,20 @@ export default function MediaList() {
 			) }
 
 			<div className="clipisode-filters">
-				<SelectControl
-					value={ typeFilter }
-					options={ TYPE_OPTIONS }
-					onChange={ setTypeFilter }
-					__nextHasNoMarginBottom
-				/>
-				<SelectControl
-					value={ labelFilter }
-					options={ LABEL_OPTIONS }
-					onChange={ setLabelFilter }
-					__nextHasNoMarginBottom
-				/>
+			<SelectControl
+				value={ typeFilter }
+				options={ TYPE_OPTIONS }
+				onChange={ setTypeFilter }
+				__nextHasNoMarginBottom
+				__next40pxDefaultSize
+			/>
+			<SelectControl
+				value={ labelFilter }
+				options={ LABEL_OPTIONS }
+				onChange={ setLabelFilter }
+				__nextHasNoMarginBottom
+				__next40pxDefaultSize
+			/>
 				<span style={ { fontSize: 13, color: '#646970', alignSelf: 'center' } }>
 					{ items.length } item{ items.length !== 1 ? 's' : '' }
 				</span>

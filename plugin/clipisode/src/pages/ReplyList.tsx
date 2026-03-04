@@ -127,26 +127,29 @@ export default function ReplyList( { topicId }: ReplyListProps ) {
 			</div>
 
 			<div className="clipisode-filters">
-				<SelectControl
-					value={ statusFilter }
-					options={ STATUS_OPTIONS }
-					onChange={ setStatusFilter }
-					__nextHasNoMarginBottom
-				/>
+			<SelectControl
+				value={ statusFilter }
+				options={ STATUS_OPTIONS }
+				onChange={ setStatusFilter }
+				__nextHasNoMarginBottom
+				__next40pxDefaultSize
+			/>
 				{ ! topicId && (
-					<SelectControl
-						value={ topicFilter }
-						options={ topicOptions }
-						onChange={ setTopicFilter }
-						__nextHasNoMarginBottom
-					/>
-				) }
 				<SelectControl
-					value={ sortOrder }
-					options={ SORT_OPTIONS }
-					onChange={ setSortOrder }
+					value={ topicFilter }
+					options={ topicOptions }
+					onChange={ setTopicFilter }
 					__nextHasNoMarginBottom
+					__next40pxDefaultSize
 				/>
+				) }
+			<SelectControl
+				value={ sortOrder }
+				options={ SORT_OPTIONS }
+				onChange={ setSortOrder }
+				__nextHasNoMarginBottom
+				__next40pxDefaultSize
+			/>
 
 				{ selected.length > 0 && (
 					<>

@@ -135,6 +135,7 @@ export default function Settings(): JSX.Element {
 								onChange={ setDefaultHost }
 								help="Pre-fills the host field when creating a new topic."
 								__nextHasNoMarginBottom
+								__next40pxDefaultSize
 							/>
 						</div>
 					</>
@@ -230,12 +231,13 @@ export default function Settings(): JSX.Element {
 							</Notice>
 						) }
 						<div style={ { display: 'flex', alignItems: 'flex-end', gap: 8 } }>
-							<TextControl
-								label="URL Prefix"
-								value={ invitationPrefix }
-								onChange={ setInvitationPrefix }
-								help={ `Invitation pages will be at: ${ window.location.origin }/${ invitationPrefix || 'invitation' }/{code}` }
-								__nextHasNoMarginBottom
+						<TextControl
+							label="URL Prefix"
+							value={ invitationPrefix }
+							onChange={ setInvitationPrefix }
+							help={ `Invitation pages will be at: ${ window.location.origin }/${ invitationPrefix || 'invitation' }/{code}` }
+							__nextHasNoMarginBottom
+							__next40pxDefaultSize
 							/>
 							<Button
 								variant="primary"

@@ -106,12 +106,13 @@ export default function ThemeList() {
 							</Button>
 							{ showCloneFor === theme.id ? (
 								<div style={ { display: 'flex', gap: 4, alignItems: 'flex-end' } }>
-									<TextControl
-										placeholder="Clone name"
-										value={ cloneTitle }
-										onChange={ setCloneTitle }
-										__nextHasNoMarginBottom
-									/>
+								<TextControl
+									placeholder="Clone name"
+									value={ cloneTitle }
+									onChange={ setCloneTitle }
+									__nextHasNoMarginBottom
+									__next40pxDefaultSize
+								/>
 									<Button
 										variant="secondary"
 										size="compact"

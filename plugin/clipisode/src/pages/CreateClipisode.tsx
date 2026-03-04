@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
-import { Button, Modal, SelectControl, Spinner } from '@wordpress/components';
+import { Button, Modal, SelectControl, Spinner, TextControl } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import { crop, copy, trash } from '@wordpress/icons';
 import TrimModal from '../components/TrimModal';
@@ -65,6 +65,7 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 	const dragOver = useRef< number | null >( null );
 	const dupCounter = useRef( 0 );
 	const [ showAddMedia, setShowAddMedia ] = useState( false );
+	const [ clipisodeName, setClipisodeName ] = useState( '' );
 
 	useEffect( () => {
 		const warn = ( e: BeforeUnloadEvent ) => {
@@ -85,6 +86,7 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 		if ( topicId ) {
 			t = await apiFetch< Topic >( { path: `/clipisode/v1/topics/${ topicId }` } );
 			setTopic( t );
+			setClipisodeName( t.title );
 		}
 
 		const mediaById = new Map( mediaItems.map( ( m ) => [ Number( m.id ), m ] ) );
@@ -210,7 +212,7 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 	const includedClips = clips.filter( ( c ) => c.included );
 
 	const startRendering = async () => {
-		if ( includedClips.length === 0 ) return;
+		if ( includedClips.length === 0 || ! clipisodeName.trim() ) return;
 
 		setRenderState( 'connecting' );
 		setRenderPhase( '' );
@@ -224,7 +226,7 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 			output = await apiFetch< Output >( {
 				path: '/clipisode/v1/outputs',
 				method: 'POST',
-				data: { ...( topicId ? { topic_id: topicId } : {} ), name: topic?.title || 'Clipisode' },
+				data: { ...( topicId ? { topic_id: topicId } : {} ), name: clipisodeName.trim() },
 			} );
 		} catch {
 			setRenderState( 'error' );
@@ -397,10 +399,10 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 		<>
 			<div className="clipisode-page-header">
 				<Button variant="tertiary" onClick={ () => navigate( topicId ? String( topicId ) : 'media' ) }>
-					&larr; { topicId ? 'Back to Topic' : 'Back to Media' }
+					{ topic ? <>{ '← Back to\u00a0' }<strong>{ topic.title }</strong></> : '← Back to Media' }
 				</Button>
 				<h1>Create Clipisode</h1>
-				{ topic && <p style={ { color: '#646970', margin: 0 } }>{ topic.title }</p> }
+				<span />
 			</div>
 
 			{ renderState === 'idle' && (
@@ -479,27 +481,40 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 						</table>
 					</div>
 
-					<div style={ { marginTop: 16, display: 'flex', alignItems: 'flex-end', gap: 16 } }>
-						<SelectControl
-							label="Theme"
-							value={ selectedTheme }
-							options={ [
-								...availableThemes.map( ( t ) => ( { value: t.id, label: t.label } ) ),
-								{ value: 'none', label: 'No Theme' },
-							] }
-							onChange={ setSelectedTheme }
-							__nextHasNoMarginBottom
-						/>
-						<Button variant="secondary" onClick={ () => setShowAddMedia( true ) }>
-							Add Media
-						</Button>
-						<Button
-							variant="primary"
-							onClick={ startRendering }
-							disabled={ includedClips.length === 0 }
-						>
-							Create Clipisode
-						</Button>
+					<div className="clipisode-create-actions">
+						<div className="clipisode-create-actions__fields">
+							<TextControl
+								label="Name"
+								value={ clipisodeName }
+								onChange={ setClipisodeName }
+								placeholder="Enter a name"
+								__nextHasNoMarginBottom
+								__next40pxDefaultSize
+							/>
+							<SelectControl
+								label="Theme"
+								value={ selectedTheme }
+								options={ [
+									...availableThemes.map( ( t ) => ( { value: t.id, label: t.label } ) ),
+									{ value: 'none', label: 'No Theme' },
+								] }
+								onChange={ setSelectedTheme }
+								__nextHasNoMarginBottom
+								__next40pxDefaultSize
+							/>
+						</div>
+						<div className="clipisode-create-actions__buttons">
+							<Button variant="secondary" onClick={ () => setShowAddMedia( true ) }>
+								Add Media
+							</Button>
+							<Button
+								variant="primary"
+								onClick={ startRendering }
+								disabled={ includedClips.length === 0 || ! clipisodeName.trim() }
+							>
+								Create Clipisode
+							</Button>
+						</div>
 					</div>
 				</>
 			) }
@@ -538,14 +553,9 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 					{ renderOutputUrl && (
 						<video src={ renderOutputUrl } controls playsInline style={ { maxWidth: '50%' } } />
 					) }
-					<div style={ { display: 'flex', gap: 8, marginTop: 12 } }>
-						<Button variant="secondary" onClick={ () => navigate( topicId ? String( topicId ) : 'media' ) }>
-							{ topicId ? 'Back to Topic' : 'Back to Media' }
-						</Button>
-						<Button variant="primary" onClick={ () => setRenderState( 'idle' ) }>
-							Create Another
-						</Button>
-					</div>
+					<Button variant="primary" onClick={ () => setRenderState( 'idle' ) } style={ { marginTop: 12 } }>
+						Create Another
+					</Button>
 				</div>
 			) }
 

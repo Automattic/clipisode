@@ -136,21 +136,23 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 			) }
 
 			<div style={ { maxWidth: 600 } }>
-				<TextControl
-					label="Title"
-					value={ form.title }
-					onChange={ updateField( 'title' ) }
-					__nextHasNoMarginBottom
-				/>
+			<TextControl
+				label="Title"
+				value={ form.title }
+				onChange={ updateField( 'title' ) }
+				__nextHasNoMarginBottom
+				__next40pxDefaultSize
+			/>
 				<div style={ { marginTop: 16, position: 'relative' } } ref={ hostRef }>
-					<TextControl
-						label="Hosted By"
-						value={ form.hosted_by }
-						onChange={ updateField( 'hosted_by' ) }
-						onFocus={ () => setHostFocused( true ) }
-						onBlur={ () => setTimeout( () => setHostFocused( false ), 150 ) }
-						autoComplete="off"
-						__nextHasNoMarginBottom
+				<TextControl
+					label="Hosted By"
+					value={ form.hosted_by }
+					onChange={ updateField( 'hosted_by' ) }
+					onFocus={ () => setHostFocused( true ) }
+					onBlur={ () => setTimeout( () => setHostFocused( false ), 150 ) }
+					autoComplete="off"
+					__nextHasNoMarginBottom
+					__next40pxDefaultSize
 					/>
 					{ hostFocused && form.hosted_by.length > 0 && ( () => {
 						const filtered = hostNames.filter(
@@ -187,17 +189,18 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 				</div>
 				<div style={ { marginTop: 16 } }>
 					{ themes.length > 1 ? (
-						<SelectControl
-							label="Theme"
-							value={ form.invitation_id }
-							options={ themes.map( ( t ) => ( {
-								label: t.title + ( t.is_default ? ' (default)' : '' ),
-								value: String( t.id ),
-							} ) ) }
-							onChange={ updateField( 'invitation_id' ) }
-							help="Choose which theme guests will see on the invitation page."
-							__nextHasNoMarginBottom
-						/>
+					<SelectControl
+						label="Theme"
+						value={ form.invitation_id }
+						options={ themes.map( ( t ) => ( {
+							label: t.title + ( t.is_default ? ' (default)' : '' ),
+							value: String( t.id ),
+						} ) ) }
+						onChange={ updateField( 'invitation_id' ) }
+						help="Choose which theme guests will see on the invitation page."
+						__nextHasNoMarginBottom
+						__next40pxDefaultSize
+					/>
 					) : (
 						<div>
 							<p style={ { fontSize: 13, color: '#646970', margin: 0 } }>
@@ -216,16 +219,17 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 				</div>
 				<div style={ { marginTop: 16 } }>
 					{ customTerms.length > 0 ? (
-						<SelectControl
-							label="Additional Custom Terms"
-							value={ form.custom_terms_id }
-							options={ [
-								{ label: '— None —', value: '' },
-								...customTerms.map( ( t ) => ( { label: t.title, value: String( t.id ) } ) ),
-							] }
-							onChange={ updateField( 'custom_terms_id' ) }
-							help="Brand terms are automatically included. Optionally select additional custom terms."
-							__nextHasNoMarginBottom
+					<SelectControl
+						label="Additional Custom Terms"
+						value={ form.custom_terms_id }
+						options={ [
+							{ label: '— None —', value: '' },
+							...customTerms.map( ( t ) => ( { label: t.title, value: String( t.id ) } ) ),
+						] }
+						onChange={ updateField( 'custom_terms_id' ) }
+						help="Brand terms are automatically included. Optionally select additional custom terms."
+						__nextHasNoMarginBottom
+						__next40pxDefaultSize
 						/>
 					) : (
 						<div>

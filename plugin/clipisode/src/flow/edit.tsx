@@ -22,14 +22,15 @@ export default function Edit( { attributes, setAttributes }: EditProps ) {
 		<>
 			<InspectorControls>
 				<PanelBody title="Invitation Settings">
-					<TextControl
-						label="Invitation Link Slug"
-						help="The 6-character slug from Clipisode (e.g. d3137f). Used when the block is placed on a page."
-						value={ slug }
-						onChange={ ( v: string ) =>
-							setAttributes( { slug: v } )
-						}
-					/>
+				<TextControl
+					label="Invitation Link Slug"
+					help="The 6-character slug from Clipisode (e.g. d3137f). Used when the block is placed on a page."
+					value={ slug }
+					onChange={ ( v: string ) =>
+						setAttributes( { slug: v } )
+					}
+					__next40pxDefaultSize
+				/>
 				</PanelBody>
 			</InspectorControls>
 

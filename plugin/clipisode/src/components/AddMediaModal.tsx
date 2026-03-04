@@ -79,13 +79,14 @@ export default function AddMediaModal( { existingMediaIds, topicId, onAdd, onClo
 	return (
 		<Modal title="Add Media" onRequestClose={ onClose } size="large">
 			<div style={ { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 } }>
-				<SelectControl
-					value={ labelFilter }
-					options={ LABEL_OPTIONS }
-					onChange={ setLabelFilter }
-					__nextHasNoMarginBottom
-					style={ { maxWidth: 150 } }
-				/>
+			<SelectControl
+				value={ labelFilter }
+				options={ LABEL_OPTIONS }
+				onChange={ setLabelFilter }
+				__nextHasNoMarginBottom
+				__next40pxDefaultSize
+				style={ { maxWidth: 150 } }
+			/>
 				{ topicId && (
 					<label style={ { display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, whiteSpace: 'nowrap' } }>
 						<input
