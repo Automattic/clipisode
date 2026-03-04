@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
-import { Button, SelectControl, Spinner } from '@wordpress/components';
+import { Button, Modal, SelectControl, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import { crop, copy, trash } from '@wordpress/icons';
 import TrimModal from '../components/TrimModal';
@@ -50,6 +50,7 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 	const [ clips, setClips ] = useState< ClipItem[] >( [] );
 	const [ loading, setLoading ] = useState( true );
 	const [ trimmingClip, setTrimmingClip ] = useState< ClipItem | null >( null );
+	const [ previewClip, setPreviewClip ] = useState< ClipItem | null >( null );
 	const availableThemes = getAvailableThemes();
 	const [ selectedTheme, setSelectedTheme ] = useState( availableThemes[ 0 ]?.id || 'standard' );
 	const [ renderState, setRenderState ] = useState< RenderState >( 'idle' );
@@ -429,7 +430,15 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 										onDragOver={ ( e ) => e.preventDefault() }
 								>
 									<td style={ { cursor: 'grab', userSelect: 'none', fontSize: 18, textAlign: 'center' } }>&#x2630;</td>
-										<td>{ clip.name }</td>
+										<td>
+											<button
+												type="button"
+												style={ { background: 'none', border: 'none', padding: 0, color: '#2271b1', cursor: 'pointer', font: 'inherit', textAlign: 'left' } }
+												onClick={ () => setPreviewClip( clip ) }
+											>
+												{ clip.name }
+											</button>
+										</td>
 										<td>
 											<span className={ `clipisode-status-badge ${ clip.role === 'intro' ? 'approved' : '' }` }>
 												{ clip.role }
@@ -558,6 +567,22 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 					onAdd={ handleAddMedia }
 					onClose={ () => setShowAddMedia( false ) }
 				/>
+			) }
+
+			{ previewClip && (
+				<Modal
+					title={ previewClip.name }
+					onRequestClose={ () => setPreviewClip( null ) }
+					style={ { maxWidth: '90vw', maxHeight: '90vh' } }
+				>
+					<video
+						src={ previewClip.url }
+						controls
+						autoPlay
+						playsInline
+						style={ { display: 'block', maxWidth: '100%', maxHeight: 'calc(90vh - 120px)', borderRadius: 4 } }
+					/>
+				</Modal>
 			) }
 		</>
 	);
