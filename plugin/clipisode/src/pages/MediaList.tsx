@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
 import { Button, SelectControl, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
+import { trash } from '@wordpress/icons';
 import type { MediaItem } from '../types';
 
 const TYPE_OPTIONS = [
@@ -230,7 +231,6 @@ export default function MediaList() {
 							<th>Size</th>
 							<th>MIME</th>
 							<th>Storage</th>
-							<th>Path</th>
 							<th>Created</th>
 							<th style={ { width: 60 } }></th>
 						</tr>
@@ -282,16 +282,13 @@ export default function MediaList() {
 								<td>{ formatBytes( item.file_size ) }</td>
 								<td style={ { fontSize: 12 } }>{ item.mime_type || '—' }</td>
 								<td>{ item.storage }</td>
-								<td>
-									<div className="clipisode-transcript-preview" title={ item.path }>
-										{ item.path }
-									</div>
-								</td>
 								<td>{ new Date( item.created_at ).toLocaleDateString() }</td>
 								<td>
 									{ item.label === 'asset' && (
 										<Button
-											variant="tertiary"
+											icon={ trash }
+											label="Delete"
+											size="compact"
 											isDestructive
 											isBusy={ deleting === item.id }
 											disabled={ deleting === item.id }
@@ -300,9 +297,7 @@ export default function MediaList() {
 													handleDelete( item.id );
 												}
 											} }
-										>
-											Delete
-										</Button>
+										/>
 									) }
 								</td>
 							</tr>
