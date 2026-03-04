@@ -4,6 +4,8 @@ export interface Topic {
 	intro_media_id: number | null;
 	intro_video_url: string | null;
 	intro_video_filename: string | null;
+	social_image_media_id: number | null;
+	social_image_url: string | null;
 	hosted_by: string;
 	brand_terms_id: number;
 	brand_terms_title: string | null;

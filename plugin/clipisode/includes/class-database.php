@@ -58,6 +58,7 @@ KEY parent_id (parent_id)
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 title VARCHAR(255) NOT NULL,
 intro_media_id BIGINT UNSIGNED DEFAULT NULL,
+social_image_media_id BIGINT UNSIGNED DEFAULT NULL,
 hosted_by VARCHAR(255),
 brand_terms_id BIGINT UNSIGNED NOT NULL,
 custom_terms_id BIGINT UNSIGNED DEFAULT NULL,

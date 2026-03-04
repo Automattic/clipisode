@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
-import { Button, SelectControl, Spinner } from '@wordpress/components';
+import { Button, Modal, SelectControl, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import { trash } from '@wordpress/icons';
 import type { MediaItem } from '../types';
@@ -59,6 +59,7 @@ export default function MediaList() {
 	const [ uploadError, setUploadError ] = useState< string | null >( null );
 	const [ deleting, setDeleting ] = useState< number | null >( null );
 	const [ selectedIds, setSelectedIds ] = useState< Set< number > >( new Set() );
+	const [ previewItem, setPreviewItem ] = useState< { name: string; url: string; type: string } | null >( null );
 	const fileInputRef = useRef< HTMLInputElement >( null );
 
 	const isSelectable = ( item: MediaItem ) => item.type === 'video' && !! item.url;
@@ -249,18 +250,30 @@ export default function MediaList() {
 								</td>
 								<td>
 									{ item.url && item.type === 'video' ? (
-										<video
-											src={ item.url }
-											style={ { width: 64, height: 48, objectFit: 'cover', borderRadius: 4, background: '#000' } }
-											muted
-											preload="metadata"
-										/>
+										<button
+											type="button"
+											onClick={ () => setPreviewItem( { name: item.used_by?.label || item.label || `media_${ item.id }`, url: item.url!, type: item.type } ) }
+											style={ { padding: 0, border: 0, background: 'none', cursor: 'pointer' } }
+										>
+											<video
+												src={ item.url }
+												style={ { width: 64, height: 48, objectFit: 'cover', borderRadius: 4, background: '#000' } }
+												muted
+												preload="metadata"
+											/>
+										</button>
 									) : item.url && item.type === 'photo' ? (
-										<img
-											src={ item.url }
-											alt=""
-											style={ { width: 64, height: 48, objectFit: 'cover', borderRadius: 4 } }
-										/>
+										<button
+											type="button"
+											onClick={ () => setPreviewItem( { name: item.used_by?.label || item.label || `media_${ item.id }`, url: item.url!, type: item.type } ) }
+											style={ { padding: 0, border: 0, background: 'none', cursor: 'pointer' } }
+										>
+											<img
+												src={ item.url }
+												alt=""
+												style={ { width: 64, height: 48, objectFit: 'cover', borderRadius: 4 } }
+											/>
+										</button>
 									) : (
 										<span style={ { color: '#a7aaad', fontSize: 12 } }>—</span>
 									) }
@@ -304,6 +317,29 @@ export default function MediaList() {
 						) ) }
 					</tbody>
 				</table>
+			) }
+			{ previewItem && (
+				<Modal
+					title={ previewItem.name }
+					onRequestClose={ () => setPreviewItem( null ) }
+					style={ { maxWidth: '90vw', maxHeight: '90vh' } }
+				>
+					{ previewItem.type === 'video' ? (
+						<video
+							src={ previewItem.url }
+							controls
+							autoPlay
+							playsInline
+							style={ { display: 'block', maxWidth: '100%', maxHeight: 'calc(90vh - 120px)', borderRadius: 4 } }
+						/>
+					) : (
+						<img
+							src={ previewItem.url }
+							alt={ previewItem.name }
+							style={ { display: 'block', maxWidth: '100%', maxHeight: 'calc(90vh - 120px)', borderRadius: 4 } }
+						/>
+					) }
+				</Modal>
 			) }
 		</>
 	);

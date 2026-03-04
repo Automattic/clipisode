@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from '@wordpress/element';
 import { Button, TextControl, SelectControl, Spinner, Notice } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import VideoUploader from '../components/VideoUploader';
+import SocialImagePicker from '../components/SocialImagePicker';
 import type { Topic, VideoValue, CustomTermsItem, Host, Theme } from '../types';
 
 interface TopicFormProps {
@@ -18,11 +19,13 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 		invitation_id: '',
 	} );
 	const [ video, setVideo ] = useState< VideoValue | null >( null );
+	const [ socialImage, setSocialImage ] = useState< { id: number; url: string } | null >( null );
 	const [ customTerms, setCustomTerms ] = useState< CustomTermsItem[] >( [] );
 	const [ themes, setThemes ] = useState< Theme[] >( [] );
 	const [ hostNames, setHostNames ] = useState< string[] >( [] );
 	const [ hostFocused, setHostFocused ] = useState( false );
 	const hostRef = useRef< HTMLDivElement >( null );
+	const introVideoRef = useRef< HTMLVideoElement >( null );
 	const [ loading, setLoading ] = useState< boolean >( true );
 	const [ saving, setSaving ] = useState< boolean >( false );
 	const [ error, setError ] = useState< string | null >( null );
@@ -53,6 +56,9 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 					} );
 					if ( topic.intro_media_id && topic.intro_video_url ) {
 						setVideo( { id: topic.intro_media_id, url: topic.intro_video_url } );
+					}
+					if ( topic.social_image_media_id && topic.social_image_url ) {
+						setSocialImage( { id: topic.social_image_media_id, url: topic.social_image_url } );
 					}
 			} else {
 				const defaultHost = hosts.find( ( h ) => h.is_default );
@@ -87,6 +93,7 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 			custom_terms_id: form.custom_terms_id || null,
 			invitation_id: form.invitation_id || null,
 			intro_media_id: video?.id || null,
+			social_image_media_id: socialImage?.id || null,
 		};
 
 		const request = isEdit
@@ -168,7 +175,15 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 					} )() }
 				</div>
 				<div style={ { marginTop: 16 } }>
-					<VideoUploader value={ video } onChange={ setVideo } />
+					<VideoUploader value={ video } onChange={ setVideo } videoRef={ introVideoRef } />
+				</div>
+				<div style={ { marginTop: 16 } }>
+					<SocialImagePicker
+						value={ socialImage }
+						videoRef={ introVideoRef }
+						hasVideo={ Boolean( video ) }
+						onChange={ setSocialImage }
+					/>
 				</div>
 				<div style={ { marginTop: 16 } }>
 					{ themes.length > 1 ? (

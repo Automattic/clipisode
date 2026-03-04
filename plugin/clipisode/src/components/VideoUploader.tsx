@@ -10,6 +10,7 @@ const MAX_SIZE = 80 * 1024 * 1024;
 interface VideoUploaderProps {
 	value: VideoValue | null;
 	onChange: ( value: VideoValue | null ) => void;
+	videoRef?: React.RefObject< HTMLVideoElement >;
 }
 
 interface ValidationResult {
@@ -122,7 +123,7 @@ function deleteAttachment( id: number ): void {
 	apiFetch( { path: `/clipisode/v1/videos/${ id }`, method: 'DELETE' } ).catch( () => {} );
 }
 
-export default function VideoUploader( { value, onChange }: VideoUploaderProps ) {
+export default function VideoUploader( { value, onChange, videoRef }: VideoUploaderProps ) {
 	const [ mode, setMode ] = useState< 'none' | 'upload' | 'url' >( value ? 'upload' : 'none' );
 	const [ url, setUrl ] = useState( '' );
 	const [ uploading, setUploading ] = useState( false );
@@ -294,7 +295,7 @@ export default function VideoUploader( { value, onChange }: VideoUploaderProps )
 
 			{ value && (
 				<div className="clipisode-video-preview">
-					<video src={ value.url } controls playsInline />
+					<video ref={ videoRef } src={ value.url } controls playsInline />
 				</div>
 			) }
 

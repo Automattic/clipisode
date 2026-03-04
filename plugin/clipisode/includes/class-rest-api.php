@@ -425,6 +425,10 @@ class Clipisode_REST_API {
 			? Clipisode_Media::get_filename( (int) $topic->intro_media_id )
 			: null;
 
+		$topic->social_image_url = ! empty( $topic->social_image_media_id )
+			? Clipisode_Media::get_url( (int) $topic->social_image_media_id )
+			: null;
+
 		if ( ! empty( $topic->invitation_id ) ) {
 			$inv_post = get_post( (int) $topic->invitation_id );
 			$topic->invitation_title    = $inv_post ? $inv_post->post_title : null;
@@ -520,19 +524,21 @@ class Clipisode_REST_API {
 		global $wpdb;
 		$table = $wpdb->prefix . 'clipisode_topics';
 
-		$custom_terms_id = $request->get_param( 'custom_terms_id' );
-		$intro_media_id  = $request->get_param( 'intro_media_id' );
-		$invitation_id   = $request->get_param( 'invitation_id' );
-		$brand_terms_id  = Clipisode_Post_Types::ensure_brand_terms();
+		$custom_terms_id      = $request->get_param( 'custom_terms_id' );
+		$intro_media_id       = $request->get_param( 'intro_media_id' );
+		$invitation_id        = $request->get_param( 'invitation_id' );
+		$social_image_media_id = $request->get_param( 'social_image_media_id' );
+		$brand_terms_id       = Clipisode_Post_Types::ensure_brand_terms();
 
 		$data = [
-			'title'           => sanitize_text_field( $request->get_param( 'title' ) ),
-			'intro_media_id'  => $intro_media_id ? (int) $intro_media_id : null,
-			'hosted_by'       => sanitize_text_field( $request->get_param( 'hosted_by' ) ?? '' ),
-			'brand_terms_id'  => $brand_terms_id,
-			'custom_terms_id' => $custom_terms_id ? (int) $custom_terms_id : null,
-			'invitation_id'   => $invitation_id ? (int) $invitation_id : Clipisode_Post_Types::ensure_default_invitation(),
-			'status'          => 'active',
+			'title'                 => sanitize_text_field( $request->get_param( 'title' ) ),
+			'intro_media_id'        => $intro_media_id ? (int) $intro_media_id : null,
+			'social_image_media_id' => $social_image_media_id ? (int) $social_image_media_id : null,
+			'hosted_by'             => sanitize_text_field( $request->get_param( 'hosted_by' ) ?? '' ),
+			'brand_terms_id'        => $brand_terms_id,
+			'custom_terms_id'       => $custom_terms_id ? (int) $custom_terms_id : null,
+			'invitation_id'         => $invitation_id ? (int) $invitation_id : Clipisode_Post_Types::ensure_default_invitation(),
+			'status'                => 'active',
 		];
 
 		$wpdb->insert( $table, $data );
@@ -579,6 +585,21 @@ class Clipisode_REST_API {
 
 			$fields['intro_media_id'] = $new_media_id;
 		}
+		if ( $request->has_param( 'social_image_media_id' ) ) {
+			$new_si_id = $request->get_param( 'social_image_media_id' );
+			$new_si_id = $new_si_id ? (int) $new_si_id : null;
+
+			$old_si_id = (int) $wpdb->get_var( $wpdb->prepare(
+				"SELECT social_image_media_id FROM $table WHERE id = %d",
+				$id
+			) );
+
+			if ( $old_si_id && $old_si_id !== $new_si_id ) {
+				Clipisode_Media::delete( $old_si_id );
+			}
+
+			$fields['social_image_media_id'] = $new_si_id;
+		}
 		if ( $request->has_param( 'custom_terms_id' ) ) {
 			$custom_terms_id = $request->get_param( 'custom_terms_id' );
 			$fields['custom_terms_id'] = $custom_terms_id ? (int) $custom_terms_id : null;
@@ -613,12 +634,17 @@ class Clipisode_REST_API {
 		global $wpdb;
 		$id = (int) $request['id'];
 
-		$intro_media_id = (int) $wpdb->get_var( $wpdb->prepare(
-			"SELECT intro_media_id FROM {$wpdb->prefix}clipisode_topics WHERE id = %d",
+		$topic_row = $wpdb->get_row( $wpdb->prepare(
+			"SELECT intro_media_id, social_image_media_id FROM {$wpdb->prefix}clipisode_topics WHERE id = %d",
 			$id
 		) );
-		if ( $intro_media_id ) {
-			Clipisode_Media::delete( $intro_media_id );
+		if ( $topic_row ) {
+			if ( (int) $topic_row->intro_media_id ) {
+				Clipisode_Media::delete( (int) $topic_row->intro_media_id );
+			}
+			if ( (int) $topic_row->social_image_media_id ) {
+				Clipisode_Media::delete( (int) $topic_row->social_image_media_id );
+			}
 		}
 
 		$output_media_ids = $wpdb->get_col( $wpdb->prepare(
@@ -1199,8 +1225,8 @@ class Clipisode_REST_API {
 		global $wpdb;
 
 		$topic = $wpdb->get_row( $wpdb->prepare(
-			"SELECT id, title FROM {$wpdb->prefix}clipisode_topics WHERE intro_media_id = %d",
-			$media_id
+			"SELECT id, title FROM {$wpdb->prefix}clipisode_topics WHERE intro_media_id = %d OR social_image_media_id = %d",
+			$media_id, $media_id
 		) );
 		if ( $topic ) {
 			return [
