@@ -3,6 +3,7 @@ import { Button, SelectControl, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import { crop, copy, trash } from '@wordpress/icons';
 import TrimModal from '../components/TrimModal';
+import AddMediaModal from '../components/AddMediaModal';
 import { themeRegistry } from '../themes';
 import { WS_URL, generateJobId, getThemeAssets, getAvailableThemes } from '../lib/transcoder';
 import type { Topic, Output, MediaItem } from '../types';
@@ -62,6 +63,7 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 	const dragItem = useRef< number | null >( null );
 	const dragOver = useRef< number | null >( null );
 	const dupCounter = useRef( 0 );
+	const [ showAddMedia, setShowAddMedia ] = useState( false );
 
 	useEffect( () => {
 		const warn = ( e: BeforeUnloadEvent ) => {
@@ -152,6 +154,32 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 	const removeClip = ( id: string ) => {
 		if ( ! window.confirm( 'Remove this clip from the list?' ) ) return;
 		setClips( ( prev ) => prev.filter( ( c ) => c.id !== id ) );
+	};
+
+	const handleAddMedia = async ( items: MediaItem[] ) => {
+		setShowAddMedia( false );
+		const newClips: ClipItem[] = await Promise.all(
+			items.map( async ( m ) => {
+				const url = m.url!;
+				let dur = 0;
+				try {
+					dur = await getDuration( url );
+				} catch {}
+				return {
+					id: `media-${ m.id }`,
+					mediaId: m.id,
+					role: 'reply' as const,
+					name: m.used_by?.label || m.label || m.path.split( '/' ).pop() || `media_${ m.id }`,
+					url,
+					filename: m.path.split( '/' ).pop() || `media_${ m.id }.mp4`,
+					duration: dur,
+					trimStart: 0,
+					trimEnd: dur,
+					included: true,
+				};
+			} )
+		);
+		setClips( ( prev ) => [ ...prev, ...newClips ] );
 	};
 
 	const handleDragStart = ( index: number ) => {
@@ -453,6 +481,9 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 							onChange={ setSelectedTheme }
 							__nextHasNoMarginBottom
 						/>
+						<Button variant="secondary" onClick={ () => setShowAddMedia( true ) }>
+							Add Media
+						</Button>
 						<Button
 							variant="primary"
 							onClick={ startRendering }
@@ -518,6 +549,14 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 					initialEnd={ trimmingClip.trimEnd }
 					onDone={ handleTrimDone }
 					onClose={ () => setTrimmingClip( null ) }
+				/>
+			) }
+
+			{ showAddMedia && (
+				<AddMediaModal
+					existingMediaIds={ clips.map( ( c ) => c.mediaId ) }
+					onAdd={ handleAddMedia }
+					onClose={ () => setShowAddMedia( false ) }
 				/>
 			) }
 		</>
