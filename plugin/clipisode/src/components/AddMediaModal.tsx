@@ -34,6 +34,18 @@ export default function AddMediaModal( { existingMediaIds, topicId, onAdd, onClo
 
 	const existingSet = new Set( existingMediaIds );
 
+	const visibleItems = items.filter( ( item ) => {
+		if ( existingSet.has( item.id ) ) return false;
+		if ( thisTopicOnly && topicId ) {
+			const u = item.used_by;
+			if ( ! u ) return false;
+			if ( u.type === 'topic' && u.id === topicId ) return true;
+			if ( u.type === 'reply' && u.topic_id === topicId ) return true;
+			return false;
+		}
+		return true;
+	} );
+
 	const fetchMedia = useCallback( () => {
 		setLoading( true );
 		const params = new URLSearchParams( { type: 'video', exclude_label: 'clipisode' } );
@@ -81,18 +93,18 @@ export default function AddMediaModal( { existingMediaIds, topicId, onAdd, onClo
 							checked={ thisTopicOnly }
 							onChange={ ( e ) => setThisTopicOnly( e.target.checked ) }
 						/>
-						This topic
+						Media from this topic only
 					</label>
 				) }
-				<span style={ { fontSize: 13, color: '#646970' } }>
-					{ items.length } item{ items.length !== 1 ? 's' : '' }
+				<span style={ { fontSize: 13, color: '#646970', marginLeft: 'auto' } }>
+					{ visibleItems.length } item{ visibleItems.length !== 1 ? 's' : '' }
 				</span>
 			</div>
 			{ loading ? (
 				<div className="clipisode-spinner-wrap">
 					<Spinner />
 				</div>
-			) : items.length === 0 ? (
+			) : visibleItems.length === 0 ? (
 				<p>No video media matches the current filter.</p>
 			) : (
 				<table className="clipisode-table" style={ { width: '100%', borderCollapse: 'collapse' } }>
@@ -106,17 +118,7 @@ export default function AddMediaModal( { existingMediaIds, topicId, onAdd, onClo
 						</tr>
 					</thead>
 					<tbody>
-						{ items.filter( ( item ) => {
-						if ( existingSet.has( item.id ) ) return false;
-						if ( thisTopicOnly && topicId ) {
-							const u = item.used_by;
-							if ( ! u ) return false;
-							if ( u.type === 'topic' && u.id === topicId ) return true;
-							if ( u.type === 'reply' && u.topic_id === topicId ) return true;
-							return false;
-						}
-						return true;
-					} ).map( ( item ) => (
+						{ visibleItems.map( ( item ) => (
 							<tr key={ item.id }>
 								<td>
 									<input
