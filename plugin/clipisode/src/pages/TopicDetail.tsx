@@ -276,13 +276,14 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 											<td>{ Number( link.replies_count ).toLocaleString() }</td>
 											<td>{ new Date( link.created_at ).toLocaleDateString() }</td>
 											<td className="clipisode-link-actions">
-												<Button
-													variant="tertiary"
-													size="compact"
-													onClick={ () => copyLinkUrl( link ) }
-												>
-													{ copiedId === link.id ? 'Copied!' : 'Copy URL' }
-												</Button>
+											<Button
+												variant="tertiary"
+												size="compact"
+												onClick={ () => copyLinkUrl( link ) }
+												title={ `${ window.location.origin }/${ window.clipisodeAdmin?.invitation_prefix || 'invitation' }/${ link.slug }` }
+											>
+												{ copiedId === link.id ? 'Copied!' : 'Copy URL' }
+											</Button>
 												<Button
 													variant="tertiary"
 													size="compact"
