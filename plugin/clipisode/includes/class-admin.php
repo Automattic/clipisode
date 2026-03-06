@@ -30,13 +30,16 @@ class Clipisode_Admin {
 
 	public function redirect_cpt_list(): void {
 		global $pagenow;
-		if (
-			$pagenow === 'edit.php' &&
-			isset( $_GET['post_type'] ) &&
-			$_GET['post_type'] === 'clipisode_invite'
-		) {
-			wp_safe_redirect( admin_url( 'admin.php?page=clipisode-themes' ) );
-			exit;
+		if ( $pagenow === 'edit.php' && isset( $_GET['post_type'] ) ) {
+			$type = $_GET['post_type'];
+			if ( $type === 'clipisode_invite' ) {
+				wp_safe_redirect( admin_url( 'admin.php?page=clipisode-themes' ) );
+				exit;
+			}
+			if ( $type === 'clipisode_preview' ) {
+				wp_safe_redirect( admin_url( 'admin.php?page=clipisode-themes' ) );
+				exit;
+			}
 		}
 	}
 
@@ -101,6 +104,7 @@ class Clipisode_Admin {
 			'rest_root'         => esc_url_raw( rest_url() ),
 			'nonce'             => wp_create_nonce( 'wp_rest' ),
 			'invitation_prefix' => Clipisode_Invitation::get_prefix(),
+			'preview_prefix'    => Clipisode_Preview::get_prefix(),
 			'themes'            => $themes,
 		] );
 	}

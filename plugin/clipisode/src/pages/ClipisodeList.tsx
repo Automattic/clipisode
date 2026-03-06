@@ -56,6 +56,7 @@ export default function ClipisodeList() {
 							<th>Clips</th>
 							<th>Size</th>
 							<th>Created</th>
+							<th></th>
 						</tr>
 					</thead>
 					<tbody>
@@ -87,8 +88,15 @@ export default function ClipisodeList() {
 									</td>
 									<td>{ usage?.clips_count || '—' }</td>
 									<td>{ formatBytes( item.file_size ) }</td>
-									<td>{ new Date( item.created_at ).toLocaleDateString() }</td>
-								</tr>
+								<td>{ new Date( item.created_at ).toLocaleDateString() }</td>
+								<td>
+									{ item.used_by?.preview_url && (
+										<a href={ item.used_by.preview_url } target="_blank" rel="noreferrer">
+											Preview
+										</a>
+									) }
+								</td>
+							</tr>
 							);
 						} ) }
 					</tbody>

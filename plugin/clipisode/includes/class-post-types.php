@@ -8,6 +8,8 @@ class Clipisode_Post_Types {
 
 	const DEFAULT_INVITATION_META = '_clipisode_default_invitation';
 
+	const DEFAULT_PREVIEW_META = '_clipisode_default_preview';
+
 	public static function register(): void {
 		register_post_type( 'clipisode_invite', [
 			'labels'              => [
@@ -30,6 +32,33 @@ class Clipisode_Post_Types {
 			'show_in_menu'        => false,
 			'show_in_rest'        => true,
 			'rest_base'           => 'clipisode-themes',
+			'supports'            => [ 'title', 'editor' ],
+			'capability_type'     => 'post',
+			'has_archive'         => false,
+			'rewrite'             => false,
+		] );
+
+		register_post_type( 'clipisode_preview', [
+			'labels'              => [
+				'name'               => 'Preview Layouts',
+				'singular_name'      => 'Preview Layout',
+				'add_new_item'       => 'Add New Preview Layout',
+				'edit_item'          => 'Edit Preview Layout',
+				'new_item'           => 'New Preview Layout',
+				'view_item'          => 'View Preview Layout',
+				'search_items'       => 'Search Preview Layouts',
+				'not_found'          => 'No preview layouts found.',
+				'not_found_in_trash' => 'No preview layouts found in Trash.',
+				'menu_name'          => 'Preview Layouts',
+			],
+			'public'              => false,
+			'publicly_queryable'  => false,
+			'exclude_from_search' => true,
+			'show_in_nav_menus'   => false,
+			'show_ui'             => true,
+			'show_in_menu'        => false,
+			'show_in_rest'        => true,
+			'rest_base'           => 'clipisode-previews',
 			'supports'            => [ 'title', 'editor' ],
 			'capability_type'     => 'post',
 			'has_archive'         => false,
@@ -168,6 +197,53 @@ BLOCKS;
 		] );
 
 		update_post_meta( $post_id, self::DEFAULT_INVITATION_META, '1' );
+
+		return $post_id;
+	}
+
+	public static function get_default_preview_id(): ?int {
+		$posts = get_posts( [
+			'post_type'   => 'clipisode_preview',
+			'post_status' => 'publish',
+			'numberposts' => 1,
+			'meta_key'    => self::DEFAULT_PREVIEW_META,
+			'meta_value'  => '1',
+		] );
+
+		return $posts ? (int) $posts[0]->ID : null;
+	}
+
+	public static function ensure_default_preview(): int {
+		$content = <<<'BLOCKS'
+<!-- wp:clipisode/preview-flow -->
+<!-- wp:clipisode/preview-element {"type":"player","lock":{"remove":true}} /-->
+<!-- wp:clipisode/preview-element {"type":"name","lock":{"remove":true}} /-->
+<!-- wp:clipisode/preview-element {"type":"topic-info","lock":{"remove":true}} /-->
+<!-- wp:clipisode/preview-element {"type":"cta","lock":{"remove":true}} /-->
+<!-- /wp:clipisode/preview-flow -->
+BLOCKS;
+
+		$existing = self::get_default_preview_id();
+		if ( $existing ) {
+			$post = get_post( $existing );
+			if ( $post && str_contains( $post->post_content, 'wp:clipisode/preview-flow' ) ) {
+				return $existing;
+			}
+			wp_update_post( [
+				'ID'           => $existing,
+				'post_content' => $content,
+			] );
+			return $existing;
+		}
+
+		$post_id = wp_insert_post( [
+			'post_type'    => 'clipisode_preview',
+			'post_title'   => 'Default',
+			'post_content' => $content,
+			'post_status'  => 'publish',
+		] );
+
+		update_post_meta( $post_id, self::DEFAULT_PREVIEW_META, '1' );
 
 		return $post_id;
 	}

@@ -8,6 +8,7 @@ class Clipisode_Database {
 		self::create_tables();
 		self::ensure_default_host();
 		Clipisode_Post_Types::ensure_default_invitation();
+		Clipisode_Post_Types::ensure_default_preview();
 	}
 
 	private static function ensure_default_host(): void {

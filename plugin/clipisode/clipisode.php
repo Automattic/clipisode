@@ -21,9 +21,12 @@ require_once CLIPISODE_PLUGIN_DIR . 'includes/class-media.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-admin.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-rest-api.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-invitation.php';
+require_once CLIPISODE_PLUGIN_DIR . 'includes/class-preview.php';
 
 register_activation_hook( __FILE__, [ Clipisode_Database::class, 'activate' ] );
-register_activation_hook( __FILE__, [ Clipisode_Invitation::class, 'flush_rewrites' ] );
+register_activation_hook( __FILE__, function () {
+	delete_option( 'rewrite_rules' );
+} );
 register_deactivation_hook( __FILE__, 'flush_rewrite_rules' );
 
 add_action( 'init', [ Clipisode_Post_Types::class, 'register' ] );
@@ -47,7 +50,7 @@ add_filter( 'clipisode_themes', function ( array $themes ): array {
 
 add_action( 'enqueue_block_editor_assets', function (): void {
 	$screen = get_current_screen();
-	if ( ! $screen || $screen->post_type !== 'clipisode_invite' ) {
+	if ( ! $screen || ! in_array( $screen->post_type, [ 'clipisode_invite', 'clipisode_preview' ], true ) ) {
 		return;
 	}
 	wp_add_inline_script(
@@ -62,3 +65,9 @@ add_action( 'init', [ $clipisode_invitation, 'register_rewrite' ] );
 add_filter( 'query_vars', [ $clipisode_invitation, 'add_query_vars' ] );
 add_filter( 'template_include', [ $clipisode_invitation, 'template_include' ] );
 add_action( 'rest_api_init', [ $clipisode_invitation, 'register_routes' ] );
+
+$clipisode_preview = new Clipisode_Preview();
+add_action( 'init', [ $clipisode_preview, 'register_blocks' ] );
+add_action( 'init', [ $clipisode_preview, 'register_rewrite' ] );
+add_filter( 'query_vars', [ $clipisode_preview, 'add_query_vars' ] );
+add_filter( 'template_include', [ $clipisode_preview, 'template_include' ] );

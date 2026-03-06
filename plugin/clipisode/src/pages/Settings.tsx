@@ -14,6 +14,7 @@ function formatDate( dateStr: string ): string {
 
 interface PluginSettings {
 	invitation_prefix: string;
+	preview_prefix: string;
 }
 
 export default function Settings(): JSX.Element {
@@ -22,7 +23,9 @@ export default function Settings(): JSX.Element {
 	const [ hosts, setHosts ] = useState< Host[] >( [] );
 	const [ loading, setLoading ] = useState< boolean >( true );
 	const [ invitationPrefix, setInvitationPrefix ] = useState( '' );
-	const [ savedPrefix, setSavedPrefix ] = useState( '' );
+	const [ savedInvitationPrefix, setSavedInvitationPrefix ] = useState( '' );
+	const [ previewPrefix, setPreviewPrefix ] = useState( '' );
+	const [ savedPreviewPrefix, setSavedPreviewPrefix ] = useState( '' );
 	const [ savingPrefix, setSavingPrefix ] = useState( false );
 	const [ prefixNotice, setPrefixNotice ] = useState< string | null >( null );
 
@@ -38,26 +41,30 @@ export default function Settings(): JSX.Element {
 				setCustomTerms( custom );
 				setHosts( h );
 				setInvitationPrefix( settings.invitation_prefix );
-				setSavedPrefix( settings.invitation_prefix );
+				setSavedInvitationPrefix( settings.invitation_prefix );
+				setPreviewPrefix( settings.preview_prefix );
+				setSavedPreviewPrefix( settings.preview_prefix );
 			} )
 			.finally( () => setLoading( false ) );
 	}, [] );
 
-	const savePrefix = useCallback( () => {
+	const savePrefixes = useCallback( () => {
 		setSavingPrefix( true );
 		setPrefixNotice( null );
 		apiFetch< PluginSettings >( {
 			path: '/clipisode/v1/settings',
 			method: 'PUT',
-			data: { invitation_prefix: invitationPrefix },
+			data: { invitation_prefix: invitationPrefix, preview_prefix: previewPrefix },
 		} )
 			.then( ( settings ) => {
 				setInvitationPrefix( settings.invitation_prefix );
-				setSavedPrefix( settings.invitation_prefix );
-				setPrefixNotice( 'Invitation prefix updated.' );
+				setSavedInvitationPrefix( settings.invitation_prefix );
+				setPreviewPrefix( settings.preview_prefix );
+				setSavedPreviewPrefix( settings.preview_prefix );
+				setPrefixNotice( 'URL prefixes updated.' );
 			} )
 			.finally( () => setSavingPrefix( false ) );
-	}, [ invitationPrefix ] );
+	}, [ invitationPrefix, previewPrefix ] );
 
 	const deleteHost = ( id: number ) => {
 		apiFetch( { path: `/clipisode/v1/hosts/${ id }`, method: 'DELETE' } )
@@ -220,41 +227,50 @@ export default function Settings(): JSX.Element {
 			<div className="clipisode-settings-section">
 				<h2>General</h2>
 
-				<Card>
-					<CardHeader>
-						<strong>Invitation URL</strong>
-					</CardHeader>
-					<CardBody>
-						{ prefixNotice && (
-							<Notice status="success" isDismissible onDismiss={ () => setPrefixNotice( null ) }>
-								{ prefixNotice }
-							</Notice>
-						) }
-						<div style={ { display: 'flex', alignItems: 'flex-end', gap: 8 } }>
+			<Card>
+				<CardHeader>
+					<strong>URL Prefixes</strong>
+				</CardHeader>
+				<CardBody>
+					{ prefixNotice && (
+						<Notice status="success" isDismissible onDismiss={ () => setPrefixNotice( null ) }>
+							{ prefixNotice }
+						</Notice>
+					) }
+					<TextControl
+						label="Invitation URL Prefix"
+						value={ invitationPrefix }
+						onChange={ setInvitationPrefix }
+						help={ `${ window.location.origin }/${ invitationPrefix || 'invitation' }/{code}` }
+						__nextHasNoMarginBottom
+						__next40pxDefaultSize
+					/>
+					<div style={ { marginTop: 16 } }>
 						<TextControl
-							label="URL Prefix"
-							value={ invitationPrefix }
-							onChange={ setInvitationPrefix }
-							help={ `Invitation pages will be at: ${ window.location.origin }/${ invitationPrefix || 'invitation' }/{code}` }
+							label="Clipisode Preview URL Prefix"
+							value={ previewPrefix }
+							onChange={ setPreviewPrefix }
+							help={ `${ window.location.origin }/${ previewPrefix || 'clipisode' }/{id}/{media_id}/{slug}` }
 							__nextHasNoMarginBottom
 							__next40pxDefaultSize
-							/>
-							<Button
-								variant="primary"
-								size="compact"
-								onClick={ savePrefix }
-								isBusy={ savingPrefix }
-								disabled={ savingPrefix || invitationPrefix === savedPrefix }
-								style={ { marginBottom: 24 } }
-							>
-								Save
-							</Button>
-						</div>
-						<p style={ { margin: '8px 0 0', color: '#d63638', fontSize: 13 } }>
-							Changing this will break all previously shared invitation links.
+						/>
+					</div>
+					<div style={ { display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 } }>
+						<Button
+							variant="primary"
+							size="compact"
+							onClick={ savePrefixes }
+							isBusy={ savingPrefix }
+							disabled={ savingPrefix || ( invitationPrefix === savedInvitationPrefix && previewPrefix === savedPreviewPrefix ) }
+						>
+							Save
+						</Button>
+						<p style={ { margin: 0, color: '#d63638', fontSize: 13 } }>
+							Changing prefixes will break previously shared links.
 						</p>
-					</CardBody>
-				</Card>
+					</div>
+				</CardBody>
+			</Card>
 
 				<Card>
 					<CardHeader>

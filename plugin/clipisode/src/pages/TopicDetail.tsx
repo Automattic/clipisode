@@ -429,6 +429,16 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 										<td>{ formatBytes( o.file_size ) }</td>
 										<td>{ new Date( o.created_at ).toLocaleDateString() }</td>
 											<td className="clipisode-link-actions">
+												{ o.preview_url && (
+													<a
+														className="components-button is-tertiary is-compact"
+														href={ o.preview_url }
+														target="_blank"
+														rel="noreferrer"
+													>
+														Preview
+													</a>
+												) }
 												{ o.url && (
 													<a
 														className="components-button is-tertiary is-compact"

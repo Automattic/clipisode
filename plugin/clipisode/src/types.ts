@@ -31,6 +31,7 @@ export interface Output {
 	slug: string;
 	upload_token?: string;
 	url: string | null;
+	preview_url: string | null;
 	clips_count: number;
 	file_size: number | null;
 	created_at: string;
@@ -99,6 +100,7 @@ export interface MediaUsage {
 	type: 'topic' | 'output' | 'reply';
 	id: number;
 	label: string;
+	preview_url?: string | null;
 	topic_id?: number | null;
 	topic_title?: string | null;
 	clips_count?: number;
@@ -156,6 +158,7 @@ declare global {
 			rest_root: string;
 			nonce: string;
 			invitation_prefix: string;
+			preview_prefix: string;
 			themes: Record< string, {
 				label: string;
 				assets: Record< string, { url: string; filename: string } >;

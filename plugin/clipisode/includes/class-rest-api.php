@@ -174,6 +174,28 @@ class Clipisode_REST_API {
 			],
 		] );
 
+		// Preview layouts (CPT-based preview designs).
+		register_rest_route( self::NAMESPACE, '/preview-layouts', [
+			[
+				'methods'             => 'GET',
+				'callback'            => [ $this, 'list_preview_layouts' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+			[
+				'methods'             => 'POST',
+				'callback'            => [ $this, 'clone_preview_layout' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+		] );
+
+		register_rest_route( self::NAMESPACE, '/preview-layouts/(?P<id>\d+)', [
+			[
+				'methods'             => 'DELETE',
+				'callback'            => [ $this, 'delete_preview_layout' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+		] );
+
 		// Outputs.
 		register_rest_route( self::NAMESPACE, '/outputs', [
 			[
@@ -307,20 +329,35 @@ class Clipisode_REST_API {
 	public function get_settings(): WP_REST_Response {
 		return new WP_REST_Response( [
 			'invitation_prefix' => Clipisode_Invitation::get_prefix(),
+			'preview_prefix'    => Clipisode_Preview::get_prefix(),
 		] );
 	}
 
 	public function update_settings( WP_REST_Request $request ): WP_REST_Response {
 		$data = $request->get_json_params();
 
+		$flush = false;
+
 		if ( isset( $data['invitation_prefix'] ) ) {
 			$old = get_option( 'clipisode_invitation_prefix', 'invitation' );
 			$new = Clipisode_Invitation::sanitize_prefix( $data['invitation_prefix'] );
 			update_option( 'clipisode_invitation_prefix', $new );
-
 			if ( $old !== $new ) {
-				Clipisode_Invitation::flush_rewrites();
+				$flush = true;
 			}
+		}
+
+		if ( isset( $data['preview_prefix'] ) ) {
+			$old = get_option( 'clipisode_preview_prefix', 'clipisode' );
+			$new = Clipisode_Preview::sanitize_prefix( $data['preview_prefix'] );
+			update_option( 'clipisode_preview_prefix', $new );
+			if ( $old !== $new ) {
+				$flush = true;
+			}
+		}
+
+		if ( $flush ) {
+			delete_option( 'rewrite_rules' );
 		}
 
 		return $this->get_settings();
@@ -459,11 +496,14 @@ class Clipisode_REST_API {
 		) );
 
 		$topic->outputs = array_map( function ( $o ) {
+			$preview_url = Clipisode_Preview::get_url( (int) $o->id, $o->media_id ? (int) $o->media_id : null, $o->slug );
+
 			return (object) [
 				'id'          => (int) $o->id,
 				'name'        => $o->name,
 				'slug'        => $o->slug,
 				'url'         => $o->media_id ? Clipisode_Media::get_url( (int) $o->media_id ) : null,
+				'preview_url' => $preview_url,
 				'clips_count' => (int) $o->clips_count,
 				'file_size'   => $o->file_size ? (int) $o->file_size : null,
 				'created_at'  => $o->created_at,
@@ -1238,7 +1278,7 @@ class Clipisode_REST_API {
 		}
 
 		$output = $wpdb->get_row( $wpdb->prepare(
-			"SELECT o.id, o.name, o.topic_id, t.title AS topic_title,
+			"SELECT o.id, o.name, o.slug, o.media_id, o.topic_id, t.title AS topic_title,
 				COALESCE(c.clips_count, 0) AS clips_count
 			 FROM {$wpdb->prefix}clipisode_outputs o
 			 LEFT JOIN {$wpdb->prefix}clipisode_topics t ON t.id = o.topic_id
@@ -1255,6 +1295,7 @@ class Clipisode_REST_API {
 				'type'        => 'output',
 				'id'          => (int) $output->id,
 				'label'       => $output->name,
+				'preview_url' => Clipisode_Preview::get_url( (int) $output->id, $output->media_id ? (int) $output->media_id : null, $output->slug ),
 				'topic_id'    => $output->topic_id ? (int) $output->topic_id : null,
 				'topic_title' => $output->topic_title,
 				'clips_count' => (int) $output->clips_count,
@@ -1369,6 +1410,78 @@ class Clipisode_REST_API {
 			return new WP_REST_Response( [
 				'message' => "Cannot delete: $in_use topic(s) still use this theme.",
 			], 409 );
+		}
+
+		wp_delete_post( $id, true );
+
+		return new WP_REST_Response( null, 204 );
+	}
+
+	// --- Preview Layouts ---
+
+	public function list_preview_layouts( WP_REST_Request $request ): WP_REST_Response {
+		Clipisode_Post_Types::ensure_default_preview();
+
+		$posts = get_posts( [
+			'post_type'   => 'clipisode_preview',
+			'post_status' => 'publish',
+			'numberposts' => -1,
+			'orderby'     => 'date',
+			'order'       => 'ASC',
+		] );
+
+		$layouts = array_map( function ( $post ) {
+			$is_default = (bool) get_post_meta( $post->ID, Clipisode_Post_Types::DEFAULT_PREVIEW_META, true );
+
+			return [
+				'id'         => $post->ID,
+				'title'      => $post->post_title,
+				'edit_url'   => get_edit_post_link( $post->ID, 'raw' ),
+				'is_default' => $is_default,
+				'created_at' => $post->post_date,
+			];
+		}, $posts );
+
+		return new WP_REST_Response( $layouts );
+	}
+
+	public function clone_preview_layout( WP_REST_Request $request ): WP_REST_Response {
+		$source_id = $request->get_param( 'source_id' );
+		$title     = sanitize_text_field( $request->get_param( 'title' ) );
+
+		if ( ! $source_id ) {
+			$source_id = Clipisode_Post_Types::ensure_default_preview();
+		}
+
+		$source = get_post( (int) $source_id );
+		if ( ! $source || $source->post_type !== 'clipisode_preview' ) {
+			return new WP_REST_Response( [ 'message' => 'Source layout not found.' ], 404 );
+		}
+
+		$new_id = wp_insert_post( [
+			'post_type'    => 'clipisode_preview',
+			'post_title'   => $title ?: $source->post_title . ' (Copy)',
+			'post_content' => $source->post_content,
+			'post_status'  => 'publish',
+		] );
+
+		if ( is_wp_error( $new_id ) ) {
+			return new WP_REST_Response( [ 'message' => $new_id->get_error_message() ], 400 );
+		}
+
+		return new WP_REST_Response( [
+			'id'       => $new_id,
+			'title'    => get_the_title( $new_id ),
+			'edit_url' => get_edit_post_link( $new_id, 'raw' ),
+		], 201 );
+	}
+
+	public function delete_preview_layout( WP_REST_Request $request ): WP_REST_Response {
+		$id = (int) $request['id'];
+
+		$is_default = get_post_meta( $id, Clipisode_Post_Types::DEFAULT_PREVIEW_META, true );
+		if ( $is_default ) {
+			return new WP_REST_Response( [ 'message' => 'Cannot delete the default preview layout.' ], 403 );
 		}
 
 		wp_delete_post( $id, true );
