@@ -362,14 +362,16 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 		};
 
 		ws.onclose = () => {
-			if ( renderState === 'connecting' ) {
-				setRenderError( 'Could not connect to render service.' );
+			if ( wsRef.current ) {
+				setRenderError( 'Connection to the Clipisode desktop app was lost. Make sure it is running and try again.' );
 				setRenderState( 'error' );
+				wsRef.current = null;
+				jobIdRef.current = null;
 			}
 		};
 
 		ws.onerror = () => {
-			ws.close();
+			// onclose always fires after onerror and handles the error state
 		};
 	};
 
