@@ -117,8 +117,6 @@ html, body {
 	background: rgba(0, 0, 0, 0.35);
 	border: none;
 	cursor: pointer;
-	font-size: 48px;
-	color: #fff;
 	transition: background 0.2s;
 }
 
