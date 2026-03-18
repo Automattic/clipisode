@@ -55,7 +55,7 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 						invitation_id: topic.invitation_id ? String( topic.invitation_id ) : '',
 					} );
 					if ( topic.intro_media_id && topic.intro_video_url ) {
-						setVideo( { id: topic.intro_media_id, url: topic.intro_video_url } );
+						setVideo( { id: topic.intro_media_id, url: topic.intro_video_url, reused: true } );
 					}
 					if ( topic.social_image_media_id && topic.social_image_url ) {
 						setSocialImage( { id: topic.social_image_media_id, url: topic.social_image_url } );

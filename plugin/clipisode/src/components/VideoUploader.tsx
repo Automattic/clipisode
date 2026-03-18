@@ -1,7 +1,7 @@
-import { useState, useRef, useCallback } from '@wordpress/element';
+import { useState, useEffect, useRef, useCallback } from '@wordpress/element';
 import { Button, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
-import type { VideoValue } from '../types';
+import type { VideoValue, MediaItem } from '../types';
 
 const ALLOWED_TYPES = [ 'video/mp4', 'video/quicktime', 'video/webm', 'video/x-m4v' ];
 const ALLOWED_ACCEPT = '.mp4,.mov,.webm,.m4v';
@@ -123,8 +123,10 @@ function deleteAttachment( id: number ): void {
 	apiFetch( { path: `/clipisode/v1/videos/${ id }`, method: 'DELETE' } ).catch( () => {} );
 }
 
+type Mode = 'none' | 'upload' | 'url' | 'existing';
+
 export default function VideoUploader( { value, onChange, videoRef }: VideoUploaderProps ) {
-	const [ mode, setMode ] = useState< 'none' | 'upload' | 'url' >( value ? 'upload' : 'none' );
+	const [ mode, setMode ] = useState< Mode | null >( value ? null : 'none' );
 	const [ url, setUrl ] = useState( '' );
 	const [ uploading, setUploading ] = useState( false );
 	const [ importing, setImporting ] = useState( false );
@@ -133,6 +135,24 @@ export default function VideoUploader( { value, onChange, videoRef }: VideoUploa
 	const [ dragOver, setDragOver ] = useState( false );
 	const fileInputRef = useRef< HTMLInputElement >( null );
 	const abortRef = useRef< ( () => void ) | null >( null );
+	const [ existingMedia, setExistingMedia ] = useState< MediaItem[] >( [] );
+	const [ loadingMedia, setLoadingMedia ] = useState( false );
+
+	useEffect( () => {
+		if ( mode !== 'existing' || value ) {
+			return;
+		}
+		setLoadingMedia( true );
+		apiFetch< MediaItem[] >( { path: '/clipisode/v1/media?type=video&label=asset' } )
+			.then( ( assets ) => {
+				return apiFetch< MediaItem[] >( { path: '/clipisode/v1/media?type=video&label=intro' } )
+					.then( ( intros ) => [ ...assets, ...intros ] );
+			} )
+			.then( ( items ) => {
+				setExistingMedia( items.filter( ( m ) => m.url ) );
+			} )
+			.finally( () => setLoadingMedia( false ) );
+	}, [ mode, value ] );
 
 	const handleFile = useCallback( async ( file: File ) => {
 		setError( null );
@@ -241,14 +261,14 @@ export default function VideoUploader( { value, onChange, videoRef }: VideoUploa
 	}, [ handleFile ] );
 
 	const handleRemove = useCallback( () => {
-		if ( value ) {
+		if ( value && ! value.reused ) {
 			deleteAttachment( value.id );
 		}
 		onChange( null );
 	}, [ value, onChange ] );
 
-	const handleModeChange = ( newMode: 'none' | 'upload' | 'url' ) => {
-		if ( newMode === 'none' && value ) {
+	const handleModeChange = ( newMode: Mode | null ) => {
+		if ( value ) {
 			handleRemove();
 		}
 		setMode( newMode );
@@ -290,6 +310,16 @@ export default function VideoUploader( { value, onChange, videoRef }: VideoUploa
 						disabled={ busy }
 					/>
 					Import from URL
+				</label>
+				<label>
+					<input
+						type="radio"
+						name="clipisode-video-mode"
+						checked={ mode === 'existing' }
+						onChange={ () => handleModeChange( 'existing' ) }
+						disabled={ busy }
+					/>
+					Use Existing Media
 				</label>
 			</div>
 
@@ -370,6 +400,38 @@ export default function VideoUploader( { value, onChange, videoRef }: VideoUploa
 						Import
 					</Button>
 				</div>
+			) }
+
+			{ ! value && mode === 'existing' && (
+				loadingMedia ? (
+					<div className="clipisode-spinner-wrap">
+						<Spinner />
+					</div>
+				) : existingMedia.length === 0 ? (
+					<div className="clipisode-media-picker-empty">
+						No existing videos found. Upload assets on the <a href="admin.php?page=clipisode-media">Media page</a>.
+					</div>
+				) : (
+					<div className="clipisode-media-picker-grid">
+						{ existingMedia.map( ( item ) => (
+							<button
+								key={ item.id }
+								type="button"
+								className="clipisode-media-picker-card"
+								onClick={ () => onChange( { id: item.id, url: item.url!, reused: true } ) }
+							>
+								<video
+									src={ item.url! }
+									muted
+									preload="metadata"
+								/>
+								<span className="clipisode-media-picker-label">
+									{ item.used_by?.label || item.label }
+								</span>
+							</button>
+						) ) }
+					</div>
+				)
 			) }
 		</div>
 	);

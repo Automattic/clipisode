@@ -49,6 +49,7 @@ export interface Theme {
 export interface VideoValue {
 	id: number;
 	url: string;
+	reused?: boolean;
 }
 
 export interface InvitationLink {

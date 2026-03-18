@@ -553,6 +553,67 @@
 			display: block;
 		}
 	}
+
+	.clipisode-media-picker-grid {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 10px;
+		max-height: 260px;
+		overflow-y: auto;
+		padding: 2px;
+	}
+
+	.clipisode-media-picker-card {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 6px;
+		padding: 8px;
+		border: 2px solid #c3c4c7;
+		border-radius: 4px;
+		background: #fff;
+		cursor: pointer;
+		transition: border-color 0.15s, box-shadow 0.15s;
+
+		&:hover {
+			border-color: #2271b1;
+			box-shadow: 0 0 0 1px #2271b1;
+		}
+
+		video {
+			width: 100%;
+			aspect-ratio: 9 / 16;
+			object-fit: cover;
+			border-radius: 3px;
+			background: #1d2327;
+			pointer-events: none;
+		}
+	}
+
+	.clipisode-media-picker-label {
+		font-size: 11px;
+		color: #646970;
+		text-transform: capitalize;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 100%;
+	}
+
+	.clipisode-media-picker-empty {
+		font-size: 13px;
+		color: #646970;
+		padding: 16px 0;
+
+		a {
+			color: #2271b1;
+			text-decoration: none;
+
+			&:hover {
+				color: #135e96;
+			}
+		}
+	}
 	// --- Clipisode Output ---
 
 	.clipisode-output-list {
