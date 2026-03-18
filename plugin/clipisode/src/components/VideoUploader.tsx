@@ -271,6 +271,10 @@ export default function VideoUploader( { value, onChange, videoRef }: VideoUploa
 		if ( value ) {
 			handleRemove();
 		}
+		if ( newMode === 'existing' ) {
+			setLoadingMedia( true );
+			setExistingMedia( [] );
+		}
 		setMode( newMode );
 	};
 
