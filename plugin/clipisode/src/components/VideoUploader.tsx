@@ -143,13 +143,13 @@ export default function VideoUploader( { value, onChange, videoRef }: VideoUploa
 			return;
 		}
 		setLoadingMedia( true );
-		apiFetch< MediaItem[] >( { path: '/clipisode/v1/media?type=video&label=asset' } )
-			.then( ( assets ) => {
-				return apiFetch< MediaItem[] >( { path: '/clipisode/v1/media?type=video&label=intro' } )
-					.then( ( intros ) => [ ...assets, ...intros ] );
-			} )
-			.then( ( items ) => {
-				setExistingMedia( items.filter( ( m ) => m.url ) );
+		Promise.all( [
+			apiFetch< MediaItem[] >( { path: '/clipisode/v1/media?type=video&label=asset' } ),
+			apiFetch< MediaItem[] >( { path: '/clipisode/v1/media?type=video&label=intro' } ),
+			apiFetch< MediaItem[] >( { path: '/clipisode/v1/media?type=video&label=original' } ),
+		] )
+			.then( ( [ assets, intros, originals ] ) => {
+				setExistingMedia( [ ...assets, ...intros, ...originals ].filter( ( m ) => m.url ) );
 			} )
 			.finally( () => setLoadingMedia( false ) );
 	}, [ mode, value ] );
