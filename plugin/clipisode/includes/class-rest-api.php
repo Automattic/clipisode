@@ -330,6 +330,7 @@ class Clipisode_REST_API {
 		return new WP_REST_Response( [
 			'invitation_prefix' => Clipisode_Invitation::get_prefix(),
 			'preview_prefix'    => Clipisode_Preview::get_prefix(),
+			'debug_mode'        => (bool) get_option( 'clipisode_debug_mode', false ),
 		] );
 	}
 
@@ -358,6 +359,10 @@ class Clipisode_REST_API {
 
 		if ( $flush ) {
 			delete_option( 'rewrite_rules' );
+		}
+
+		if ( isset( $data['debug_mode'] ) ) {
+			update_option( 'clipisode_debug_mode', (bool) $data['debug_mode'] ? '1' : '' );
 		}
 
 		return $this->get_settings();

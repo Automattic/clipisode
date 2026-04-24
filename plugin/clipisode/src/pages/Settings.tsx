@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from '@wordpress/element';
-import { Button, Card, CardBody, CardHeader, SelectControl, Spinner, TextControl, Notice } from '@wordpress/components';
+import { Button, Card, CardBody, CardHeader, SelectControl, Spinner, TextControl, Notice, ToggleControl } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import type { BrandTerms, CustomTermsItem, Host } from '../types';
 
@@ -15,6 +15,7 @@ function formatDate( dateStr: string ): string {
 interface PluginSettings {
 	invitation_prefix: string;
 	preview_prefix: string;
+	debug_mode: boolean;
 }
 
 export default function Settings(): JSX.Element {
@@ -28,6 +29,8 @@ export default function Settings(): JSX.Element {
 	const [ savedPreviewPrefix, setSavedPreviewPrefix ] = useState( '' );
 	const [ savingPrefix, setSavingPrefix ] = useState( false );
 	const [ prefixNotice, setPrefixNotice ] = useState< string | null >( null );
+	const [ debugMode, setDebugMode ] = useState( false );
+	const [ savingDebug, setSavingDebug ] = useState( false );
 
 	useEffect( () => {
 		Promise.all( [
@@ -44,6 +47,7 @@ export default function Settings(): JSX.Element {
 				setSavedInvitationPrefix( settings.invitation_prefix );
 				setPreviewPrefix( settings.preview_prefix );
 				setSavedPreviewPrefix( settings.preview_prefix );
+				setDebugMode( settings.debug_mode );
 			} )
 			.finally( () => setLoading( false ) );
 	}, [] );
@@ -79,6 +83,18 @@ export default function Settings(): JSX.Element {
 			data: { id },
 		} ).then( setHosts );
 	};
+
+	const toggleDebugMode = useCallback( ( enabled: boolean ) => {
+		setDebugMode( enabled );
+		setSavingDebug( true );
+		apiFetch< PluginSettings >( {
+			path: '/clipisode/v1/settings',
+			method: 'PUT',
+			data: { debug_mode: enabled },
+		} )
+			.then( ( settings ) => setDebugMode( settings.debug_mode ) )
+			.finally( () => setSavingDebug( false ) );
+	}, [] );
 
 	const newTermsUrl = 'post-new.php?post_type=clipisode_terms';
 
@@ -293,6 +309,22 @@ export default function Settings(): JSX.Element {
 						<p style={ { margin: 0, color: '#646970', fontSize: 13 } }>
 							Transcription configuration coming soon.
 						</p>
+					</CardBody>
+				</Card>
+			</div>
+
+			<div className="clipisode-settings-section">
+				<h2>Developer</h2>
+				<Card>
+					<CardBody>
+						<ToggleControl
+							label="Debug Mode"
+							checked={ debugMode }
+							onChange={ toggleDebugMode }
+							disabled={ savingDebug }
+							help="Enables debug tools like the manifest inspector on the Create Clipisode screen."
+							__nextHasNoMarginBottom
+						/>
 					</CardBody>
 				</Card>
 			</div>

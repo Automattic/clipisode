@@ -160,6 +160,7 @@ declare global {
 			nonce: string;
 			invitation_prefix: string;
 			preview_prefix: string;
+			debug_mode: boolean;
 			themes: Record< string, {
 				label: string;
 				assets: Record< string, { url: string; filename: string } >;

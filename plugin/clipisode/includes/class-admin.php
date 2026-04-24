@@ -106,6 +106,7 @@ class Clipisode_Admin {
 			'invitation_prefix' => Clipisode_Invitation::get_prefix(),
 			'preview_prefix'    => Clipisode_Preview::get_prefix(),
 			'themes'            => $themes,
+			'debug_mode'        => (bool) get_option( 'clipisode_debug_mode', false ),
 		] );
 	}
 

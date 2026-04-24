@@ -521,17 +521,19 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 							>
 								Create Clipisode
 							</Button>
-							<Button
-								variant="tertiary"
-								onClick={ () => {
-									const restRoot = window.clipisodeAdmin?.rest_root || `${ window.location.origin }/wp-json/`;
-									const manifest = buildManifest( `${ restRoot }clipisode/v1/outputs/<id>/upload?token=<token>` );
-									setDebugManifest( JSON.stringify( manifest, null, 2 ) );
-								} }
-								disabled={ includedClips.length === 0 }
-							>
-								Debug Manifest
-							</Button>
+							{ window.clipisodeAdmin?.debug_mode && (
+								<Button
+									variant="tertiary"
+									onClick={ () => {
+										const restRoot = window.clipisodeAdmin?.rest_root || `${ window.location.origin }/wp-json/`;
+										const manifest = buildManifest( `${ restRoot }clipisode/v1/outputs/<id>/upload?token=<token>` );
+										setDebugManifest( JSON.stringify( manifest, null, 2 ) );
+									} }
+									disabled={ includedClips.length === 0 }
+								>
+									Debug Manifest
+								</Button>
+							) }
 						</div>
 					</div>
 				</>
