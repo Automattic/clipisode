@@ -622,7 +622,33 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 					onRequestClose={ () => setDebugManifest( null ) }
 					style={ { maxWidth: '720px', maxHeight: '90vh' } }
 				>
-					<pre style={ { whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12, lineHeight: 1.5, maxHeight: 'calc(90vh - 120px)', overflow: 'auto' } }>
+					<div style={ { display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12 } }>
+						<Button
+							variant="secondary"
+							onClick={ () => {
+								navigator.clipboard.writeText( debugManifest );
+							} }
+						>
+							Copy
+						</Button>
+						<Button
+							variant="secondary"
+							onClick={ () => {
+								const blob = new Blob( [ debugManifest ], { type: 'application/json' } );
+								const url = URL.createObjectURL( blob );
+								const a = document.createElement( 'a' );
+								a.href = url;
+								a.download = `clipisode-manifest-${ Date.now() }.json`;
+								document.body.appendChild( a );
+								a.click();
+								document.body.removeChild( a );
+								URL.revokeObjectURL( url );
+							} }
+						>
+							Download
+						</Button>
+					</div>
+					<pre style={ { whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12, lineHeight: 1.5, maxHeight: 'calc(90vh - 160px)', overflow: 'auto' } }>
 						{ debugManifest }
 					</pre>
 				</Modal>
