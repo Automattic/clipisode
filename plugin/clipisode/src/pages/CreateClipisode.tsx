@@ -210,6 +210,48 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 	};
 
 	const includedClips = clips.filter( ( c ) => c.included );
+	const [ debugManifest, setDebugManifest ] = useState< string | null >( null );
+
+	const buildManifest = ( callbackUrl: string ) => {
+		const videos: Record< string, object > = {};
+		includedClips.forEach( ( clip, i ) => {
+			videos[ `clip_${ i }` ] = {
+				url: clip.url,
+				filename: clip.filename,
+				name: clip.name,
+				trim_start: clip.trimStart,
+				trim_end: clip.trimEnd,
+				duration: clip.duration,
+			};
+		} );
+
+		const getElements = themeRegistry[ selectedTheme ];
+		let elements: unknown[] = [];
+		let assets: Record< string, { url: string; filename: string } > = {};
+
+		if ( getElements ) {
+			const videoData = {
+				id: String( topicId || 0 ),
+				title: topic?.title || 'Clipisode',
+				clips: includedClips.map( ( clip, i ) => ( {
+					id: `clip_${ i }`,
+					duration: clip.trimEnd - clip.trimStart,
+					displayName: clip.name,
+				} ) ),
+			};
+			elements = getElements( videoData );
+			assets = getThemeAssets( selectedTheme );
+		}
+
+		return {
+			type: 'start_job',
+			job_id: '<generated>',
+			callback_url: callbackUrl,
+			videos,
+			assets,
+			elements,
+		};
+	};
 
 	const startRendering = async () => {
 		if ( includedClips.length === 0 || ! clipisodeName.trim() ) return;
@@ -261,44 +303,7 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 		const jobId = generateJobId();
 		jobIdRef.current = jobId;
 
-		const videos: Record< string, object > = {};
-		includedClips.forEach( ( clip, i ) => {
-			videos[ `clip_${ i }` ] = {
-				url: clip.url,
-				filename: clip.filename,
-				name: clip.name,
-				trim_start: clip.trimStart,
-				trim_end: clip.trimEnd,
-				duration: clip.duration,
-			};
-		} );
-
-		const getElements = themeRegistry[ selectedTheme ];
-		let elements: unknown[] = [];
-		let assets: Record< string, { url: string; filename: string } > = {};
-
-		if ( getElements ) {
-			const videoData = {
-				id: String( topicId || 0 ),
-				title: topic?.title || 'Clipisode',
-				clips: includedClips.map( ( clip, i ) => ( {
-					id: `clip_${ i }`,
-					duration: clip.trimEnd - clip.trimStart,
-					displayName: clip.name,
-				} ) ),
-			};
-			elements = getElements( videoData );
-			assets = getThemeAssets( selectedTheme );
-		}
-
-		const payload = {
-			type: 'start_job',
-			job_id: jobId,
-			callback_url: callbackUrl,
-			videos,
-			assets,
-			elements,
-		};
+		const payload = { ...buildManifest( callbackUrl ), job_id: jobId };
 
 		const ws = new WebSocket( WS_URL );
 		wsRef.current = ws;
@@ -516,6 +521,17 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 							>
 								Create Clipisode
 							</Button>
+							<Button
+								variant="tertiary"
+								onClick={ () => {
+									const restRoot = window.clipisodeAdmin?.rest_root || `${ window.location.origin }/wp-json/`;
+									const manifest = buildManifest( `${ restRoot }clipisode/v1/outputs/<id>/upload?token=<token>` );
+									setDebugManifest( JSON.stringify( manifest, null, 2 ) );
+								} }
+								disabled={ includedClips.length === 0 }
+							>
+								Debug Manifest
+							</Button>
 						</div>
 					</div>
 				</>
@@ -595,6 +611,18 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 						playsInline
 						style={ { display: 'block', maxWidth: '100%', maxHeight: 'calc(90vh - 120px)', borderRadius: 4 } }
 					/>
+				</Modal>
+			) }
+
+			{ debugManifest && (
+				<Modal
+					title="Debug Manifest"
+					onRequestClose={ () => setDebugManifest( null ) }
+					style={ { maxWidth: '720px', maxHeight: '90vh' } }
+				>
+					<pre style={ { whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12, lineHeight: 1.5, maxHeight: 'calc(90vh - 120px)', overflow: 'auto' } }>
+						{ debugManifest }
+					</pre>
 				</Modal>
 			) }
 		</>
