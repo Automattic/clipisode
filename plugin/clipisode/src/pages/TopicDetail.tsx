@@ -5,9 +5,15 @@ import ReplyModal from '../components/ReplyModal';
 import type { Topic, InvitationLink, Reply } from '../types';
 
 function formatBytes( bytes: number | null ): string {
-	if ( ! bytes ) return '—';
-	if ( bytes < 1024 ) return `${ bytes } B`;
-	if ( bytes < 1048576 ) return `${ ( bytes / 1024 ).toFixed( 1 ) } KB`;
+	if ( ! bytes ) {
+		return '—';
+	}
+	if ( bytes < 1024 ) {
+		return `${ bytes } B`;
+	}
+	if ( bytes < 1048576 ) {
+		return `${ ( bytes / 1024 ).toFixed( 1 ) } KB`;
+	}
 	return `${ ( bytes / 1048576 ).toFixed( 1 ) } MB`;
 }
 
@@ -23,15 +29,32 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const [ loading, setLoading ] = useState< boolean >( true );
 	const [ deleting, setDeleting ] = useState< boolean >( false );
 	const [ copiedId, setCopiedId ] = useState< number | null >( null );
-	const [ editingSlug, setEditingSlug ] = useState< Record< number, string > >( {} );
-	const [ slugError, setSlugError ] = useState< Record< number, string > >( {} );
-	const [ savingSlug, setSavingSlug ] = useState< Record< number, boolean > >( {} );
-	const [ selectedReply, setSelectedReply ] = useState< Reply | null >( null );
-	const [ selectedReplyIds, setSelectedReplyIds ] = useState< Set< number > >( new Set() );
-	const [ previewOutput, setPreviewOutput ] = useState< { name: string; url: string } | null >( null );
+	const [ editingSlug, setEditingSlug ] = useState<
+		Record< number, string >
+	>( {} );
+	const [ slugError, setSlugError ] = useState< Record< number, string > >(
+		{}
+	);
+	const [ savingSlug, setSavingSlug ] = useState< Record< number, boolean > >(
+		{}
+	);
+	const [ selectedReply, setSelectedReply ] = useState< Reply | null >(
+		null
+	);
+	const [ selectedReplyIds, setSelectedReplyIds ] = useState< Set< number > >(
+		new Set()
+	);
+	const [ previewOutput, setPreviewOutput ] = useState< {
+		name: string;
+		url: string;
+	} | null >( null );
 
 	const deleteOutput = ( outputId: number, name: string ) => {
-		if ( ! window.confirm( `Delete "${ name }"? The video will be permanently removed.` ) ) {
+		if (
+			! window.confirm(
+				`Delete "${ name }"? The video will be permanently removed.`
+			)
+		) {
 			return;
 		}
 		apiFetch( {
@@ -39,7 +62,9 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 			method: 'DELETE',
 		} ).then( () => {
 			setTopic( ( prev ) => {
-				if ( ! prev ) return prev;
+				if ( ! prev ) {
+					return prev;
+				}
 				return {
 					...prev,
 					outputs: prev.outputs.filter( ( o ) => o.id !== outputId ),
@@ -51,16 +76,28 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const load = useCallback( () => {
 		Promise.all( [
 			apiFetch< Topic >( { path: `/clipisode/v1/topics/${ id }` } ),
-			apiFetch< InvitationLink[] >( { path: `/clipisode/v1/topics/${ id }/invitation-links` } ),
-			apiFetch< Reply[] >( { path: `/clipisode/v1/replies?topic_id=${ id }` } ),
-		] ).then( ( [ t, l, cl ] ) => {
-			setTopic( t );
-			setLinks( l );
-			setReplies( cl );
-			setSelectedReplyIds( new Set(
-				cl.filter( ( r ) => r.status === 'approved' && r.media_id ).map( ( r ) => r.id )
-			) );
-		} ).finally( () => setLoading( false ) );
+			apiFetch< InvitationLink[] >( {
+				path: `/clipisode/v1/topics/${ id }/invitation-links`,
+			} ),
+			apiFetch< Reply[] >( {
+				path: `/clipisode/v1/replies?topic_id=${ id }`,
+			} ),
+		] )
+			.then( ( [ t, l, cl ] ) => {
+				setTopic( t );
+				setLinks( l );
+				setReplies( cl );
+				setSelectedReplyIds(
+					new Set(
+						cl
+							.filter(
+								( r ) => r.status === 'approved' && r.media_id
+							)
+							.map( ( r ) => r.id )
+					)
+				);
+			} )
+			.finally( () => setLoading( false ) );
 	}, [ id ] );
 
 	useEffect( () => {
@@ -83,29 +120,48 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 			method: 'PUT',
 			data: { status: newStatus },
 		} ).then( ( updated ) => {
-			setLinks( ( prev ) => prev.map( ( l ) => ( l.id === updated.id ? updated : l ) ) );
+			setLinks( ( prev ) =>
+				prev.map( ( l ) => ( l.id === updated.id ? updated : l ) )
+			);
 		} );
 	};
 
 	const saveSlug = async ( link: InvitationLink ) => {
 		const newSlug = editingSlug[ link.id ];
 		if ( ! newSlug || newSlug === link.slug ) {
-			setEditingSlug( ( prev ) => { const n = { ...prev }; delete n[ link.id ]; return n; } );
+			setEditingSlug( ( prev ) => {
+				const n = { ...prev };
+				delete n[ link.id ];
+				return n;
+			} );
 			return;
 		}
 		setSavingSlug( ( prev ) => ( { ...prev, [ link.id ]: true } ) );
-		setSlugError( ( prev ) => { const n = { ...prev }; delete n[ link.id ]; return n; } );
+		setSlugError( ( prev ) => {
+			const n = { ...prev };
+			delete n[ link.id ];
+			return n;
+		} );
 		try {
 			const updated = await apiFetch< InvitationLink >( {
 				path: `/clipisode/v1/invitation-links/${ link.id }`,
 				method: 'PUT',
 				data: { slug: newSlug },
 			} );
-			setLinks( ( prev ) => prev.map( ( l ) => ( l.id === updated.id ? updated : l ) ) );
-			setEditingSlug( ( prev ) => { const n = { ...prev }; delete n[ link.id ]; return n; } );
+			setLinks( ( prev ) =>
+				prev.map( ( l ) => ( l.id === updated.id ? updated : l ) )
+			);
+			setEditingSlug( ( prev ) => {
+				const n = { ...prev };
+				delete n[ link.id ];
+				return n;
+			} );
 		} catch ( err: unknown ) {
-			const message = err instanceof Error ? err.message
-				: ( err as { message?: string } )?.message || 'Slug update failed.';
+			const message =
+				err instanceof Error
+					? err.message
+					: ( err as { message?: string } )?.message ||
+					  'Slug update failed.';
 			setSlugError( ( prev ) => ( { ...prev, [ link.id ]: message } ) );
 		} finally {
 			setSavingSlug( ( prev ) => ( { ...prev, [ link.id ]: false } ) );
@@ -117,11 +173,18 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 		const url = `${ window.location.origin }/${ prefix }/${ link.slug }`;
 		navigator.clipboard.writeText( url );
 		setCopiedId( link.id );
-		setTimeout( () => setCopiedId( ( prev ) => ( prev === link.id ? null : prev ) ), 3000 );
+		setTimeout(
+			() => setCopiedId( ( prev ) => ( prev === link.id ? null : prev ) ),
+			3000
+		);
 	};
 
 	const deleteTopic = () => {
-		if ( ! window.confirm( 'Delete this topic and all its replies? This cannot be undone.' ) ) {
+		if (
+			! window.confirm(
+				'Delete this topic and all its replies? This cannot be undone.'
+			)
+		) {
 			return;
 		}
 		setDeleting( true );
@@ -149,12 +212,17 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 		return <div className="clipisode-empty">Topic not found.</div>;
 	}
 
-	const approvedCount = replies.filter( ( r ) => r.status === 'approved' ).length;
+	const approvedCount = replies.filter(
+		( r ) => r.status === 'approved'
+	).length;
 
 	return (
 		<>
 			<div className="clipisode-detail-header">
-				<a className="clipisode-back-link" onClick={ () => navigate( '' ) }>
+				<a
+					className="clipisode-back-link"
+					onClick={ () => navigate( '' ) }
+				>
 					← All Topics
 				</a>
 				<div className="clipisode-detail-header-row">
@@ -185,34 +253,55 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 				<div className="clipisode-detail-main">
 					<div className="clipisode-stats-row">
 						<div className="clipisode-stat-card">
-							<span className="clipisode-stat-value">{ Number( topic.clicks ).toLocaleString() }</span>
+							<span className="clipisode-stat-value">
+								{ Number( topic.clicks ).toLocaleString() }
+							</span>
 							<span className="clipisode-stat-label">Clicks</span>
 						</div>
 						<div className="clipisode-stat-card">
-							<span className="clipisode-stat-value">{ Number( topic.replies_count ).toLocaleString() }</span>
-							<span className="clipisode-stat-label">Replies</span>
+							<span className="clipisode-stat-value">
+								{ Number(
+									topic.replies_count
+								).toLocaleString() }
+							</span>
+							<span className="clipisode-stat-label">
+								Replies
+							</span>
 						</div>
 						<div className="clipisode-stat-card">
-							<span className="clipisode-stat-value">{ links.length.toLocaleString() }</span>
+							<span className="clipisode-stat-value">
+								{ links.length.toLocaleString() }
+							</span>
 							<span className="clipisode-stat-label">Links</span>
 						</div>
 						<div className="clipisode-stat-card">
-							<span className="clipisode-stat-value">{ approvedCount.toLocaleString() }</span>
-							<span className="clipisode-stat-label">Approved</span>
+							<span className="clipisode-stat-value">
+								{ approvedCount.toLocaleString() }
+							</span>
+							<span className="clipisode-stat-label">
+								Approved
+							</span>
 						</div>
 					</div>
 
 					<div className="clipisode-section">
 						<div className="clipisode-section-header">
 							<h2>Invitation Links</h2>
-							<Button variant="secondary" size="compact" onClick={ createLink }>
+							<Button
+								variant="secondary"
+								size="compact"
+								onClick={ createLink }
+							>
 								New Link
 							</Button>
 						</div>
 
 						{ links.length === 0 ? (
 							<div className="clipisode-empty-section">
-								<p>No invitation links yet. Create one to start collecting replies.</p>
+								<p>
+									No invitation links yet. Create one to start
+									collecting replies.
+								</p>
 							</div>
 						) : (
 							<table className="clipisode-table">
@@ -230,37 +319,149 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 									{ links.map( ( link ) => (
 										<tr key={ link.id }>
 											<td>
-												{ editingSlug[ link.id ] !== undefined ? (
+												{ editingSlug[ link.id ] !==
+												undefined ? (
 													<span className="clipisode-slug-edit">
 														<input
 															type="text"
-															value={ editingSlug[ link.id ] }
+															value={
+																editingSlug[
+																	link.id
+																]
+															}
 															maxLength={ 20 }
-															onChange={ ( e ) => setEditingSlug( ( prev ) => ( { ...prev, [ link.id ]: e.target.value } ) ) }
-															onKeyDown={ ( e ) => {
-																if ( e.key === 'Enter' ) saveSlug( link );
-																if ( e.key === 'Escape' ) setEditingSlug( ( prev ) => { const n = { ...prev }; delete n[ link.id ]; return n; } );
+															onChange={ ( e ) =>
+																setEditingSlug(
+																	(
+																		prev
+																	) => ( {
+																		...prev,
+																		[ link.id ]:
+																			e
+																				.target
+																				.value,
+																	} )
+																)
+															}
+															onKeyDown={ (
+																e
+															) => {
+																if (
+																	e.key ===
+																	'Enter'
+																) {
+																	saveSlug(
+																		link
+																	);
+																}
+																if (
+																	e.key ===
+																	'Escape'
+																) {
+																	setEditingSlug(
+																		(
+																			prev
+																		) => {
+																			const n =
+																				{
+																					...prev,
+																				};
+																			delete n[
+																				link
+																					.id
+																			];
+																			return n;
+																		}
+																	);
+																}
 															} }
-															disabled={ savingSlug[ link.id ] }
+															disabled={
+																savingSlug[
+																	link.id
+																]
+															}
 														/>
-														<Button variant="tertiary" size="compact" onClick={ () => saveSlug( link ) } disabled={ savingSlug[ link.id ] }>
-															{ savingSlug[ link.id ] ? '…' : 'Save' }
+														<Button
+															variant="tertiary"
+															size="compact"
+															onClick={ () =>
+																saveSlug( link )
+															}
+															disabled={
+																savingSlug[
+																	link.id
+																]
+															}
+														>
+															{ savingSlug[
+																link.id
+															]
+																? '…'
+																: 'Save' }
 														</Button>
-														<Button variant="tertiary" size="compact" onClick={ () => {
-															setEditingSlug( ( prev ) => { const n = { ...prev }; delete n[ link.id ]; return n; } );
-															setSlugError( ( prev ) => { const n = { ...prev }; delete n[ link.id ]; return n; } );
-														} }>
+														<Button
+															variant="tertiary"
+															size="compact"
+															onClick={ () => {
+																setEditingSlug(
+																	(
+																		prev
+																	) => {
+																		const n =
+																			{
+																				...prev,
+																			};
+																		delete n[
+																			link
+																				.id
+																		];
+																		return n;
+																	}
+																);
+																setSlugError(
+																	(
+																		prev
+																	) => {
+																		const n =
+																			{
+																				...prev,
+																			};
+																		delete n[
+																			link
+																				.id
+																		];
+																		return n;
+																	}
+																);
+															} }
+														>
 															Cancel
 														</Button>
-														{ slugError[ link.id ] && (
-															<span className="clipisode-slug-error">{ slugError[ link.id ] }</span>
+														{ slugError[
+															link.id
+														] && (
+															<span className="clipisode-slug-error">
+																{
+																	slugError[
+																		link.id
+																	]
+																}
+															</span>
 														) }
 													</span>
 												) : (
 													<button
 														type="button"
 														className="clipisode-slug-btn"
-														onClick={ () => setEditingSlug( ( prev ) => ( { ...prev, [ link.id ]: link.slug } ) ) }
+														onClick={ () =>
+															setEditingSlug(
+																( prev ) => ( {
+																	...prev,
+																	[ link.id ]:
+																		link.slug,
+																} )
+															)
+														}
 														title="Click to edit"
 													>
 														{ link.slug }
@@ -268,29 +469,59 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 												) }
 											</td>
 											<td>
-												<span className={ `clipisode-status-badge ${ link.status }` }>
+												<span
+													className={ `clipisode-status-badge ${ link.status }` }
+												>
 													{ link.status }
 												</span>
 											</td>
-											<td>{ Number( link.clicks ).toLocaleString() }</td>
-											<td>{ Number( link.replies_count ).toLocaleString() }</td>
-											<td>{ new Date( link.created_at ).toLocaleDateString() }</td>
+											<td>
+												{ Number(
+													link.clicks
+												).toLocaleString() }
+											</td>
+											<td>
+												{ Number(
+													link.replies_count
+												).toLocaleString() }
+											</td>
+											<td>
+												{ new Date(
+													link.created_at
+												).toLocaleDateString() }
+											</td>
 											<td className="clipisode-link-actions">
-											<Button
-												variant="tertiary"
-												size="compact"
-												onClick={ () => copyLinkUrl( link ) }
-												title={ `${ window.location.origin }/${ window.clipisodeAdmin?.invitation_prefix || 'invitation' }/${ link.slug }` }
-											>
-												{ copiedId === link.id ? 'Copied!' : 'Copy URL' }
-											</Button>
 												<Button
 													variant="tertiary"
 													size="compact"
-													isDestructive={ link.status === 'open' }
-													onClick={ () => toggleLinkStatus( link ) }
+													onClick={ () =>
+														copyLinkUrl( link )
+													}
+													title={ `${
+														window.location.origin
+													}/${
+														window.clipisodeAdmin
+															?.invitation_prefix ||
+														'invitation'
+													}/${ link.slug }` }
 												>
-													{ link.status === 'open' ? 'Close' : 'Reopen' }
+													{ copiedId === link.id
+														? 'Copied!'
+														: 'Copy URL' }
+												</Button>
+												<Button
+													variant="tertiary"
+													size="compact"
+													isDestructive={
+														link.status === 'open'
+													}
+													onClick={ () =>
+														toggleLinkStatus( link )
+													}
+												>
+													{ link.status === 'open'
+														? 'Close'
+														: 'Reopen' }
 												</Button>
 											</td>
 										</tr>
@@ -315,83 +546,145 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 
 						{ replies.length === 0 ? (
 							<div className="clipisode-empty-section">
-								<p>No replies yet. Share an invitation link to start collecting video replies.</p>
+								<p>
+									No replies yet. Share an invitation link to
+									start collecting video replies.
+								</p>
 							</div>
 						) : (
 							<>
-							<table className="clipisode-table clipisode-replies-table">
-								<thead>
-									<tr>
-										<th style={ { width: 30 } }></th>
-										<th>Name</th>
-										<th>Tag</th>
-										<th>Status</th>
-										<th>Transcript</th>
-										<th>Date</th>
-									</tr>
-								</thead>
-								<tbody>
-									{ replies.slice( 0, 10 ).map( ( reply ) => (
-										<tr
-											key={ reply.id }
-											className="clickable"
-											onClick={ () => setSelectedReply( reply ) }
-										>
-											<td onClick={ ( e ) => e.stopPropagation() }>
-												{ reply.status === 'approved' && reply.media_id && (
-													<input
-														type="checkbox"
-														checked={ selectedReplyIds.has( reply.id ) }
-														onChange={ () => {
-															setSelectedReplyIds( ( prev ) => {
-																const next = new Set( prev );
-																if ( next.has( reply.id ) ) {
-																	next.delete( reply.id );
-																} else {
-																	next.add( reply.id );
-																}
-																return next;
-															} );
-														} }
-													/>
-												) }
-											</td>
-											<td className="clipisode-reply-name">{ reply.name }</td>
-											<td>{ reply.tag || '—' }</td>
-											<td>
-												<span className={ `clipisode-status-badge ${ reply.status }` }>
-													{ reply.status.replace( '_', ' ' ) }
-												</span>
-											</td>
-											<td>
-												<div className="clipisode-transcript-preview">
-													{ reply.transcript || '—' }
-												</div>
-											</td>
-											<td>{ new Date( reply.created_at ).toLocaleDateString() }</td>
+								<table className="clipisode-table clipisode-replies-table">
+									<thead>
+										<tr>
+											<th style={ { width: 30 } }></th>
+											<th>Name</th>
+											<th>Tag</th>
+											<th>Status</th>
+											<th>Transcript</th>
+											<th>Date</th>
 										</tr>
-									) ) }
-								</tbody>
-							</table>
-							{ selectedReplyIds.size > 0 && (
-								<div style={ { marginTop: 12 } }>
-									<Button
-										variant="primary"
-										onClick={ () => {
-											const mediaIds = replies
-												.filter( ( r ) => selectedReplyIds.has( r.id ) && r.media_id )
-												.map( ( r ) => r.media_id );
-											if ( topic?.intro_media_id ) {
-												mediaIds.unshift( topic.intro_media_id );
-											}
-											navigate( `create-clipisode/${ id }/${ mediaIds.join( ',' ) }` );
-										} }
-									>
-										Create Clipisode ({ selectedReplyIds.size } clip{ selectedReplyIds.size !== 1 ? 's' : '' })
-									</Button>
-								</div>
-							) }
-						</>
+									</thead>
+									<tbody>
+										{ replies
+											.slice( 0, 10 )
+											.map( ( reply ) => (
+												<tr
+													key={ reply.id }
+													className="clickable"
+													onClick={ () =>
+														setSelectedReply(
+															reply
+														)
+													}
+												>
+													<td
+														onClick={ ( e ) =>
+															e.stopPropagation()
+														}
+													>
+														{ reply.status ===
+															'approved' &&
+															reply.media_id && (
+																<input
+																	type="checkbox"
+																	checked={ selectedReplyIds.has(
+																		reply.id
+																	) }
+																	onChange={ () => {
+																		setSelectedReplyIds(
+																			(
+																				prev
+																			) => {
+																				const next =
+																					new Set(
+																						prev
+																					);
+																				if (
+																					next.has(
+																						reply.id
+																					)
+																				) {
+																					next.delete(
+																						reply.id
+																					);
+																				} else {
+																					next.add(
+																						reply.id
+																					);
+																				}
+																				return next;
+																			}
+																		);
+																	} }
+																/>
+															) }
+													</td>
+													<td className="clipisode-reply-name">
+														{ reply.name }
+													</td>
+													<td>
+														{ reply.tag || '—' }
+													</td>
+													<td>
+														<span
+															className={ `clipisode-status-badge ${ reply.status }` }
+														>
+															{ reply.status.replace(
+																'_',
+																' '
+															) }
+														</span>
+													</td>
+													<td>
+														<div className="clipisode-transcript-preview">
+															{ reply.transcript ||
+																'—' }
+														</div>
+													</td>
+													<td>
+														{ new Date(
+															reply.created_at
+														).toLocaleDateString() }
+													</td>
+												</tr>
+											) ) }
+									</tbody>
+								</table>
+								{ selectedReplyIds.size > 0 && (
+									<div style={ { marginTop: 12 } }>
+										<Button
+											variant="primary"
+											onClick={ () => {
+												const mediaIds = replies
+													.filter(
+														( r ) =>
+															selectedReplyIds.has(
+																r.id
+															) && r.media_id
+													)
+													.map( ( r ) => r.media_id );
+												if ( topic?.intro_media_id ) {
+													mediaIds.unshift(
+														topic.intro_media_id
+													);
+												}
+												navigate(
+													`create-clipisode/${ id }/${ mediaIds.join(
+														','
+													) }`
+												);
+											} }
+										>
+											Create Clipisode (
+											{ selectedReplyIds.size } clip
+											{ selectedReplyIds.size !== 1
+												? 's'
+												: '' }
+											)
+										</Button>
+									</div>
+								) }
+							</>
 						) }
 					</div>
 
@@ -402,15 +695,15 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 
 						{ topic.outputs && topic.outputs.length > 0 ? (
 							<table className="clipisode-table">
-							<thead>
-								<tr>
-									<th>Name</th>
-									<th>Clips</th>
-									<th>Size</th>
-									<th>Created</th>
-									<th></th>
-								</tr>
-							</thead>
+								<thead>
+									<tr>
+										<th>Name</th>
+										<th>Clips</th>
+										<th>Size</th>
+										<th>Created</th>
+										<th></th>
+									</tr>
+								</thead>
 								<tbody>
 									{ topic.outputs.map( ( o ) => (
 										<tr key={ o.id }>
@@ -418,16 +711,37 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 												{ o.url ? (
 													<button
 														type="button"
-														style={ { background: 'none', border: 'none', padding: 0, color: '#2271b1', cursor: 'pointer', font: 'inherit', textAlign: 'left' } }
-														onClick={ () => setPreviewOutput( { name: o.name, url: o.url! } ) }
+														style={ {
+															background: 'none',
+															border: 'none',
+															padding: 0,
+															color: '#2271b1',
+															cursor: 'pointer',
+															font: 'inherit',
+															textAlign: 'left',
+														} }
+														onClick={ () =>
+															setPreviewOutput( {
+																name: o.name,
+																url: o.url!,
+															} )
+														}
 													>
 														{ o.name }
 													</button>
-												) : o.name }
+												) : (
+													o.name
+												) }
 											</td>
 											<td>{ o.clips_count || '—' }</td>
-										<td>{ formatBytes( o.file_size ) }</td>
-										<td>{ new Date( o.created_at ).toLocaleDateString() }</td>
+											<td>
+												{ formatBytes( o.file_size ) }
+											</td>
+											<td>
+												{ new Date(
+													o.created_at
+												).toLocaleDateString() }
+											</td>
 											<td className="clipisode-link-actions">
 												{ o.preview_url && (
 													<a
@@ -452,7 +766,12 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 													variant="tertiary"
 													size="compact"
 													isDestructive
-													onClick={ () => deleteOutput( o.id, o.name ) }
+													onClick={ () =>
+														deleteOutput(
+															o.id,
+															o.name
+														)
+													}
 												>
 													Delete
 												</Button>
@@ -473,7 +792,11 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 					{ topic.intro_video_url && (
 						<div className="clipisode-sidebar-card">
 							<h3>Intro Video</h3>
-							<video src={ topic.intro_video_url } controls playsInline />
+							<video
+								src={ topic.intro_video_url }
+								controls
+								playsInline
+							/>
 						</div>
 					) }
 
@@ -481,7 +804,11 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 						<h3>Details</h3>
 						<dl className="clipisode-detail-meta">
 							<dt>Created</dt>
-							<dd>{ new Date( topic.created_at ).toLocaleDateString() }</dd>
+							<dd>
+								{ new Date(
+									topic.created_at
+								).toLocaleDateString() }
+							</dd>
 
 							<dt>Hosted By</dt>
 							<dd>{ topic.hosted_by || '—' }</dd>
@@ -490,19 +817,29 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 							<dd>
 								{ topic.invitation_title ? (
 									topic.invitation_edit_url ? (
-										<a href={ topic.invitation_edit_url } target="_blank" rel="noreferrer">
+										<a
+											href={ topic.invitation_edit_url }
+											target="_blank"
+											rel="noreferrer"
+										>
 											{ topic.invitation_title }
 										</a>
 									) : (
 										topic.invitation_title
 									)
-								) : '—' }
+								) : (
+									'—'
+								) }
 							</dd>
 
 							<dt>Terms</dt>
 							<dd>
 								{ topic.brand_terms_url ? (
-									<a href={ topic.brand_terms_url } target="_blank" rel="noreferrer">
+									<a
+										href={ topic.brand_terms_url }
+										target="_blank"
+										rel="noreferrer"
+									>
 										{ topic.brand_terms_title }
 									</a>
 								) : (
@@ -512,7 +849,11 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 									<>
 										{ ', ' }
 										{ topic.custom_terms_url ? (
-											<a href={ topic.custom_terms_url } target="_blank" rel="noreferrer">
+											<a
+												href={ topic.custom_terms_url }
+												target="_blank"
+												rel="noreferrer"
+											>
 												{ topic.custom_terms_title }
 											</a>
 										) : (
@@ -545,7 +886,12 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 						controls
 						autoPlay
 						playsInline
-						style={ { display: 'block', maxWidth: '100%', maxHeight: 'calc(90vh - 120px)', borderRadius: 4 } }
+						style={ {
+							display: 'block',
+							maxWidth: '100%',
+							maxHeight: 'calc(90vh - 120px)',
+							borderRadius: 4,
+						} }
 					/>
 				</Modal>
 			) }

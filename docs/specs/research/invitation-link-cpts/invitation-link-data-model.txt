@@ -1,0 +1,82 @@
+Here is how **Invitation Links** are modeled in this project.
+
+## Database: `clipisode_invitation_links`
+
+They live in a dedicated MySQL table (with the WordPress DB prefix, e.g. `wp_clipisode_invitation_links`):
+
+```75:86:plugin/clipisode/includes/class-database.php
+			"CREATE TABLE {$wpdb->prefix}clipisode_invitation_links (
+id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+topic_id BIGINT UNSIGNED NOT NULL,
+slug VARCHAR(20) NOT NULL,
+type VARCHAR(20) NOT NULL,
+status VARCHAR(20) NOT NULL DEFAULT 'open',
+clicks BIGINT UNSIGNED NOT NULL DEFAULT 0,
+created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+PRIMARY KEY  (id),
+UNIQUE KEY slug (slug),
+KEY topic_id (topic_id)
+) $charset;"
+```
+
+So each link is a **row** with:
+
+| Field | Role |
+|--------|------|
+| `id` | Surrogate primary key |
+| `topic_id` | Which topic this link belongs to (many links per topic) |
+| `slug` | The **code** used in the public URL (1–20 chars; see below) |
+| `type` | e.g. `public` on create |
+| `status` | e.g. `open` / toggled in admin |
+| `clicks` | Counter |
+| `created_at` | Timestamp |
+
+**“Code” storage:** the shareable code is the **`slug` column** — there is no separate “code” field. **`slug` is unique across the whole site** (`UNIQUE KEY slug (slug)`), not per topic. Two different topics cannot share the same slug.
+
+**Generation:** new links get a 6‑character hex slug from `random_bytes(3)`; admins can change it via REST to any **1–20 alphanumeric** string if it is still globally unique.
+
+```896:911:plugin/clipisode/includes/class-rest-api.php
+	public function create_invitation_link( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
+		$table = $wpdb->prefix . 'clipisode_invitation_links';
+
+		$attempts = 5;
+		$result   = false;
+
+		while ( $attempts-- > 0 ) {
+			$slug   = substr( bin2hex( random_bytes( 3 ) ), 0, 6 );
+			$result = $wpdb->insert( $table, [
+				'topic_id' => (int) $request['topic_id'],
+				'slug'     => $slug,
+				'type'     => 'public',
+				'status'   => 'open',
+			] );
+```
+
+**Public URL:** `{site}/{invitation_prefix}/{slug}`. The prefix is a **site option** (`clipisode_invitation_prefix`, default `invitation`), not stored on the link row.
+
+## TypeScript (admin UI)
+
+The REST payload matches this shape:
+
+```55:64:plugin/clipisode/src/types.ts
+export interface InvitationLink {
+	id: number;
+	topic_id: number;
+	slug: string;
+	type: string;
+	status: string;
+	clicks: number;
+	replies_count: number;
+	created_at: string;
+}
+```
+
+`replies_count` is joined in queries, not a stored column on the link.
+
+## Relation to `Topic.invitation_id` (naming)
+
+On **`clipisode_topics`**, `invitation_id` is **not** an invitation link id. It points at the **invitation theme** (Gutenberg “invite” layout). Shareable links are **only** the rows in `clipisode_invitation_links` keyed by `topic_id`.
+
+**Replies** reference the link with `invitation_link_id` on `clipisode_replies`, so you can tell which of several links produced a given reply.
+

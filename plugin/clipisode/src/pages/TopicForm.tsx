@@ -1,5 +1,11 @@
 import { useState, useEffect, useRef } from '@wordpress/element';
-import { Button, TextControl, SelectControl, Spinner, Notice } from '@wordpress/components';
+import {
+	Button,
+	TextControl,
+	SelectControl,
+	Spinner,
+	Notice,
+} from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import VideoUploader from '../components/VideoUploader';
 import SocialImagePicker from '../components/SocialImagePicker';
@@ -19,7 +25,10 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 		invitation_id: '',
 	} );
 	const [ video, setVideo ] = useState< VideoValue | null >( null );
-	const [ socialImage, setSocialImage ] = useState< { id: number; url: string } | null >( null );
+	const [ socialImage, setSocialImage ] = useState< {
+		id: number;
+		url: string;
+	} | null >( null );
 	const [ customTerms, setCustomTerms ] = useState< CustomTermsItem[] >( [] );
 	const [ themes, setThemes ] = useState< Theme[] >( [] );
 	const [ hostNames, setHostNames ] = useState< string[] >( [] );
@@ -32,46 +41,77 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 
 	useEffect( () => {
 		const promises: Promise< any >[] = [
-			apiFetch< CustomTermsItem[] >( { path: '/clipisode/v1/terms/custom' } ),
+			apiFetch< CustomTermsItem[] >( {
+				path: '/clipisode/v1/terms/custom',
+			} ),
 			apiFetch< Host[] >( { path: '/clipisode/v1/hosts' } ),
 			apiFetch< Theme[] >( { path: '/clipisode/v1/themes' } ),
 		];
 
 		if ( isEdit ) {
-			promises.push( apiFetch( { path: `/clipisode/v1/topics/${ id }` } ) );
+			promises.push(
+				apiFetch( { path: `/clipisode/v1/topics/${ id }` } )
+			);
 		}
 
 		Promise.all( promises )
-			.then( ( [ terms, hosts, themeList, topic ]: [ CustomTermsItem[], Host[], Theme[], Topic? ] ) => {
-				setCustomTerms( terms );
-				setHostNames( hosts.map( ( h ) => h.name ) );
-				setThemes( themeList );
+			.then(
+				( [ terms, hosts, themeList, topic ]: [
+					CustomTermsItem[],
+					Host[],
+					Theme[],
+					Topic?,
+				] ) => {
+					setCustomTerms( terms );
+					setHostNames( hosts.map( ( h ) => h.name ) );
+					setThemes( themeList );
 
-				if ( topic ) {
-					setForm( {
-						title: topic.title || '',
-						hosted_by: topic.hosted_by || '',
-						custom_terms_id: topic.custom_terms_id ? String( topic.custom_terms_id ) : '',
-						invitation_id: topic.invitation_id ? String( topic.invitation_id ) : '',
-					} );
-					if ( topic.intro_media_id && topic.intro_video_url ) {
-						setVideo( { id: topic.intro_media_id, url: topic.intro_video_url, reused: true } );
+					if ( topic ) {
+						setForm( {
+							title: topic.title || '',
+							hosted_by: topic.hosted_by || '',
+							custom_terms_id: topic.custom_terms_id
+								? String( topic.custom_terms_id )
+								: '',
+							invitation_id: topic.invitation_id
+								? String( topic.invitation_id )
+								: '',
+						} );
+						if ( topic.intro_media_id && topic.intro_video_url ) {
+							setVideo( {
+								id: topic.intro_media_id,
+								url: topic.intro_video_url,
+								reused: true,
+							} );
+						}
+						if (
+							topic.social_image_media_id &&
+							topic.social_image_url
+						) {
+							setSocialImage( {
+								id: topic.social_image_media_id,
+								url: topic.social_image_url,
+							} );
+						}
+					} else {
+						const defaultHost = hosts.find( ( h ) => h.is_default );
+						const defaultTheme =
+							themeList.length > 0
+								? themeList.find( ( t ) => t.is_default ) ||
+								  themeList[ 0 ]
+								: null;
+						setForm( ( prev ) => ( {
+							...prev,
+							...( defaultHost
+								? { hosted_by: defaultHost.name }
+								: {} ),
+							...( defaultTheme
+								? { invitation_id: String( defaultTheme.id ) }
+								: {} ),
+						} ) );
 					}
-					if ( topic.social_image_media_id && topic.social_image_url ) {
-						setSocialImage( { id: topic.social_image_media_id, url: topic.social_image_url } );
-					}
-			} else {
-				const defaultHost = hosts.find( ( h ) => h.is_default );
-				const defaultTheme = themeList.length > 0
-					? themeList.find( ( t ) => t.is_default ) || themeList[ 0 ]
-					: null;
-				setForm( ( prev ) => ( {
-					...prev,
-					...( defaultHost ? { hosted_by: defaultHost.name } : {} ),
-					...( defaultTheme ? { invitation_id: String( defaultTheme.id ) } : {} ),
-				} ) );
-			}
-			} )
+				}
+			)
 			.finally( () => setLoading( false ) );
 	}, [ id, isEdit ] );
 
@@ -97,8 +137,16 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 		};
 
 		const request = isEdit
-			? apiFetch( { path: `/clipisode/v1/topics/${ id }`, method: 'PUT', data } )
-			: apiFetch( { path: '/clipisode/v1/topics', method: 'POST', data } );
+			? apiFetch( {
+					path: `/clipisode/v1/topics/${ id }`,
+					method: 'PUT',
+					data,
+			  } )
+			: apiFetch( {
+					path: '/clipisode/v1/topics',
+					method: 'POST',
+					data,
+			  } );
 
 		request
 			.then( ( topic: Topic ) => navigate( String( topic.id ) ) )
@@ -114,7 +162,9 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 		);
 	}
 
-	const selectedTheme = themes.find( ( t ) => String( t.id ) === form.invitation_id );
+	const selectedTheme = themes.find(
+		( t ) => String( t.id ) === form.invitation_id
+	);
 
 	return (
 		<>
@@ -136,48 +186,69 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 			) }
 
 			<div style={ { maxWidth: 600 } }>
-			<TextControl
-				label="Title"
-				value={ form.title }
-				onChange={ updateField( 'title' ) }
-				__nextHasNoMarginBottom
-				__next40pxDefaultSize
-			/>
-				<div style={ { marginTop: 16, position: 'relative' } } ref={ hostRef }>
 				<TextControl
-					label="Hosted By"
-					value={ form.hosted_by }
-					onChange={ updateField( 'hosted_by' ) }
-					onFocus={ () => setHostFocused( true ) }
-					onBlur={ () => setTimeout( () => setHostFocused( false ), 150 ) }
-					autoComplete="off"
+					label="Title"
+					value={ form.title }
+					onChange={ updateField( 'title' ) }
 					__nextHasNoMarginBottom
 					__next40pxDefaultSize
+				/>
+				<div
+					style={ { marginTop: 16, position: 'relative' } }
+					ref={ hostRef }
+				>
+					<TextControl
+						label="Hosted By"
+						value={ form.hosted_by }
+						onChange={ updateField( 'hosted_by' ) }
+						onFocus={ () => setHostFocused( true ) }
+						onBlur={ () =>
+							setTimeout( () => setHostFocused( false ), 150 )
+						}
+						autoComplete="off"
+						__nextHasNoMarginBottom
+						__next40pxDefaultSize
 					/>
-					{ hostFocused && form.hosted_by.length > 0 && ( () => {
-						const filtered = hostNames.filter(
-							( n ) => n.toLowerCase().includes( form.hosted_by.toLowerCase() ) && n !== form.hosted_by
-						);
-						if ( ! filtered.length ) return null;
-						return (
-							<ul className="clipisode-host-suggestions">
-								{ filtered.map( ( name ) => (
-									<li
-										key={ name }
-										onMouseDown={ () => {
-											setForm( ( prev ) => ( { ...prev, hosted_by: name } ) );
-											setHostFocused( false );
-										} }
-									>
-										{ name }
-									</li>
-								) ) }
-							</ul>
-						);
-					} )() }
+					{ hostFocused &&
+						form.hosted_by.length > 0 &&
+						( () => {
+							const filtered = hostNames.filter(
+								( n ) =>
+									n
+										.toLowerCase()
+										.includes(
+											form.hosted_by.toLowerCase()
+										) && n !== form.hosted_by
+							);
+							if ( ! filtered.length ) {
+								return null;
+							}
+							return (
+								<ul className="clipisode-host-suggestions">
+									{ filtered.map( ( name ) => (
+										<li
+											key={ name }
+											onMouseDown={ () => {
+												setForm( ( prev ) => ( {
+													...prev,
+													hosted_by: name,
+												} ) );
+												setHostFocused( false );
+											} }
+										>
+											{ name }
+										</li>
+									) ) }
+								</ul>
+							);
+						} )() }
 				</div>
 				<div style={ { marginTop: 16 } }>
-					<VideoUploader value={ video } onChange={ setVideo } videoRef={ introVideoRef } />
+					<VideoUploader
+						value={ video }
+						onChange={ setVideo }
+						videoRef={ introVideoRef }
+					/>
 				</div>
 				<div style={ { marginTop: 16 } }>
 					<SocialImagePicker
@@ -189,26 +260,39 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 				</div>
 				<div style={ { marginTop: 16 } }>
 					{ themes.length > 1 ? (
-					<SelectControl
-						label="Theme"
-						value={ form.invitation_id }
-						options={ themes.map( ( t ) => ( {
-							label: t.title + ( t.is_default ? ' (default)' : '' ),
-							value: String( t.id ),
-						} ) ) }
-						onChange={ updateField( 'invitation_id' ) }
-						help="Choose which theme guests will see on the invitation page."
-						__nextHasNoMarginBottom
-						__next40pxDefaultSize
-					/>
+						<SelectControl
+							label="Theme"
+							value={ form.invitation_id }
+							options={ themes.map( ( t ) => ( {
+								label:
+									t.title +
+									( t.is_default ? ' (default)' : '' ),
+								value: String( t.id ),
+							} ) ) }
+							onChange={ updateField( 'invitation_id' ) }
+							help="Choose which theme guests will see on the invitation page."
+							__nextHasNoMarginBottom
+							__next40pxDefaultSize
+						/>
 					) : (
 						<div>
-							<p style={ { fontSize: 13, color: '#646970', margin: 0 } }>
-								<strong>Theme:</strong> { selectedTheme?.title || 'Default' }
+							<p
+								style={ {
+									fontSize: 13,
+									color: '#646970',
+									margin: 0,
+								} }
+							>
+								<strong>Theme:</strong>{ ' ' }
+								{ selectedTheme?.title || 'Default' }
 								{ selectedTheme?.edit_url && (
 									<>
 										{ ' — ' }
-										<a href={ selectedTheme.edit_url } target="_blank" rel="noreferrer">
+										<a
+											href={ selectedTheme.edit_url }
+											target="_blank"
+											rel="noreferrer"
+										>
 											Edit in block editor
 										</a>
 									</>
@@ -219,23 +303,32 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 				</div>
 				<div style={ { marginTop: 16 } }>
 					{ customTerms.length > 0 ? (
-					<SelectControl
-						label="Additional Custom Terms"
-						value={ form.custom_terms_id }
-						options={ [
-							{ label: '— None —', value: '' },
-							...customTerms.map( ( t ) => ( { label: t.title, value: String( t.id ) } ) ),
-						] }
-						onChange={ updateField( 'custom_terms_id' ) }
-						help="Brand terms are automatically included. Optionally select additional custom terms."
-						__nextHasNoMarginBottom
-						__next40pxDefaultSize
+						<SelectControl
+							label="Additional Custom Terms"
+							value={ form.custom_terms_id }
+							options={ [
+								{ label: '— None —', value: '' },
+								...customTerms.map( ( t ) => ( {
+									label: t.title,
+									value: String( t.id ),
+								} ) ),
+							] }
+							onChange={ updateField( 'custom_terms_id' ) }
+							help="Brand terms are automatically included. Optionally select additional custom terms."
+							__nextHasNoMarginBottom
+							__next40pxDefaultSize
 						/>
 					) : (
 						<div>
-							<p style={ { fontSize: 13, color: '#646970', margin: 0 } }>
-								Brand terms are automatically included. No custom terms have been created yet.
-								{ ' ' }
+							<p
+								style={ {
+									fontSize: 13,
+									color: '#646970',
+									margin: 0,
+								} }
+							>
+								Brand terms are automatically included. No
+								custom terms have been created yet.{ ' ' }
 								<a href="/wp-admin/post-new.php?post_type=clipisode_terms">
 									Create custom terms
 								</a>

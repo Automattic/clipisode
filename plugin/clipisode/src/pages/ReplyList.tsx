@@ -28,7 +28,9 @@ export default function ReplyList( { topicId }: ReplyListProps ) {
 	const [ statusFilter, setStatusFilter ] = useState< string >( '' );
 	const [ topicFilter, setTopicFilter ] = useState< string >( topicId || '' );
 	const [ sortOrder, setSortOrder ] = useState< string >( 'desc' );
-	const [ selectedReply, setSelectedReply ] = useState< Reply | null >( null );
+	const [ selectedReply, setSelectedReply ] = useState< Reply | null >(
+		null
+	);
 	const [ selected, setSelected ] = useState< number[] >( [] );
 
 	const fetchReplies = useCallback( () => {
@@ -52,7 +54,9 @@ export default function ReplyList( { topicId }: ReplyListProps ) {
 
 	useEffect( () => {
 		if ( ! topicId ) {
-			apiFetch< Topic[] >( { path: '/clipisode/v1/topics' } ).then( setTopics );
+			apiFetch< Topic[] >( { path: '/clipisode/v1/topics' } ).then(
+				setTopics
+			);
 		}
 	}, [ topicId ] );
 
@@ -78,7 +82,9 @@ export default function ReplyList( { topicId }: ReplyListProps ) {
 		).then( ( updatedReplies: Reply[] ) => {
 			setReplies( ( prev ) =>
 				prev.map( ( r ) => {
-					const updated = updatedReplies.find( ( u: Reply ) => u.id === r.id );
+					const updated = updatedReplies.find(
+						( u: Reply ) => u.id === r.id
+					);
 					return updated || r;
 				} )
 			);
@@ -119,7 +125,13 @@ export default function ReplyList( { topicId }: ReplyListProps ) {
 				<h1>
 					Replies
 					{ topicId && (
-						<span style={ { fontWeight: 300, fontSize: 16, marginLeft: 8 } }>
+						<span
+							style={ {
+								fontWeight: 300,
+								fontSize: 16,
+								marginLeft: 8,
+							} }
+						>
 							(filtered by topic)
 						</span>
 					) }
@@ -127,42 +139,54 @@ export default function ReplyList( { topicId }: ReplyListProps ) {
 			</div>
 
 			<div className="clipisode-filters">
-			<SelectControl
-				value={ statusFilter }
-				options={ STATUS_OPTIONS }
-				onChange={ setStatusFilter }
-				__nextHasNoMarginBottom
-				__next40pxDefaultSize
-			/>
-				{ ! topicId && (
 				<SelectControl
-					value={ topicFilter }
-					options={ topicOptions }
-					onChange={ setTopicFilter }
+					value={ statusFilter }
+					options={ STATUS_OPTIONS }
+					onChange={ setStatusFilter }
 					__nextHasNoMarginBottom
 					__next40pxDefaultSize
 				/>
+				{ ! topicId && (
+					<SelectControl
+						value={ topicFilter }
+						options={ topicOptions }
+						onChange={ setTopicFilter }
+						__nextHasNoMarginBottom
+						__next40pxDefaultSize
+					/>
 				) }
-			<SelectControl
-				value={ sortOrder }
-				options={ SORT_OPTIONS }
-				onChange={ setSortOrder }
-				__nextHasNoMarginBottom
-				__next40pxDefaultSize
-			/>
+				<SelectControl
+					value={ sortOrder }
+					options={ SORT_OPTIONS }
+					onChange={ setSortOrder }
+					__nextHasNoMarginBottom
+					__next40pxDefaultSize
+				/>
 
 				{ selected.length > 0 && (
 					<>
 						<span style={ { fontSize: 13, color: '#646970' } }>
 							{ selected.length } selected:
 						</span>
-						<Button size="compact" variant="secondary" onClick={ () => bulkAction( 'approved' ) }>
+						<Button
+							size="compact"
+							variant="secondary"
+							onClick={ () => bulkAction( 'approved' ) }
+						>
 							Approve
 						</Button>
-						<Button size="compact" variant="secondary" onClick={ () => bulkAction( 'rejected' ) }>
+						<Button
+							size="compact"
+							variant="secondary"
+							onClick={ () => bulkAction( 'rejected' ) }
+						>
 							Reject
 						</Button>
-						<Button size="compact" variant="secondary" onClick={ () => bulkAction( 'on_hold' ) }>
+						<Button
+							size="compact"
+							variant="secondary"
+							onClick={ () => bulkAction( 'on_hold' ) }
+						>
 							On Hold
 						</Button>
 					</>
@@ -180,7 +204,9 @@ export default function ReplyList( { topicId }: ReplyListProps ) {
 							<th style={ { width: 32 } }>
 								<input
 									type="checkbox"
-									checked={ selected.length === replies.length }
+									checked={
+										selected.length === replies.length
+									}
 									onChange={ toggleAll }
 								/>
 							</th>
@@ -198,8 +224,12 @@ export default function ReplyList( { topicId }: ReplyListProps ) {
 								<td>
 									<input
 										type="checkbox"
-										checked={ selected.includes( reply.id ) }
-										onChange={ () => toggleSelect( reply.id ) }
+										checked={ selected.includes(
+											reply.id
+										) }
+										onChange={ () =>
+											toggleSelect( reply.id )
+										}
 									/>
 								</td>
 								<td
@@ -208,10 +238,14 @@ export default function ReplyList( { topicId }: ReplyListProps ) {
 								>
 									{ reply.name }
 								</td>
-								{ ! topicId && <td>{ reply.topic_title || '—' }</td> }
+								{ ! topicId && (
+									<td>{ reply.topic_title || '—' }</td>
+								) }
 								<td>{ reply.tag || '—' }</td>
 								<td>
-									<span className={ `clipisode-status-badge ${ reply.status }` }>
+									<span
+										className={ `clipisode-status-badge ${ reply.status }` }
+									>
 										{ reply.status.replace( '_', ' ' ) }
 									</span>
 								</td>
@@ -220,7 +254,11 @@ export default function ReplyList( { topicId }: ReplyListProps ) {
 										{ reply.transcript || '—' }
 									</div>
 								</td>
-								<td>{ new Date( reply.created_at ).toLocaleDateString() }</td>
+								<td>
+									{ new Date(
+										reply.created_at
+									).toLocaleDateString() }
+								</td>
 							</tr>
 						) ) }
 					</tbody>

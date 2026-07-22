@@ -43,7 +43,9 @@ export default function TrimModal( {
 
 	const syncPlayhead = useCallback( () => {
 		const video = videoRef.current;
-		if ( ! video ) return;
+		if ( ! video ) {
+			return;
+		}
 
 		setCurrentTime( video.currentTime );
 
@@ -63,14 +65,19 @@ export default function TrimModal( {
 
 	const togglePlay = useCallback( () => {
 		const video = videoRef.current;
-		if ( ! video ) return;
+		if ( ! video ) {
+			return;
+		}
 
 		if ( playingRef.current ) {
 			video.pause();
 			setPlaying( false );
 			cancelAnimationFrame( rafRef.current );
 		} else {
-			if ( video.currentTime < trimStartRef.current || video.currentTime >= trimEndRef.current ) {
+			if (
+				video.currentTime < trimStartRef.current ||
+				video.currentTime >= trimEndRef.current
+			) {
 				video.currentTime = trimStartRef.current;
 			}
 			video.play();
@@ -103,18 +110,24 @@ export default function TrimModal( {
 
 	const setInPoint = useCallback( () => {
 		const time = videoRef.current?.currentTime ?? 0;
-		setTrimStart( Math.max( 0, Math.min( time, trimEndRef.current - 0.1 ) ) );
+		setTrimStart(
+			Math.max( 0, Math.min( time, trimEndRef.current - 0.1 ) )
+		);
 	}, [] );
 
 	const setOutPoint = useCallback( () => {
 		const time = videoRef.current?.currentTime ?? duration;
-		setTrimEnd( Math.min( duration, Math.max( time, trimStartRef.current + 0.1 ) ) );
+		setTrimEnd(
+			Math.min( duration, Math.max( time, trimStartRef.current + 0.1 ) )
+		);
 	}, [ duration ] );
 
 	useEffect( () => {
 		const onKeyDown = ( e: KeyboardEvent ) => {
 			const tag = ( e.target as HTMLElement )?.tagName;
-			if ( tag === 'INPUT' || tag === 'TEXTAREA' ) return;
+			if ( tag === 'INPUT' || tag === 'TEXTAREA' ) {
+				return;
+			}
 
 			if ( e.key === ' ' ) {
 				e.preventDefault();
@@ -136,7 +149,11 @@ export default function TrimModal( {
 	const removedDuration = duration - selectedDuration;
 
 	return (
-		<Modal title={ `Trim: ${ name }` } onRequestClose={ onClose } isFullScreen>
+		<Modal
+			title={ `Trim: ${ name }` }
+			onRequestClose={ onClose }
+			isFullScreen
+		>
 			<div className="clipisode-trim-modal">
 				<div className="clipisode-trim-video-wrap">
 					<video
@@ -144,11 +161,19 @@ export default function TrimModal( {
 						src={ url }
 						playsInline
 						onClick={ togglePlay }
-						style={ { width: '100%', maxHeight: '60vh', background: '#000', cursor: 'pointer' } }
+						style={ {
+							width: '100%',
+							maxHeight: '60vh',
+							background: '#000',
+							cursor: 'pointer',
+						} }
 					/>
 				</div>
 
-				<div className="clipisode-trim-timeline-wrap" style={ { margin: '16px 0' } }>
+				<div
+					className="clipisode-trim-timeline-wrap"
+					style={ { margin: '16px 0' } }
+				>
 					<TrimTimeline
 						duration={ duration }
 						trimStart={ trimStart }
@@ -159,7 +184,15 @@ export default function TrimModal( {
 					/>
 				</div>
 
-				<div className="clipisode-trim-controls" style={ { display: 'flex', justifyContent: 'center', gap: 12, margin: '8px 0' } }>
+				<div
+					className="clipisode-trim-controls"
+					style={ {
+						display: 'flex',
+						justifyContent: 'center',
+						gap: 12,
+						margin: '8px 0',
+					} }
+				>
 					<Button variant="secondary" onClick={ togglePlay }>
 						{ playing ? '⏸ Pause' : '▶ Play' }
 					</Button>
@@ -171,27 +204,57 @@ export default function TrimModal( {
 					</Button>
 				</div>
 
-				<div className="clipisode-trim-info" style={ { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, color: '#646970', marginBottom: 12 } }>
+				<div
+					className="clipisode-trim-info"
+					style={ {
+						display: 'flex',
+						justifyContent: 'space-between',
+						alignItems: 'center',
+						fontSize: 13,
+						color: '#646970',
+						marginBottom: 12,
+					} }
+				>
 					<span>In: { formatTime( trimStart ) }</span>
-					<span>Trimmed: { formatTime( removedDuration ) } / { formatTime( duration ) }</span>
+					<span>
+						Trimmed: { formatTime( removedDuration ) } /{ ' ' }
+						{ formatTime( duration ) }
+					</span>
 					<span>Out: { formatTime( trimEnd ) }</span>
 				</div>
 
-				<div className="clipisode-trim-actions" style={ { display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 16 } }>
-					<Button variant="secondary" onClick={ () => {
-						const video = videoRef.current;
-						if ( ! video ) return;
-						video.currentTime = trimStartRef.current;
-						video.play();
-						setPlaying( true );
-						rafRef.current = requestAnimationFrame( syncPlayhead );
-					} }>
+				<div
+					className="clipisode-trim-actions"
+					style={ {
+						display: 'flex',
+						justifyContent: 'center',
+						gap: 8,
+						marginBottom: 16,
+					} }
+				>
+					<Button
+						variant="secondary"
+						onClick={ () => {
+							const video = videoRef.current;
+							if ( ! video ) {
+								return;
+							}
+							video.currentTime = trimStartRef.current;
+							video.play();
+							setPlaying( true );
+							rafRef.current =
+								requestAnimationFrame( syncPlayhead );
+						} }
+					>
 						Preview Trim
 					</Button>
 					<Button variant="tertiary" onClick={ handleReset }>
 						Reset
 					</Button>
-					<Button variant="primary" onClick={ () => onDone( trimStart, trimEnd ) }>
+					<Button
+						variant="primary"
+						onClick={ () => onDone( trimStart, trimEnd ) }
+					>
 						Done
 					</Button>
 				</div>

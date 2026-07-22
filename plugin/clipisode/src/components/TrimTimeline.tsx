@@ -28,24 +28,35 @@ export default function TrimTimeline( {
 	const dragging = useRef< 'in' | 'out' | 'seek' | null >( null );
 
 	const timeToX = useCallback(
-		( time: number, width: number ) => HANDLE_WIDTH + ( ( time / duration ) * ( width - HANDLE_WIDTH * 2 ) ),
+		( time: number, width: number ) =>
+			HANDLE_WIDTH + ( time / duration ) * ( width - HANDLE_WIDTH * 2 ),
 		[ duration ]
 	);
 
 	const xToTime = useCallback(
 		( x: number, width: number ) => {
-			const clamped = Math.max( HANDLE_WIDTH, Math.min( x, width - HANDLE_WIDTH ) );
-			return ( ( clamped - HANDLE_WIDTH ) / ( width - HANDLE_WIDTH * 2 ) ) * duration;
+			const clamped = Math.max(
+				HANDLE_WIDTH,
+				Math.min( x, width - HANDLE_WIDTH )
+			);
+			return (
+				( ( clamped - HANDLE_WIDTH ) / ( width - HANDLE_WIDTH * 2 ) ) *
+				duration
+			);
 		},
 		[ duration ]
 	);
 
 	const draw = useCallback( () => {
 		const canvas = canvasRef.current;
-		if ( ! canvas || duration <= 0 ) return;
+		if ( ! canvas || duration <= 0 ) {
+			return;
+		}
 
 		const ctx = canvas.getContext( '2d' );
-		if ( ! ctx ) return;
+		if ( ! ctx ) {
+			return;
+		}
 
 		const dpr = window.devicePixelRatio || 1;
 		const rect = canvas.getBoundingClientRect();
@@ -101,7 +112,9 @@ export default function TrimTimeline( {
 
 	useEffect( () => {
 		const canvas = canvasRef.current;
-		if ( ! canvas ) return;
+		if ( ! canvas ) {
+			return;
+		}
 
 		const observer = new ResizeObserver( () => draw() );
 		observer.observe( canvas );
@@ -110,22 +123,30 @@ export default function TrimTimeline( {
 
 	const getPointerTime = ( e: React.PointerEvent ) => {
 		const canvas = canvasRef.current;
-		if ( ! canvas ) return 0;
+		if ( ! canvas ) {
+			return 0;
+		}
 		const rect = canvas.getBoundingClientRect();
 		return xToTime( e.clientX - rect.left, rect.width );
 	};
 
 	const hitTest = ( e: React.PointerEvent ): 'in' | 'out' | 'seek' => {
 		const canvas = canvasRef.current;
-		if ( ! canvas ) return 'seek';
+		if ( ! canvas ) {
+			return 'seek';
+		}
 		const rect = canvas.getBoundingClientRect();
 		const x = e.clientX - rect.left;
 		const w = rect.width;
 		const inX = timeToX( trimStart, w );
 		const outX = timeToX( trimEnd, w );
 
-		if ( Math.abs( x - inX ) < HANDLE_WIDTH + 4 ) return 'in';
-		if ( Math.abs( x - outX ) < HANDLE_WIDTH + 4 ) return 'out';
+		if ( Math.abs( x - inX ) < HANDLE_WIDTH + 4 ) {
+			return 'in';
+		}
+		if ( Math.abs( x - outX ) < HANDLE_WIDTH + 4 ) {
+			return 'out';
+		}
 		return 'seek';
 	};
 
@@ -140,7 +161,9 @@ export default function TrimTimeline( {
 	};
 
 	const onPointerMove = ( e: React.PointerEvent ) => {
-		if ( ! dragging.current ) return;
+		if ( ! dragging.current ) {
+			return;
+		}
 		const time = getPointerTime( e );
 
 		if ( dragging.current === 'in' ) {
@@ -159,7 +182,13 @@ export default function TrimTimeline( {
 	return (
 		<canvas
 			ref={ canvasRef }
-			style={ { width: '100%', height: BAR_HEIGHT, cursor: 'pointer', borderRadius: 4, display: 'block' } }
+			style={ {
+				width: '100%',
+				height: BAR_HEIGHT,
+				cursor: 'pointer',
+				borderRadius: 4,
+				display: 'block',
+			} }
 			onPointerDown={ onPointerDown }
 			onPointerMove={ onPointerMove }
 			onPointerUp={ onPointerUp }

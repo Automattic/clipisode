@@ -16,6 +16,7 @@ export interface Topic {
 	invitation_id: number | null;
 	invitation_title: string | null;
 	invitation_edit_url: string | null;
+	invitation_renderer_theme: string | null;
 	status: string;
 	replies_count: number;
 	links_count: number;
@@ -43,6 +44,7 @@ export interface Theme {
 	edit_url: string;
 	topic_count: number;
 	is_default: boolean;
+	renderer_theme: string;
 	created_at: string;
 }
 
@@ -161,10 +163,13 @@ declare global {
 			invitation_prefix: string;
 			preview_prefix: string;
 			debug_mode: boolean;
-			themes: Record< string, {
-				label: string;
-				assets: Record< string, { url: string; filename: string } >;
-			} >;
+			themes: Record<
+				string,
+				{
+					label: string;
+					assets: Record< string, { url: string; filename: string } >;
+				}
+			>;
 		};
 	}
 }

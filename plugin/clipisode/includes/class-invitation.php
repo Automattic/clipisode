@@ -14,15 +14,49 @@ class Clipisode_Invitation {
 		return $value ?: 'invitation';
 	}
 
-	public function register_blocks(): void {
-		register_block_type( CLIPISODE_PLUGIN_DIR . 'build/flow' );
-		register_block_type( CLIPISODE_PLUGIN_DIR . 'build/blocks/stage-desktop' );
-		register_block_type( CLIPISODE_PLUGIN_DIR . 'build/blocks/stage-landing' );
-		register_block_type( CLIPISODE_PLUGIN_DIR . 'build/blocks/stage-record' );
-		register_block_type( CLIPISODE_PLUGIN_DIR . 'build/blocks/stage-thanks' );
-		register_block_type( CLIPISODE_PLUGIN_DIR . 'build/element' );
+	/**
+	 * Returns the configured short-URL base for invitation links, or
+	 * an empty string if the short-URL feature isn't configured on
+	 * this site.
+	 *
+	 * Today this is always empty — the short-URL feature is planned
+	 * but not implemented (see docs/specs/planned/short-invitation-urls.md
+	 * for the design). The method exists so the editor preview
+	 * generator can reference {short_url_base} in preview-values.json
+	 * templates; an empty result causes templates to fall back to
+	 * the long invitation URL via the JSON's fallback shape, so
+	 * starter HTML referencing {invitation_short_url} doesn't break.
+	 *
+	 * When the feature ships, replace the stub with a real lookup:
+	 *
+	 *   $value = get_option( 'clipisode_short_url_base', '' );
+	 *   return is_string( $value ) ? trim( $value ) : '';
+	 *
+	 * Plus the runtime substitution + rs.video-style host handler
+	 * described in the planning doc.
+	 */
+	public static function get_short_url_base(): string {
+		return '';
 	}
 
+	/**
+	 * Registers the public invitation-flow rewrite rule.
+	 *
+	 * One rule, one query var, one template. The URL prefix is
+	 * stored in the `clipisode_invitation_prefix` site option
+	 * (default "invitation") so non-English sites can serve the
+	 * flow at locale-appropriate paths (`/invitasjon/`, `/邀請/`,
+	 * etc.). Changing the option requires a rewrite-rules flush;
+	 * the Settings page does that automatically when the value
+	 * changes.
+	 *
+	 * Earlier versions of the plugin ran a parallel "v2" flow on a
+	 * hardcoded /clipisode-flow/ prefix while the new
+	 * clipisode_screen-driven template was under construction. That
+	 * flow is now the only flow, and the configurable prefix routes
+	 * directly to it. See docs/specs/shipped/kill-v1-invitation-flow.md
+	 * for the cutover history.
+	 */
 	public function register_rewrite(): void {
 		$prefix = self::get_prefix();
 		add_rewrite_rule(
@@ -39,10 +73,11 @@ class Clipisode_Invitation {
 
 	public function template_include( string $template ): string {
 		$slug = get_query_var( 'clipisode_invite' );
-		if ( ! $slug ) {
-			return $template;
+		if ( $slug ) {
+			return CLIPISODE_PLUGIN_DIR . 'assets/templates/clipisode-flow.php';
 		}
-		return CLIPISODE_PLUGIN_DIR . 'assets/templates/invitation.php';
+
+		return $template;
 	}
 
 	public function register_routes(): void {
@@ -70,7 +105,7 @@ class Clipisode_Invitation {
 		}
 
 		if ( ! $nonce || ! wp_verify_nonce( $nonce, 'clipisode_upload_' . $slug ) ) {
-			return new WP_REST_Response( [ 'message' => 'Invalid or expired nonce.' ], 403 );
+			return new WP_REST_Response( [ 'message' => 'Your session has timed out.' ], 403 );
 		}
 
 		$links_table = $wpdb->prefix . 'clipisode_invitation_links';
@@ -119,14 +154,18 @@ class Clipisode_Invitation {
 		$nonce         = sanitize_text_field( $request->get_param( '_clipisode_nonce' ) );
 		$name          = sanitize_text_field( $request->get_param( 'name' ) );
 		$social_handle = sanitize_text_field( $request->get_param( 'social_handle' ) ?? '' );
+		$social_network = sanitize_key( (string) ( $request->get_param( 'social_network' ) ?? '' ) );
 		$media_id      = (int) $request->get_param( 'media_id' );
+		if ( ! in_array( $social_network, [ 'instagram', 'x' ], true ) ) {
+			$social_network = '';
+		}
 
 		if ( ! $slug || ! $name ) {
 			return new WP_REST_Response( [ 'message' => 'Slug and name are required.' ], 400 );
 		}
 
 		if ( ! $nonce || ! wp_verify_nonce( $nonce, 'clipisode_upload_' . $slug ) ) {
-			return new WP_REST_Response( [ 'message' => 'Invalid or expired nonce.' ], 403 );
+			return new WP_REST_Response( [ 'message' => 'Your session has timed out.' ], 403 );
 		}
 
 		$links_table = $wpdb->prefix . 'clipisode_invitation_links';
@@ -168,7 +207,7 @@ class Clipisode_Invitation {
 			'name'                     => $name,
 			'media_id'                 => $media_id ?: null,
 			'social_handle'            => $social_handle ?: null,
-			'social_network'           => 'instagram',
+			'social_network'           => $social_network ?: null,
 			'status'                   => 'unapproved',
 			'brand_terms_id'           => $topic->brand_terms_id,
 			'brand_terms_revision_id'  => $brand_revision_id,

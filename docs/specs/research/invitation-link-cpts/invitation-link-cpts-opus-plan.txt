@@ -1,0 +1,137 @@
+
+I've read through the core files. Here is the current-state summary, followed by the refactor plan.
+
+---
+
+## Part 1 — Current state
+
+### End-to-end flow in plain English
+
+1. A guest visits `{site}/{invitation_prefix}/{slug}` (default prefix `invitation`, stored as site option `clipisode_invitation_prefix`).
+2. A rewrite rule converts the slug into the `clipisode_invite` query var and swaps in a custom template.
+3. The template looks up the slug in the custom `wp_clipisode_invitation_links` table, 404s if missing, rejects if `status != 'open'`, increments `clicks`, loads the linked `topic`, then loads **one** WordPress post of CPT type `clipisode_invite` (the "Theme") whose ID is stored on `topics.invitation_id`.
+4. That Theme post's content is a single Gutenberg block tree: `clipisode/invitation-flow` as the root, holding four child stage blocks (`invitation-desktop`, `invitation-landing`, `invitation-record`, `invitation-thanks`), each of which holds element blocks (`video`, `title`, `hosted`, `cta`, `terms`, `upload-form`, `thanks-*`, `qr-code`).
+5. Before rendering, the template **string-injects the slug** into the flow block's JSON attributes via `preg_replace` so child blocks can see it via block context (`providesContext: clipisode/slug`).
+6. `do_blocks()` renders everything server-side. All four stages are in the DOM simultaneously, wrapped in `.ci-flow-root` with `data-slug`, `data-rest-url`, `data-nonce`, and `data-upload-nonce` on the wrapper.
+7. One script (`view.ts`, the flow block's `viewScript`) boots on `DOMContentLoaded`. It:
+   - Decides `isMobile` via `navigator.maxTouchPoints > 0 && window.innerWidth < 1280`.
+   - If not mobile: adds `.ci-desktop` to the root (CSS handles which stage is visible), renders a QR code into `.ci-qr-canvas`, and returns. Desktop has no interactions beyond "watch video, scan QR".
+   - If mobile: attaches a delegated click handler for `[data-goto]`. The only CTA that emits this is the landing `cta` element with `data-goto="record"`.
+   - Handles file input change → starts an XHR POST to `/clipisode/v1/invitation/upload`, updates `.ci-status-text` and `.ci-progress-fill` on progress events, stores `media_id` on success.
+   - Handles submit → POSTs `{slug, name, social_handle, media_id}` to `/clipisode/v1/invitation/submit`, then calls `showStep('thanks')`.
+   - Calls `showStep('landing')` at the end of init.
+
+### Which file owns which part
+
+| Concern | File |
+|---|---|
+| URL rewrite → query var → template swap | `plugin/clipisode/includes/class-invitation.php` |
+| Slug → link → topic → Theme post lookup, click tracking, full HTML doc, OG tags, slug injection | `plugin/clipisode/assets/templates/invitation.php` |
+| `invitation_prefix` site option | `includes/class-invitation.php::get_prefix()` + `src/pages/Settings.tsx` |
+| Theme CPT (`clipisode_invite`) + default-Theme seeding (the big block template) | `plugin/clipisode/includes/class-post-types.php` |
+| Invitation-links table, topics table, replies table | `plugin/clipisode/includes/class-database.php` |
+| Invitation-link CRUD REST (`/topics/:id/invitation-links`, `/invitation-links/:id`) | `plugin/clipisode/includes/class-rest-api.php` |
+| Public upload/submit REST | `plugin/clipisode/includes/class-invitation.php` |
+| Flow parent block (wrapper `<div>` + data attrs) | `src/flow/` (`block.json`, `render.php`, `edit.tsx`) |
+| Four stage blocks (each a `<div data-step="...">`) | `src/blocks/stage-desktop\|landing\|record\|thanks/` |
+| Type-switched element block (renders the actual UI) | `src/element/` (`block.json`, `render.php`) |
+| **All** client behavior — transitions, upload, submit, QR, terms modal, video play/pause | `src/flow/view.ts` |
+| All styles | `src/flow/view.css` |
+
+### Where screen transitions live today
+
+Only in `plugin/clipisode/src/flow/view.ts`. Everything else about screens is server-rendered HTML. There is no router, no history API, no per-screen fetch. Transitions are:
+
+```17:21:plugin/clipisode/src/flow/view.ts
+	function showStep( step: string ): void {
+		stages.forEach( ( el ) => {
+			el.style.display = el.dataset.step === step ? '' : 'none';
+		} );
+	}
+```
+
+It's a `display: none` toggle across four sibling `<div>`s that are all in the DOM from first paint.
+
+### What makes each screen show or hide
+
+- **Desktop stage** — shown when `isMobile === false`. The JS early-returns without calling `showStep`, and a root class `.ci-desktop` (added in JS) plus CSS is what hides the mobile stages and reveals the desktop one. Desktop has no stage transitions.
+- **Landing** — `showStep('landing')` is called at the end of `initFlow` as the mobile default.
+- **Record** — clicking any `[data-goto="record"]` element (only the landing `cta`) triggers `showStep('record')`, which also programmatically clicks the hidden file input after 150ms.
+- **Thanks** — `showStep('thanks')` runs after a successful `POST /invitation/submit`.
+
+Name/handle inputs are **not a separate screen** today — they sit inside the record stage's `upload-form` element. The submit button is disabled until `uploadComplete && name.trim()`.
+
+There is currently **no** Name screen, Email screen, Success screen distinct from Thanks, or any Warning screen. The target state's screens 4–9 don't exist in code yet.
+
+---
+
+## Part 2 — Refactor plan (proposal only, no edits yet)
+
+### Single highest risk: upload survival across a router transition
+
+Everything else in this refactor is CRUD and block editor config — annoying but predictable. The one thing that can burn a full day and break the demo is this:
+
+> When the Interactivity API router swaps the Record screen out and the Name screen in, the in-flight `XMLHttpRequest` must keep running AND its progress events must continue to update the new screen's progress bar.
+
+Why it's dangerous:
+- The XHR itself is a JS object and will happily keep uploading regardless of DOM churn.
+- But today's progress updates are written **directly to DOM nodes** (`statusText.textContent = ...`). Those nodes will be removed by the router.
+- After the swap, the Name screen's progress bar is a fresh DOM node that the old code has no reference to.
+- If the router re-hydrates/re-creates the store, you lose the XHR.
+- If the user hits Back, the Record screen's DOM is rebuilt but the upload state is lost.
+
+**De-risk it before anything else.** Before writing a single CPT, spend Saturday morning on a throwaway spike:
+
+1. One PHP template with two sibling regions, both inside a `data-wp-interactive` root, both behind a simple router.
+2. One Interactivity store with `uploadPct: 0`, `uploadComplete: false`, `mediaId: null`, and actions `startUpload(file)`, `reset()`.
+3. `startUpload` creates the XHR, but only writes to **store state**, never to DOM.
+4. Region A has `<input type="file">` wired to `startUpload`.
+5. Region B has `<progress>` bound to `state.uploadPct` via `data-wp-bind--value` and `data-wp-text`.
+6. Click a button that navigates router from A → B while upload is in flight.
+7. Throttle your network in DevTools so the upload takes 20s+. You should see B's progress bar keep ticking.
+
+If that spike passes, you know the architecture is safe and the rest is carpentry. If it fails, **the fallback** is: do not use the router for the Record → Name transition. Keep Record and Name in the same router region and toggle them via a `state.screen` variable with `data-wp-bind--hidden`. Use the router only for Intro → Record and for Success. Warnings stay as overlays (they were always overlays, no router needed). You lose the "one CPT per screen" cleanliness for the Record+Name pair, but you ship Tuesday.
+
+Budget: **half a day Saturday, hard cap**. If by Saturday dinner the spike isn't green, switch to the fallback and proceed.
+
+### What will break or need updating in current code
+
+Flagging everything so nothing surprises us on Monday night:
+
+1. **`assets/templates/invitation.php`** — will be largely rewritten. It currently loads one post and injects a slug string via regex. New job: decide initial screen (Intro vs Intro-Desktop), render only that screen's block content, emit initial store state, and register the page as an Interactivity region.
+2. **`src/flow/block.json`, `src/flow/render.php`, `src/flow/edit.tsx`, `src/flow/view.ts`, `src/flow/view.css`** — the entire flow block becomes obsolete as a *block*, because a Theme post no longer has internal content. The `viewScript` and the wrapper `data-*` attributes move to the template. `view.ts` becomes Interactivity store modules, not a single DOMContentLoaded script.
+3. **`src/blocks/stage-desktop|landing|record|thanks/`** — all four are dead with the new model. Their visual templates migrate into the per-screen CPT's default block template. Safe to delete after migration.
+4. **`src/element/block.json`** — the `parent` array currently pins elements as children of the four stage blocks. It needs to be re-pointed at the new screen wrapper blocks (or removed if every screen embeds elements directly).
+5. **`src/element/render.php`** — the `upload-form` case currently emits file input **and** name/handle inputs in one element. It has to split: file chooser stays on Record, name/handle move to Name. New element types need adding for Email (email input + consent checkboxes), warnings, and the Success variants.
+6. **`includes/class-post-types.php::ensure_default_invitation()`** — today it seeds one post with a big block template. It now must seed one Theme parent + nine child posts, one per screen CPT, each with its own default block template. This is the single biggest PHP change. Needs to be idempotent so reactivation doesn't duplicate screens.
+7. **`includes/class-post-types.php::register()`** — add nine new CPTs (or one generic `clipisode_screen` CPT with a `screen_type` taxonomy/meta — worth discussing; see below). Each needs `show_in_rest` so the Interactivity router can fetch them, `hierarchical => true` so `post_parent` works, `public => false`, mobile-width editor lock (already done for `clipisode_invite`, extend to new types).
+8. **`includes/class-rest-api.php`** — add at least one endpoint: "given a Theme ID + screen_type, return the rendered HTML for that screen." The Interactivity router needs this for fetched navigation.
+9. **`includes/class-invitation.php::upload_video()` and `submit_reply()`** — unchanged. They key off slug + nonce, not client screen state. This is the one comfortably stable piece.
+10. **`includes/class-database.php`** — no table changes. Leave it alone.
+11. **`src/pages/ThemeList.tsx`** — today it lists Theme posts. With nine child screens per theme, editors need a way to drill into each screen's editor. Add a "Screens" column or a row expander with nine edit links. This is UI-only and can be Monday work.
+12. **`src/pages/TopicForm.tsx`** — `topic.invitation_id` still means "parent Theme ID". No change needed.
+13. **`src/pages/Settings.tsx`** — `invitation_prefix` unchanged. No change needed.
+14. **Rewrite rules** — `flush_rewrite_rules()` on next activation (already wired via `delete_option( 'rewrite_rules' )` on activation). No changes needed unless you add new public-facing URLs; target-state says the public URL is unchanged, so this is safe.
+
+A design question worth answering Saturday: **nine CPTs vs. one `clipisode_screen` CPT with a `screen_type` meta**. David Bowman says nine CPTs. Nine gives you per-type block templates, per-type editor sidebars, and per-type capability checks — nice, but a lot of `register_post_type()` boilerplate and nine activation-seed routines. One CPT + meta is half the PHP, still gives you one-post-per-screen, and lets you share REST endpoints. If you want a learning-friendly middle ground, I'd suggest one CPT + `screen_type` meta with per-meta-value block templates. That said, defer to Bowman if the team has already committed. I'll propose whichever you pick; just flag it before we start file 1.
+
+### File-by-file sequence (I'll send them one at a time as you confirm)
+
+Rough ordering, front-loaded for de-risk:
+
+- **Step 0** — Interactivity + XHR-survival spike (above). Scratch branch, delete after.
+- **Step 1** — `includes/class-post-types.php`: register the new screen CPT(s). I'll explain `hierarchical`, `show_in_rest`, `rest_base`, `supports`, and the mobile-width editor lock as we go.
+- **Step 2** — `includes/class-post-types.php` again: extend `ensure_default_invitation()` to seed parent Theme + child screens with idempotent checks.
+- **Step 3** — `includes/class-rest-api.php`: add the "render one screen" endpoint the router will call.
+- **Step 4** — `assets/templates/invitation.php`: rework to render the Interactivity region with the initial screen.
+- **Step 5** — New `src/interactivity/` store modules (one file at a time): `store.ts`, `upload.ts`, `navigation.ts`, `warnings.ts`.
+- **Step 6** — New per-screen wrapper blocks (`src/screens/intro/`, etc.) one screen at a time, starting with Intro + Record since those are on the critical path for the upload flow.
+- **Step 7** — `src/element/*`: split `upload-form`, add new element types for name/email/consent/warnings.
+- **Step 8** — Retire the old flow + stage blocks. This is last so nothing in the middle breaks.
+- **Step 9** — `src/pages/ThemeList.tsx`: add screen drill-down.
+
+Before I send file 1, two things I need from you:
+
+1. **Nine CPTs or one-CPT-with-meta?** (Strong recommendation: one CPT + `screen_type` meta, for scope reasons, unless Bowman has already committed.)
+2. **Do we spike first?** (Strong recommendation: yes, Saturday morning.)
+

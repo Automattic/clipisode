@@ -12,7 +12,7 @@ the_post();
 <title><?php the_title(); ?> — <?php bloginfo( 'name' ); ?></title>
 <style>
 	body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; color: #1d2327; line-height: 1.7; font-size: 15px; }
-	h1 { font-size: 24px; font-weight: 600; margin: 0 0 24px; }
+	h1 { font-size: 24px; font-weight: 700; margin: 0 0 24px; }
 </style>
 </head>
 <body>

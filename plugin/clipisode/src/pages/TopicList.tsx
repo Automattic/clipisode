@@ -36,7 +36,10 @@ export default function TopicList( { navigate }: TopicListProps ) {
 
 			{ topics.length === 0 ? (
 				<div className="clipisode-empty">
-					<p>No topics yet. Create your first one to start collecting replies.</p>
+					<p>
+						No topics yet. Create your first one to start collecting
+						replies.
+					</p>
 				</div>
 			) : (
 				<table className="clipisode-table">
@@ -61,15 +64,31 @@ export default function TopicList( { navigate }: TopicListProps ) {
 									{ topic.title }
 								</td>
 								<td>{ topic.hosted_by || '—' }</td>
-								<td>{ Number( topic.links_count ).toLocaleString() }</td>
-								<td>{ Number( topic.clicks ).toLocaleString() }</td>
-								<td>{ Number( topic.replies_count ).toLocaleString() }</td>
 								<td>
-									<span className={ `clipisode-status-badge ${ topic.status }` }>
+									{ Number(
+										topic.links_count
+									).toLocaleString() }
+								</td>
+								<td>
+									{ Number( topic.clicks ).toLocaleString() }
+								</td>
+								<td>
+									{ Number(
+										topic.replies_count
+									).toLocaleString() }
+								</td>
+								<td>
+									<span
+										className={ `clipisode-status-badge ${ topic.status }` }
+									>
 										{ topic.status }
 									</span>
 								</td>
-								<td>{ new Date( topic.created_at ).toLocaleDateString() }</td>
+								<td>
+									{ new Date(
+										topic.created_at
+									).toLocaleDateString() }
+								</td>
 							</tr>
 						) ) }
 					</tbody>

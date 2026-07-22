@@ -1,31 +1,33 @@
-import { ThemeElement, VideoData } from "@clipisode/theme";
-import { combinationIcon } from "./combinationIcon";
-import { combinationGradient } from "./combinationGradient";
-import { titleCard } from "./titleCard";
-import { endingCard } from "./endingCard";
-import { clip } from "./clip";
+import { ThemeElement, VideoData } from '@clipisode/theme';
+import { combinationIcon } from './combinationIcon';
+import { combinationGradient } from './combinationGradient';
+import { titleCard } from './titleCard';
+import { endingCard } from './endingCard';
+import { clip } from './clip';
 
 export type ForegroundMetaData = {
-  titleDuration: number;
-  endingDuration: number;
-  width: number;
-  height: number;
-  spacing: number;
-  titleHeight: number;
-  yoyoMin: number;
+	titleDuration: number;
+	endingDuration: number;
+	width: number;
+	height: number;
+	spacing: number;
+	titleHeight: number;
+	yoyoMin: number;
 };
 
 export function foreground(
-  video: VideoData,
-  meta: ForegroundMetaData
+	video: VideoData,
+	meta: ForegroundMetaData
 ): ThemeElement[] {
-  const elements: ThemeElement[] = [];
+	const elements: ThemeElement[] = [];
 
-  titleCard(video, meta).forEach((e) => elements.push(e));
-  elements.push(combinationGradient(video, meta));
-  elements.push(combinationIcon(video, meta));
-  video.clips.forEach((_, index) => elements.push(clip(video, index, meta)));
-  endingCard(video, meta).forEach((e) => elements.push(e));
+	titleCard( video, meta ).forEach( ( e ) => elements.push( e ) );
+	elements.push( combinationGradient( video, meta ) );
+	elements.push( combinationIcon( video, meta ) );
+	video.clips.forEach( ( _, index ) =>
+		elements.push( clip( video, index, meta ) )
+	);
+	endingCard( video, meta ).forEach( ( e ) => elements.push( e ) );
 
-  return elements;
+	return elements;
 }

@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback } from '@wordpress/element';
 
-export default function useHashRoute(): { route: string; navigate: ( path: string | number ) => void } {
-	const getRoute = (): string => window.location.hash.replace( /^#\/?/, '' ) || '';
+export default function useHashRoute(): {
+	route: string;
+	navigate: ( path: string | number ) => void;
+} {
+	const getRoute = (): string =>
+		window.location.hash.replace( /^#\/?/, '' ) || '';
 
 	const [ route, setRouteState ] = useState< string >( getRoute );
 

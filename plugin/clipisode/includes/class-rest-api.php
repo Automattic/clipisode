@@ -475,9 +475,11 @@ class Clipisode_REST_API {
 			$inv_post = get_post( (int) $topic->invitation_id );
 			$topic->invitation_title    = $inv_post ? $inv_post->post_title : null;
 			$topic->invitation_edit_url = $inv_post ? get_edit_post_link( $inv_post->ID, 'raw' ) : null;
+			$topic->invitation_renderer_theme = Clipisode_Post_Types::invitation_renderer_theme( (int) $topic->invitation_id );
 		} else {
 			$topic->invitation_title    = null;
 			$topic->invitation_edit_url = null;
+			$topic->invitation_renderer_theme = null;
 		}
 
 		$outputs_table  = $wpdb->prefix . 'clipisode_outputs';
@@ -1358,6 +1360,7 @@ class Clipisode_REST_API {
 				'edit_url'    => get_edit_post_link( $post->ID, 'raw' ),
 				'topic_count' => $topic_count,
 				'is_default'  => $is_default,
+				'renderer_theme' => Clipisode_Post_Types::invitation_renderer_theme( (int) $post->ID ),
 				'created_at'  => $post->post_date,
 			];
 		}, $posts );
@@ -1368,6 +1371,7 @@ class Clipisode_REST_API {
 	public function clone_theme( WP_REST_Request $request ): WP_REST_Response {
 		$source_id = $request->get_param( 'source_id' );
 		$title     = sanitize_text_field( $request->get_param( 'title' ) );
+		$requested_renderer_theme = sanitize_key( (string) $request->get_param( 'renderer_theme' ) );
 
 		if ( ! $source_id ) {
 			$source_id = Clipisode_Post_Types::ensure_default_invitation();
@@ -1389,10 +1393,28 @@ class Clipisode_REST_API {
 			return new WP_REST_Response( [ 'message' => $new_id->get_error_message() ], 400 );
 		}
 
+		if ( $requested_renderer_theme !== '' ) {
+			$renderer_theme = Clipisode_Post_Types::resolve_renderer_theme_slug(
+				$requested_renderer_theme,
+				(int) $new_id
+			);
+		} else {
+			$source_renderer_theme = Clipisode_Post_Types::invitation_renderer_theme( (int) $source_id );
+			$guessed_renderer_theme = Clipisode_Post_Types::resolve_renderer_theme_slug( '', (int) $new_id );
+			$renderer_theme = ( $source_renderer_theme === 'default' && $guessed_renderer_theme !== 'default' )
+				? $guessed_renderer_theme
+				: Clipisode_Post_Types::resolve_renderer_theme_slug( $source_renderer_theme, (int) $new_id );
+		}
+		update_post_meta( (int) $new_id, Clipisode_Post_Types::RENDERER_THEME_META, $renderer_theme );
+
+		$cloned_screens = $this->clone_theme_screens( (int) $source_id, (int) $new_id );
+
 		return new WP_REST_Response( [
 			'id'       => $new_id,
 			'title'    => get_the_title( $new_id ),
 			'edit_url' => get_edit_post_link( $new_id, 'raw' ),
+			'renderer_theme' => $renderer_theme,
+			'screens'  => $cloned_screens,
 		], 201 );
 	}
 
@@ -1417,9 +1439,86 @@ class Clipisode_REST_API {
 			], 409 );
 		}
 
+		// Remove child screens first so they don't become orphans in the DB.
+		$this->delete_theme_screens( $id );
+
 		wp_delete_post( $id, true );
 
 		return new WP_REST_Response( null, 204 );
+	}
+
+	/**
+	 * Clones every clipisode_screen child of the source theme into the destination theme.
+	 *
+	 * Calls seed_default_screens() on the source first so themes that pre-date the
+	 * screen-CPT refactor get auto-upgraded with their 10 screens before being copied.
+	 *
+	 * Returns a [screen_type => new_screen_id] map.
+	 */
+	private function clone_theme_screens( int $source_theme_id, int $dest_theme_id ): array {
+		$result = [];
+
+		Clipisode_Post_Types::seed_default_screens( $source_theme_id );
+
+		foreach ( Clipisode_Post_Types::SCREEN_TYPES as $screen_type ) {
+			$source_screen_id = Clipisode_Post_Types::get_screen_post( $source_theme_id, $screen_type );
+			if ( ! $source_screen_id ) {
+				continue;
+			}
+
+			$source_screen = get_post( $source_screen_id );
+			if ( ! $source_screen ) {
+				continue;
+			}
+
+			$new_screen_id = wp_insert_post( [
+				'post_type'    => 'clipisode_screen',
+				'post_parent'  => $dest_theme_id,
+				'post_title'   => $source_screen->post_title,
+				'post_content' => $source_screen->post_content,
+				'post_status'  => 'publish',
+			] );
+
+			if ( is_wp_error( $new_screen_id ) || ! $new_screen_id ) {
+				continue;
+			}
+
+			update_post_meta( $new_screen_id, Clipisode_Post_Types::SCREEN_TYPE_META, $screen_type );
+
+			$redirect = get_post_meta( $source_screen_id, Clipisode_Post_Types::SCREEN_REDIRECT_META, true );
+			if ( $redirect !== '' ) {
+				update_post_meta( $new_screen_id, Clipisode_Post_Types::SCREEN_REDIRECT_META, $redirect );
+			}
+
+			$result[ $screen_type ] = (int) $new_screen_id;
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Force-deletes every clipisode_screen child of the given theme.
+	 *
+	 * Returns the count of screens deleted. Used by delete_theme() to keep the DB
+	 * clean of orphan screens whose parent theme no longer exists.
+	 */
+	private function delete_theme_screens( int $theme_id ): int {
+		$screen_ids = get_posts( [
+			'post_type'      => 'clipisode_screen',
+			'post_status'    => 'any',
+			'post_parent'    => $theme_id,
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+		] );
+
+		$count = 0;
+		foreach ( $screen_ids as $screen_id ) {
+			if ( wp_delete_post( (int) $screen_id, true ) ) {
+				$count++;
+			}
+		}
+
+		return $count;
 	}
 
 	// --- Preview Layouts ---

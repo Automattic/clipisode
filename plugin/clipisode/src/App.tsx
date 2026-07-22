@@ -45,11 +45,21 @@ export default function App() {
 		return <TopicForm id={ editMatch[ 1 ] } navigate={ navigate } />;
 	}
 
-	const createClipisodeWithTopicMatch = route.match( /^create-clipisode\/(\d+)\/([\d,]+)$/ );
+	const createClipisodeWithTopicMatch = route.match(
+		/^create-clipisode\/(\d+)\/([\d,]+)$/
+	);
 	const createClipisodeMatch = route.match( /^create-clipisode\/([\d,]+)$/ );
 	if ( createClipisodeWithTopicMatch ) {
-		const mediaIds = createClipisodeWithTopicMatch[ 2 ].split( ',' ).map( Number );
-		return <CreateClipisode topicId={ Number( createClipisodeWithTopicMatch[ 1 ] ) } mediaIds={ mediaIds } navigate={ navigate } />;
+		const mediaIds = createClipisodeWithTopicMatch[ 2 ]
+			.split( ',' )
+			.map( Number );
+		return (
+			<CreateClipisode
+				topicId={ Number( createClipisodeWithTopicMatch[ 1 ] ) }
+				mediaIds={ mediaIds }
+				navigate={ navigate }
+			/>
+		);
 	}
 	if ( createClipisodeMatch ) {
 		const mediaIds = createClipisodeMatch[ 1 ].split( ',' ).map( Number );

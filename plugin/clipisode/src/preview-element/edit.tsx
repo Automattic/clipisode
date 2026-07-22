@@ -28,14 +28,18 @@ export default function Edit( { attributes }: EditProps ) {
 		case 'topic-info':
 			return (
 				<div { ...blockProps }>
-					<p className="cp-el-text">Topic Name &middot; Hosted by Host Name</p>
+					<p className="cp-el-text">
+						Topic Name &middot; Hosted by Host Name
+					</p>
 				</div>
 			);
 
 		case 'cta':
 			return (
 				<div { ...blockProps }>
-					<span className="cp-cta cp-cta-preview">Record Your Own</span>
+					<span className="cp-cta cp-cta-preview">
+						Record Your Own
+					</span>
 				</div>
 			);
 

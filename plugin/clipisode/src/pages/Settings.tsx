@@ -1,5 +1,15 @@
 import { useState, useEffect, useCallback } from '@wordpress/element';
-import { Button, Card, CardBody, CardHeader, SelectControl, Spinner, TextControl, Notice, ToggleControl } from '@wordpress/components';
+import {
+	Button,
+	Card,
+	CardBody,
+	CardHeader,
+	SelectControl,
+	Spinner,
+	TextControl,
+	Notice,
+	ToggleControl,
+} from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import type { BrandTerms, CustomTermsItem, Host } from '../types';
 
@@ -35,7 +45,9 @@ export default function Settings(): JSX.Element {
 	useEffect( () => {
 		Promise.all( [
 			apiFetch< BrandTerms >( { path: '/clipisode/v1/terms/brand' } ),
-			apiFetch< CustomTermsItem[] >( { path: '/clipisode/v1/terms/custom' } ),
+			apiFetch< CustomTermsItem[] >( {
+				path: '/clipisode/v1/terms/custom',
+			} ),
 			apiFetch< Host[] >( { path: '/clipisode/v1/hosts' } ),
 			apiFetch< PluginSettings >( { path: '/clipisode/v1/settings' } ),
 		] )
@@ -58,7 +70,10 @@ export default function Settings(): JSX.Element {
 		apiFetch< PluginSettings >( {
 			path: '/clipisode/v1/settings',
 			method: 'PUT',
-			data: { invitation_prefix: invitationPrefix, preview_prefix: previewPrefix },
+			data: {
+				invitation_prefix: invitationPrefix,
+				preview_prefix: previewPrefix,
+			},
 		} )
 			.then( ( settings ) => {
 				setInvitationPrefix( settings.invitation_prefix );
@@ -71,8 +86,12 @@ export default function Settings(): JSX.Element {
 	}, [ invitationPrefix, previewPrefix ] );
 
 	const deleteHost = ( id: number ) => {
-		apiFetch( { path: `/clipisode/v1/hosts/${ id }`, method: 'DELETE' } )
-			.then( () => setHosts( ( prev ) => prev.filter( ( h ) => h.id !== id ) ) );
+		apiFetch( {
+			path: `/clipisode/v1/hosts/${ id }`,
+			method: 'DELETE',
+		} ).then( () =>
+			setHosts( ( prev ) => prev.filter( ( h ) => h.id !== id ) )
+		);
 	};
 
 	const setDefaultHost = ( value: string ) => {
@@ -115,11 +134,16 @@ export default function Settings(): JSX.Element {
 			<div className="clipisode-settings-section">
 				<h2>Hosts</h2>
 				<p className="clipisode-empty-hint" style={ { marginTop: 0 } }>
-					Host names appear as autocomplete suggestions when creating a topic. Deleting a host here only removes it from suggestions — existing topics keep their host name.
+					Host names appear as autocomplete suggestions when creating
+					a topic. Deleting a host here only removes it from
+					suggestions — existing topics keep their host name.
 				</p>
 
 				{ hosts.length === 0 ? (
-					<p className="clipisode-empty-hint">No hosts yet. They are added automatically when you create a topic.</p>
+					<p className="clipisode-empty-hint">
+						No hosts yet. They are added automatically when you
+						create a topic.
+					</p>
 				) : (
 					<>
 						<table className="clipisode-table">
@@ -138,7 +162,9 @@ export default function Settings(): JSX.Element {
 												variant="tertiary"
 												isDestructive
 												size="compact"
-												onClick={ () => deleteHost( host.id ) }
+												onClick={ () =>
+													deleteHost( host.id )
+												}
 											>
 												Delete
 											</Button>
@@ -150,10 +176,16 @@ export default function Settings(): JSX.Element {
 						<div style={ { maxWidth: 300, marginTop: 12 } }>
 							<SelectControl
 								label="Default Host"
-								value={ String( hosts.find( ( h ) => h.is_default )?.id ?? '' ) }
+								value={ String(
+									hosts.find( ( h ) => h.is_default )?.id ??
+										''
+								) }
 								options={ [
 									{ label: '— None —', value: '' },
-									...hosts.map( ( h ) => ( { label: h.name, value: String( h.id ) } ) ),
+									...hosts.map( ( h ) => ( {
+										label: h.name,
+										value: String( h.id ),
+									} ) ),
 								] }
 								onChange={ setDefaultHost }
 								help="Pre-fills the host field when creating a new topic."
@@ -207,7 +239,8 @@ export default function Settings(): JSX.Element {
 
 					{ customTerms.length === 0 ? (
 						<p className="clipisode-empty-hint">
-							No custom terms yet. Custom terms can be optionally assigned to individual topics.
+							No custom terms yet. Custom terms can be optionally
+							assigned to individual topics.
 						</p>
 					) : (
 						<table className="clipisode-table">
@@ -222,13 +255,20 @@ export default function Settings(): JSX.Element {
 								{ customTerms.map( ( term ) => (
 									<tr key={ term.id }>
 										<td>
-											<a className="row-title" href={ term.edit_url }>
+											<a
+												className="row-title"
+												href={ term.edit_url }
+											>
 												{ term.title }
 											</a>
 										</td>
 										<td>{ formatDate( term.modified ) }</td>
 										<td>
-											<a href={ term.preview_url } target="_blank" rel="noreferrer">
+											<a
+												href={ term.preview_url }
+												target="_blank"
+												rel="noreferrer"
+											>
 												Preview
 											</a>
 										</td>
@@ -243,58 +283,98 @@ export default function Settings(): JSX.Element {
 			<div className="clipisode-settings-section">
 				<h2>General</h2>
 
-			<Card>
-				<CardHeader>
-					<strong>URL Prefixes</strong>
-				</CardHeader>
-				<CardBody>
-					{ prefixNotice && (
-						<Notice status="success" isDismissible onDismiss={ () => setPrefixNotice( null ) }>
-							{ prefixNotice }
-						</Notice>
-					) }
-					<TextControl
-						label="Invitation URL Prefix"
-						value={ invitationPrefix }
-						onChange={ setInvitationPrefix }
-						help={ `${ window.location.origin }/${ invitationPrefix || 'invitation' }/{code}` }
-						__nextHasNoMarginBottom
-						__next40pxDefaultSize
-					/>
-					<div style={ { marginTop: 16 } }>
+				<Card>
+					<CardHeader>
+						<strong>URL Prefixes</strong>
+					</CardHeader>
+					<CardBody>
+						{ prefixNotice && (
+							<Notice
+								status="success"
+								isDismissible
+								onDismiss={ () => setPrefixNotice( null ) }
+							>
+								{ prefixNotice }
+							</Notice>
+						) }
 						<TextControl
-							label="Clipisode Preview URL Prefix"
-							value={ previewPrefix }
-							onChange={ setPreviewPrefix }
-							help={ `${ window.location.origin }/${ previewPrefix || 'clipisode' }/{id}/{media_id}/{slug}` }
+							label="Invitation URL Prefix"
+							value={ invitationPrefix }
+							onChange={ setInvitationPrefix }
+							help={
+								<>
+									{ `${ window.location.origin }/${
+										invitationPrefix || 'invitation'
+									}/{code}` }
+									<br />
+									Localized prefixes are supported (e.g. <code>invitasjon</code>, <code>邀請</code>). Saving rebuilds rewrite rules automatically.
+								</>
+							}
 							__nextHasNoMarginBottom
 							__next40pxDefaultSize
 						/>
-					</div>
-					<div style={ { display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 } }>
-						<Button
-							variant="primary"
-							size="compact"
-							onClick={ savePrefixes }
-							isBusy={ savingPrefix }
-							disabled={ savingPrefix || ( invitationPrefix === savedInvitationPrefix && previewPrefix === savedPreviewPrefix ) }
+						<div style={ { marginTop: 16 } }>
+							<TextControl
+								label="Clipisode Preview URL Prefix"
+								value={ previewPrefix }
+								onChange={ setPreviewPrefix }
+								help={ `${ window.location.origin }/${
+									previewPrefix || 'clipisode'
+								}/{id}/{media_id}/{slug}` }
+								__nextHasNoMarginBottom
+								__next40pxDefaultSize
+							/>
+						</div>
+						<div
+							style={ {
+								display: 'flex',
+								alignItems: 'center',
+								gap: 12,
+								marginTop: 16,
+							} }
 						>
-							Save
-						</Button>
-						<p style={ { margin: 0, color: '#d63638', fontSize: 13 } }>
-							Changing prefixes will break previously shared links.
-						</p>
-					</div>
-				</CardBody>
-			</Card>
+							<Button
+								variant="primary"
+								size="compact"
+								onClick={ savePrefixes }
+								isBusy={ savingPrefix }
+								disabled={
+									savingPrefix ||
+									( invitationPrefix ===
+										savedInvitationPrefix &&
+										previewPrefix === savedPreviewPrefix )
+								}
+							>
+								Save
+							</Button>
+							<p
+								style={ {
+									margin: 0,
+									color: '#d63638',
+									fontSize: 13,
+								} }
+							>
+								Changing prefixes will break previously shared
+								links.
+							</p>
+						</div>
+					</CardBody>
+				</Card>
 
 				<Card>
 					<CardHeader>
 						<strong>Storage</strong>
 					</CardHeader>
 					<CardBody>
-						<p style={ { margin: 0, color: '#646970', fontSize: 13 } }>
-							Storage configuration coming soon. Replies currently use the WordPress media library.
+						<p
+							style={ {
+								margin: 0,
+								color: '#646970',
+								fontSize: 13,
+							} }
+						>
+							Storage configuration coming soon. Replies currently
+							use the WordPress media library.
 						</p>
 					</CardBody>
 				</Card>
@@ -306,7 +386,13 @@ export default function Settings(): JSX.Element {
 						<strong>Transcription</strong>
 					</CardHeader>
 					<CardBody>
-						<p style={ { margin: 0, color: '#646970', fontSize: 13 } }>
+						<p
+							style={ {
+								margin: 0,
+								color: '#646970',
+								fontSize: 13,
+							} }
+						>
 							Transcription configuration coming soon.
 						</p>
 					</CardBody>

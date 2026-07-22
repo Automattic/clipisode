@@ -24,19 +24,49 @@ require_once CLIPISODE_PLUGIN_DIR . 'includes/class-invitation.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-preview.php';
 
 register_activation_hook( __FILE__, [ Clipisode_Database::class, 'activate' ] );
+register_activation_hook( __FILE__, [ Clipisode_Post_Types::class, 'ensure_default_logo_attachment' ] );
+register_activation_hook( __FILE__, [ Clipisode_Post_Types::class, 'ensure_default_qr_attachment' ] );
 register_activation_hook( __FILE__, function () {
 	delete_option( 'rewrite_rules' );
 } );
 register_deactivation_hook( __FILE__, 'flush_rewrite_rules' );
 
+/**
+ * Auto-flush rewrite rules on plugin version change.
+ *
+ * Activation hooks fire only on activate/deactivate, not on plugin
+ * upgrades that overwrite files in place. The previous registration
+ * of rewrite rules (legacy /invitation/ and parallel /clipisode-flow/)
+ * was retired in favour of a single configurable-prefix rule routing
+ * to the v2 template (see docs/specs/shipped/kill-v1-invitation-flow.md).
+ * Without an upgrade-time flush, sites updating from the dual-rule
+ * version would keep serving the old hardcoded /clipisode-flow/
+ * route until someone manually visited Settings → Permalinks. The
+ * version compare here covers that case: if the stored rewrite-
+ * version doesn't match CLIPISODE_VERSION, drop the cached rules
+ * and update the marker. WordPress will lazily rebuild the rules
+ * on the next request.
+ */
+add_action( 'init', function (): void {
+	$stored = get_option( 'clipisode_rewrite_version', '' );
+	if ( $stored !== CLIPISODE_VERSION ) {
+		delete_option( 'rewrite_rules' );
+		update_option( 'clipisode_rewrite_version', CLIPISODE_VERSION, true );
+	}
+}, 99 );
+
 add_action( 'init', [ Clipisode_Post_Types::class, 'register' ] );
 add_action( 'init', [ new Clipisode_Media(), 'register_hooks' ] );
 add_action( 'admin_menu', [ new Clipisode_Admin(), 'register_menus' ] );
 add_action( 'rest_api_init', [ new Clipisode_REST_API(), 'register_routes' ] );
+add_action( 'enqueue_block_assets', [ Clipisode_Post_Types::class, 'enqueue_screen_editor_canvas_styles' ] );
+add_action( 'enqueue_block_editor_assets', [ Clipisode_Post_Types::class, 'enqueue_block_editor_extensions' ] );
+add_filter( 'block_editor_settings_all', [ Clipisode_Post_Types::class, 'filter_screen_editor_font_settings' ], 10, 2 );
+add_filter( 'render_block', [ Clipisode_Post_Types::class, 'filter_flow_block_directives' ], 10, 2 );
 
 add_filter( 'clipisode_themes', function ( array $themes ): array {
-	$themes['standard'] = [
-		'label'     => 'Standard',
+	$themes['default'] = [
+		'label'     => 'Default',
 		'asset_url' => CLIPISODE_PLUGIN_URL . 'assets/themes/standard/',
 		'asset_dir' => CLIPISODE_PLUGIN_DIR . 'assets/themes/standard/',
 	];
@@ -50,7 +80,7 @@ add_filter( 'clipisode_themes', function ( array $themes ): array {
 
 add_action( 'enqueue_block_editor_assets', function (): void {
 	$screen = get_current_screen();
-	if ( ! $screen || ! in_array( $screen->post_type, [ 'clipisode_invite', 'clipisode_preview' ], true ) ) {
+	if ( ! $screen || $screen->post_type !== 'clipisode_preview' ) {
 		return;
 	}
 	wp_add_inline_script(
@@ -60,7 +90,6 @@ add_action( 'enqueue_block_editor_assets', function (): void {
 } );
 
 $clipisode_invitation = new Clipisode_Invitation();
-add_action( 'init', [ $clipisode_invitation, 'register_blocks' ] );
 add_action( 'init', [ $clipisode_invitation, 'register_rewrite' ] );
 add_filter( 'query_vars', [ $clipisode_invitation, 'add_query_vars' ] );
 add_filter( 'template_include', [ $clipisode_invitation, 'template_include' ] );
@@ -71,3 +100,4 @@ add_action( 'init', [ $clipisode_preview, 'register_blocks' ] );
 add_action( 'init', [ $clipisode_preview, 'register_rewrite' ] );
 add_filter( 'query_vars', [ $clipisode_preview, 'add_query_vars' ] );
 add_filter( 'template_include', [ $clipisode_preview, 'template_include' ] );
+require_once CLIPISODE_PLUGIN_DIR . 'spike/spike.php';

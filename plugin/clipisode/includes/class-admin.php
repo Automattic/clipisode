@@ -20,6 +20,7 @@ class Clipisode_Admin {
 		add_submenu_page( 'clipisode', 'Clipisodes', 'Clipisodes', 'manage_options', 'clipisode-clipisodes', [ $this, 'render_page' ] );
 		add_submenu_page( 'clipisode', 'Media', 'Media', 'manage_options', 'clipisode-media', [ $this, 'render_page' ] );
 		add_submenu_page( 'clipisode', 'Themes', 'Themes', 'manage_options', 'clipisode-themes', [ $this, 'render_page' ] );
+		add_submenu_page( 'clipisode', 'Screens', 'Screens', 'manage_options', 'edit.php?post_type=clipisode_screen' );
 		add_submenu_page( 'clipisode', 'Settings', 'Settings', 'manage_options', 'clipisode-settings', [ $this, 'render_page' ] );
 
 		add_action( "admin_print_styles-$hook", [ $this, 'enqueue_assets' ] );

@@ -35,8 +35,14 @@ class PostTypesTest extends TestCase {
 		$this->assertTrue( $post_type->publicly_queryable );
 	}
 
-	public function test_invite_supports_editor(): void {
-		$this->assertTrue( post_type_supports( 'clipisode_invite', 'editor' ) );
+	/**
+	 * `clipisode_invite` is the Theme container CPT. After the v1
+	 * stage-block tree was retired, the post type stopped supporting
+	 * `editor` — the screens are the editable content, not the theme
+	 * post itself. See docs/specs/shipped/kill-v1-invitation-flow.md.
+	 */
+	public function test_invite_does_not_support_editor(): void {
+		$this->assertFalse( post_type_supports( 'clipisode_invite', 'editor' ) );
 	}
 
 	public function test_invite_supports_title(): void {

@@ -3,7 +3,12 @@ import { Button, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import type { VideoValue, MediaItem } from '../types';
 
-const ALLOWED_TYPES = [ 'video/mp4', 'video/quicktime', 'video/webm', 'video/x-m4v' ];
+const ALLOWED_TYPES = [
+	'video/mp4',
+	'video/quicktime',
+	'video/webm',
+	'video/x-m4v',
+];
 const ALLOWED_ACCEPT = '.mp4,.mov,.webm,.m4v';
 const MAX_SIZE = 80 * 1024 * 1024;
 
@@ -42,7 +47,10 @@ function validateVideo( src: string ): Promise< ValidationResult > {
 
 			if ( videoWidth && videoHeight && videoWidth >= videoHeight ) {
 				cleanup();
-				resolve( { valid: false, error: 'Video must be portrait orientation (taller than wide).' } );
+				resolve( {
+					valid: false,
+					error: 'Video must be portrait orientation (taller than wide).',
+				} );
 				return;
 			}
 
@@ -52,13 +60,19 @@ function validateVideo( src: string ): Promise< ValidationResult > {
 			if ( audioTracks !== undefined ) {
 				if ( ! audioTracks.length ) {
 					cleanup();
-					resolve( { valid: false, error: 'Video must contain an audio track.' } );
+					resolve( {
+						valid: false,
+						error: 'Video must contain an audio track.',
+					} );
 					return;
 				}
 			} else if ( mozHasAudio !== undefined ) {
 				if ( ! mozHasAudio ) {
 					cleanup();
-					resolve( { valid: false, error: 'Video must contain an audio track.' } );
+					resolve( {
+						valid: false,
+						error: 'Video must contain an audio track.',
+					} );
 					return;
 				}
 			}
@@ -69,7 +83,10 @@ function validateVideo( src: string ): Promise< ValidationResult > {
 
 		videoEl.onerror = () => {
 			cleanup();
-			resolve( { valid: false, error: 'Could not play this video file.' } );
+			resolve( {
+				valid: false,
+				error: 'Could not play this video file.',
+			} );
 		};
 
 		videoEl.src = src;
@@ -105,8 +122,12 @@ function uploadFile(
 			}
 		} );
 
-		xhr.addEventListener( 'error', () => reject( new Error( 'Upload failed.' ) ) );
-		xhr.addEventListener( 'abort', () => reject( new Error( 'Upload cancelled.' ) ) );
+		xhr.addEventListener( 'error', () =>
+			reject( new Error( 'Upload failed.' ) )
+		);
+		xhr.addEventListener( 'abort', () =>
+			reject( new Error( 'Upload cancelled.' ) )
+		);
 
 		const root = window.clipisodeAdmin?.rest_root || '/wp-json/';
 		const nonce = window.clipisodeAdmin?.nonce || '';
@@ -120,12 +141,19 @@ function uploadFile(
 }
 
 function deleteAttachment( id: number ): void {
-	apiFetch( { path: `/clipisode/v1/videos/${ id }`, method: 'DELETE' } ).catch( () => {} );
+	apiFetch( {
+		path: `/clipisode/v1/videos/${ id }`,
+		method: 'DELETE',
+	} ).catch( () => {} );
 }
 
 type Mode = 'none' | 'upload' | 'url' | 'existing';
 
-export default function VideoUploader( { value, onChange, videoRef }: VideoUploaderProps ) {
+export default function VideoUploader( {
+	value,
+	onChange,
+	videoRef,
+}: VideoUploaderProps ) {
 	const [ mode, setMode ] = useState< Mode | null >( value ? null : 'none' );
 	const [ url, setUrl ] = useState( '' );
 	const [ uploading, setUploading ] = useState( false );
@@ -144,62 +172,75 @@ export default function VideoUploader( { value, onChange, videoRef }: VideoUploa
 		}
 		setLoadingMedia( true );
 		Promise.all( [
-			apiFetch< MediaItem[] >( { path: '/clipisode/v1/media?type=video&label=asset' } ),
-			apiFetch< MediaItem[] >( { path: '/clipisode/v1/media?type=video&label=intro' } ),
-			apiFetch< MediaItem[] >( { path: '/clipisode/v1/media?type=video&label=original' } ),
+			apiFetch< MediaItem[] >( {
+				path: '/clipisode/v1/media?type=video&label=asset',
+			} ),
+			apiFetch< MediaItem[] >( {
+				path: '/clipisode/v1/media?type=video&label=intro',
+			} ),
+			apiFetch< MediaItem[] >( {
+				path: '/clipisode/v1/media?type=video&label=original',
+			} ),
 		] )
 			.then( ( [ assets, intros, originals ] ) => {
-				setExistingMedia( [ ...assets, ...intros, ...originals ].filter( ( m ) => m.url ) );
+				setExistingMedia(
+					[ ...assets, ...intros, ...originals ].filter(
+						( m ) => m.url
+					)
+				);
 			} )
 			.finally( () => setLoadingMedia( false ) );
 	}, [ mode, value ] );
 
-	const handleFile = useCallback( async ( file: File ) => {
-		setError( null );
+	const handleFile = useCallback(
+		async ( file: File ) => {
+			setError( null );
 
-		if ( ! ALLOWED_TYPES.includes( file.type ) ) {
-			setError( 'Invalid video type. Allowed: MP4, MOV, WebM, M4V.' );
-			return;
-		}
-
-		if ( file.size > MAX_SIZE ) {
-			setError( 'File too large. Maximum 80 MB.' );
-			return;
-		}
-
-		setUploading( true );
-		setProgress( 0 );
-
-		const objectUrl = URL.createObjectURL( file );
-		const upload = uploadFile( file, setProgress );
-		abortRef.current = upload.abort;
-
-		try {
-			const [ uploadResult, validation ] = await Promise.all( [
-				upload.promise,
-				validateVideo( objectUrl ),
-			] );
-
-			URL.revokeObjectURL( objectUrl );
-
-			if ( ! validation.valid ) {
-				deleteAttachment( uploadResult.id );
-				setError( validation.error || 'Video validation failed.' );
+			if ( ! ALLOWED_TYPES.includes( file.type ) ) {
+				setError( 'Invalid video type. Allowed: MP4, MOV, WebM, M4V.' );
 				return;
 			}
 
-			onChange( uploadResult );
-		} catch ( err: any ) {
-			URL.revokeObjectURL( objectUrl );
-			if ( err.message !== 'Upload cancelled.' ) {
-				setError( err.message || 'Upload failed.' );
+			if ( file.size > MAX_SIZE ) {
+				setError( 'File too large. Maximum 80 MB.' );
+				return;
 			}
-		} finally {
-			abortRef.current = null;
-			setUploading( false );
+
+			setUploading( true );
 			setProgress( 0 );
-		}
-	}, [ onChange ] );
+
+			const objectUrl = URL.createObjectURL( file );
+			const upload = uploadFile( file, setProgress );
+			abortRef.current = upload.abort;
+
+			try {
+				const [ uploadResult, validation ] = await Promise.all( [
+					upload.promise,
+					validateVideo( objectUrl ),
+				] );
+
+				URL.revokeObjectURL( objectUrl );
+
+				if ( ! validation.valid ) {
+					deleteAttachment( uploadResult.id );
+					setError( validation.error || 'Video validation failed.' );
+					return;
+				}
+
+				onChange( uploadResult );
+			} catch ( err: any ) {
+				URL.revokeObjectURL( objectUrl );
+				if ( err.message !== 'Upload cancelled.' ) {
+					setError( err.message || 'Upload failed.' );
+				}
+			} finally {
+				abortRef.current = null;
+				setUploading( false );
+				setProgress( 0 );
+			}
+		},
+		[ onChange ]
+	);
 
 	const handleImportUrl = useCallback( async () => {
 		if ( ! url.trim() ) {
@@ -232,14 +273,17 @@ export default function VideoUploader( { value, onChange, videoRef }: VideoUploa
 		}
 	}, [ url, onChange ] );
 
-	const handleDrop = useCallback( ( e: React.DragEvent ) => {
-		e.preventDefault();
-		setDragOver( false );
-		const file = e.dataTransfer.files[ 0 ];
-		if ( file ) {
-			handleFile( file );
-		}
-	}, [ handleFile ] );
+	const handleDrop = useCallback(
+		( e: React.DragEvent ) => {
+			e.preventDefault();
+			setDragOver( false );
+			const file = e.dataTransfer.files[ 0 ];
+			if ( file ) {
+				handleFile( file );
+			}
+		},
+		[ handleFile ]
+	);
 
 	const handleDragOver = useCallback( ( e: React.DragEvent ) => {
 		e.preventDefault();
@@ -250,15 +294,18 @@ export default function VideoUploader( { value, onChange, videoRef }: VideoUploa
 		setDragOver( false );
 	}, [] );
 
-	const handleFileInput = useCallback( ( e: React.ChangeEvent< HTMLInputElement > ) => {
-		const file = e.target.files?.[ 0 ];
-		if ( file ) {
-			handleFile( file );
-		}
-		if ( fileInputRef.current ) {
-			fileInputRef.current.value = '';
-		}
-	}, [ handleFile ] );
+	const handleFileInput = useCallback(
+		( e: React.ChangeEvent< HTMLInputElement > ) => {
+			const file = e.target.files?.[ 0 ];
+			if ( file ) {
+				handleFile( file );
+			}
+			if ( fileInputRef.current ) {
+				fileInputRef.current.value = '';
+			}
+		},
+		[ handleFile ]
+	);
 
 	const handleRemove = useCallback( () => {
 		if ( value && ! value.reused ) {
@@ -282,7 +329,9 @@ export default function VideoUploader( { value, onChange, videoRef }: VideoUploa
 
 	return (
 		<div className="clipisode-video-uploader">
-			<label className="components-base-control__label">Intro Video</label>
+			<label className="components-base-control__label">
+				Intro Video
+			</label>
 
 			<div className="clipisode-video-mode-toggle">
 				<label>
@@ -329,19 +378,26 @@ export default function VideoUploader( { value, onChange, videoRef }: VideoUploa
 
 			{ value && (
 				<div className="clipisode-video-preview">
-					<video ref={ videoRef } src={ value.url } controls playsInline />
+					<video
+						ref={ videoRef }
+						src={ value.url }
+						controls
+						playsInline
+					/>
 				</div>
 			) }
 
-			{ error && (
-				<div className="clipisode-video-error">{ error }</div>
-			) }
+			{ error && <div className="clipisode-video-error">{ error }</div> }
 
 			{ ! value && mode === 'upload' && (
 				<>
 					<div
-						className={ `clipisode-video-dropzone${ dragOver ? ' drag-over' : '' }${ busy ? ' busy' : '' }` }
-						onClick={ () => ! busy && fileInputRef.current?.click() }
+						className={ `clipisode-video-dropzone${
+							dragOver ? ' drag-over' : ''
+						}${ busy ? ' busy' : '' }` }
+						onClick={ () =>
+							! busy && fileInputRef.current?.click()
+						}
 						onDrop={ handleDrop }
 						onDragOver={ handleDragOver }
 						onDragLeave={ handleDragLeave }
@@ -360,7 +416,14 @@ export default function VideoUploader( { value, onChange, videoRef }: VideoUploa
 						) : (
 							<>
 								<div className="clipisode-dropzone-icon">
-									<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#8c8f94" strokeWidth="1.5">
+									<svg
+										width="36"
+										height="36"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="#8c8f94"
+										strokeWidth="1.5"
+									>
 										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
 										<polyline points="17 8 12 3 7 8" />
 										<line x1="12" y1="3" x2="12" y2="15" />
@@ -370,7 +433,8 @@ export default function VideoUploader( { value, onChange, videoRef }: VideoUploa
 									Drag &amp; drop a video or click to browse
 								</div>
 								<div className="clipisode-dropzone-hint">
-									MP4, MOV, WebM, M4V &mdash; max 80 MB &mdash; portrait only
+									MP4, MOV, WebM, M4V &mdash; max 80 MB
+									&mdash; portrait only
 								</div>
 							</>
 						) }
@@ -406,14 +470,16 @@ export default function VideoUploader( { value, onChange, videoRef }: VideoUploa
 				</div>
 			) }
 
-			{ ! value && mode === 'existing' && (
-				loadingMedia ? (
+			{ ! value &&
+				mode === 'existing' &&
+				( loadingMedia ? (
 					<div className="clipisode-spinner-wrap">
 						<Spinner />
 					</div>
 				) : existingMedia.length === 0 ? (
 					<div className="clipisode-media-picker-empty">
-						No existing videos found. Upload assets on the <a href="admin.php?page=clipisode-media">Media page</a>.
+						No existing videos found. Upload assets on the{ ' ' }
+						<a href="admin.php?page=clipisode-media">Media page</a>.
 					</div>
 				) : (
 					<div className="clipisode-media-picker-grid">
@@ -422,7 +488,13 @@ export default function VideoUploader( { value, onChange, videoRef }: VideoUploa
 								key={ item.id }
 								type="button"
 								className="clipisode-media-picker-card"
-								onClick={ () => onChange( { id: item.id, url: item.url!, reused: true } ) }
+								onClick={ () =>
+									onChange( {
+										id: item.id,
+										url: item.url!,
+										reused: true,
+									} )
+								}
 							>
 								<video
 									src={ item.url! }
@@ -435,8 +507,7 @@ export default function VideoUploader( { value, onChange, videoRef }: VideoUploa
 							</button>
 						) ) }
 					</div>
-				)
-			) }
+				) ) }
 		</div>
 	);
 }

@@ -9,3 +9,6 @@ _tmp/
 # PHP testing
 vendor/
 composer.lock
+
+# Screenshot scratch folders (per-theme working images)
+z_screenshots/

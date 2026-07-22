@@ -1,11 +1,22 @@
 import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
-import { Button, Modal, SelectControl, Spinner, TextControl } from '@wordpress/components';
+import {
+	Button,
+	Modal,
+	SelectControl,
+	Spinner,
+	TextControl,
+} from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import { crop, copy, trash } from '@wordpress/icons';
 import TrimModal from '../components/TrimModal';
 import AddMediaModal from '../components/AddMediaModal';
 import { themeRegistry } from '../themes';
-import { WS_URL, generateJobId, getThemeAssets, getAvailableThemes } from '../lib/transcoder';
+import {
+	WS_URL,
+	generateJobId,
+	getThemeAssets,
+	getAvailableThemes,
+} from '../lib/transcoder';
 import type { Topic, Output, MediaItem } from '../types';
 
 interface CreateClipisodeProps {
@@ -45,20 +56,30 @@ function getDuration( url: string ): Promise< number > {
 	} );
 }
 
-export default function CreateClipisode( { topicId, mediaIds, navigate }: CreateClipisodeProps ) {
+export default function CreateClipisode( {
+	topicId,
+	mediaIds,
+	navigate,
+}: CreateClipisodeProps ) {
 	const [ topic, setTopic ] = useState< Topic | null >( null );
 	const [ clips, setClips ] = useState< ClipItem[] >( [] );
 	const [ loading, setLoading ] = useState( true );
-	const [ trimmingClip, setTrimmingClip ] = useState< ClipItem | null >( null );
+	const [ trimmingClip, setTrimmingClip ] = useState< ClipItem | null >(
+		null
+	);
 	const [ previewClip, setPreviewClip ] = useState< ClipItem | null >( null );
 	const availableThemes = getAvailableThemes();
-	const [ selectedTheme, setSelectedTheme ] = useState( availableThemes[ 0 ]?.id || 'standard' );
+	const [ selectedTheme, setSelectedTheme ] = useState(
+		availableThemes[ 0 ]?.id || 'default'
+	);
 	const [ renderState, setRenderState ] = useState< RenderState >( 'idle' );
 	const [ renderPhase, setRenderPhase ] = useState( '' );
 	const [ renderMessage, setRenderMessage ] = useState( '' );
 	const [ renderProgress, setRenderProgress ] = useState( 0 );
 	const [ renderError, setRenderError ] = useState( '' );
-	const [ renderOutputUrl, setRenderOutputUrl ] = useState< string | null >( null );
+	const [ renderOutputUrl, setRenderOutputUrl ] = useState< string | null >(
+		null
+	);
 	const wsRef = useRef< WebSocket | null >( null );
 	const jobIdRef = useRef< string | null >( null );
 	const dragItem = useRef< number | null >( null );
@@ -69,7 +90,10 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 
 	useEffect( () => {
 		const warn = ( e: BeforeUnloadEvent ) => {
-			if ( renderState === 'connecting' || renderState === 'processing' ) {
+			if (
+				renderState === 'connecting' ||
+				renderState === 'processing'
+			) {
 				e.preventDefault();
 			}
 		};
@@ -84,12 +108,24 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 
 		let t: Topic | null = null;
 		if ( topicId ) {
-			t = await apiFetch< Topic >( { path: `/clipisode/v1/topics/${ topicId }` } );
+			t = await apiFetch< Topic >( {
+				path: `/clipisode/v1/topics/${ topicId }`,
+			} );
 			setTopic( t );
 			setClipisodeName( t.title );
+			if ( t.invitation_renderer_theme ) {
+				const resolvedFromInvitation = themeRegistry[
+					t.invitation_renderer_theme
+				]
+					? t.invitation_renderer_theme
+					: 'default';
+				setSelectedTheme( resolvedFromInvitation );
+			}
 		}
 
-		const mediaById = new Map( mediaItems.map( ( m ) => [ Number( m.id ), m ] ) );
+		const mediaById = new Map(
+			mediaItems.map( ( m ) => [ Number( m.id ), m ] )
+		);
 
 		const items: ClipItem[] = mediaIds
 			.map( ( id ) => mediaById.get( id ) )
@@ -97,8 +133,16 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 			.map( ( m ) => ( {
 				id: `media-${ m.id }`,
 				mediaId: m.id,
-				role: ( t?.intro_media_id === m.id ? 'intro' : 'reply' ) as 'intro' | 'reply',
-				name: ( t?.intro_media_id === m.id && t?.hosted_by ) ? t.hosted_by : ( m.used_by?.label || m.label || m.path.split( '/' ).pop() || `media_${ m.id }` ),
+				role: ( t?.intro_media_id === m.id ? 'intro' : 'reply' ) as
+					| 'intro'
+					| 'reply',
+				name:
+					t?.intro_media_id === m.id && t?.hosted_by
+						? t.hosted_by
+						: m.used_by?.label ||
+						  m.label ||
+						  m.path.split( '/' ).pop() ||
+						  `media_${ m.id }`,
 				url: m.url!,
 				filename: m.path.split( '/' ).pop() || `media_${ m.id }.mp4`,
 				duration: 0,
@@ -127,13 +171,23 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 	}, [ loadData ] );
 
 	const toggleIncluded = ( id: string ) => {
-		setClips( ( prev ) => prev.map( ( c ) => ( c.id === id ? { ...c, included: ! c.included } : c ) ) );
+		setClips( ( prev ) =>
+			prev.map( ( c ) =>
+				c.id === id ? { ...c, included: ! c.included } : c
+			)
+		);
 	};
 
 	const handleTrimDone = ( start: number, end: number ) => {
-		if ( ! trimmingClip ) return;
+		if ( ! trimmingClip ) {
+			return;
+		}
 		setClips( ( prev ) =>
-			prev.map( ( c ) => ( c.id === trimmingClip.id ? { ...c, trimStart: start, trimEnd: end } : c ) )
+			prev.map( ( c ) =>
+				c.id === trimmingClip.id
+					? { ...c, trimStart: start, trimEnd: end }
+					: c
+			)
 		);
 		setTrimmingClip( null );
 	};
@@ -155,7 +209,9 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 	};
 
 	const removeClip = ( id: string ) => {
-		if ( ! window.confirm( 'Remove this clip from the list?' ) ) return;
+		if ( ! window.confirm( 'Remove this clip from the list?' ) ) {
+			return;
+		}
 		setClips( ( prev ) => prev.filter( ( c ) => c.id !== id ) );
 	};
 
@@ -172,9 +228,14 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 					id: `media-${ m.id }`,
 					mediaId: m.id,
 					role: 'reply' as const,
-					name: m.used_by?.label || m.label || m.path.split( '/' ).pop() || `media_${ m.id }`,
+					name:
+						m.used_by?.label ||
+						m.label ||
+						m.path.split( '/' ).pop() ||
+						`media_${ m.id }`,
 					url,
-					filename: m.path.split( '/' ).pop() || `media_${ m.id }.mp4`,
+					filename:
+						m.path.split( '/' ).pop() || `media_${ m.id }.mp4`,
 					duration: dur,
 					trimStart: 0,
 					trimEnd: dur,
@@ -194,10 +255,14 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 	};
 
 	const handleDragEnd = () => {
-		if ( dragItem.current === null || dragOver.current === null ) return;
+		if ( dragItem.current === null || dragOver.current === null ) {
+			return;
+		}
 		const from = dragItem.current;
 		const to = dragOver.current;
-		if ( from === to ) return;
+		if ( from === to ) {
+			return;
+		}
 
 		setClips( ( prev ) => {
 			const next = [ ...prev ];
@@ -210,7 +275,9 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 	};
 
 	const includedClips = clips.filter( ( c ) => c.included );
-	const [ debugManifest, setDebugManifest ] = useState< string | null >( null );
+	const [ debugManifest, setDebugManifest ] = useState< string | null >(
+		null
+	);
 
 	const buildManifest = ( callbackUrl: string ) => {
 		const videos: Record< string, object > = {};
@@ -225,11 +292,14 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 			};
 		} );
 
-		const getElements = themeRegistry[ selectedTheme ];
 		let elements: unknown[] = [];
 		let assets: Record< string, { url: string; filename: string } > = {};
 
-		if ( getElements ) {
+		if ( selectedTheme !== 'none' ) {
+			const resolvedThemeId = themeRegistry[ selectedTheme ]
+				? selectedTheme
+				: 'default';
+			const getElements = themeRegistry[ resolvedThemeId ];
 			const videoData = {
 				id: String( topicId || 0 ),
 				title: topic?.title || 'Clipisode',
@@ -241,6 +311,9 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 			};
 			elements = getElements( videoData );
 			assets = getThemeAssets( selectedTheme );
+			if ( Object.keys( assets ).length === 0 ) {
+				assets = getThemeAssets( resolvedThemeId );
+			}
 		}
 
 		return {
@@ -254,7 +327,9 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 	};
 
 	const startRendering = async () => {
-		if ( includedClips.length === 0 || ! clipisodeName.trim() ) return;
+		if ( includedClips.length === 0 || ! clipisodeName.trim() ) {
+			return;
+		}
 
 		setRenderState( 'connecting' );
 		setRenderPhase( '' );
@@ -268,7 +343,10 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 			output = await apiFetch< Output >( {
 				path: '/clipisode/v1/outputs',
 				method: 'POST',
-				data: { ...( topicId ? { topic_id: topicId } : {} ), name: clipisodeName.trim() },
+				data: {
+					...( topicId ? { topic_id: topicId } : {} ),
+					name: clipisodeName.trim(),
+				},
 			} );
 		} catch {
 			setRenderState( 'error' );
@@ -297,7 +375,9 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 			return;
 		}
 
-		const restRoot = window.clipisodeAdmin?.rest_root || `${ window.location.origin }/wp-json/`;
+		const restRoot =
+			window.clipisodeAdmin?.rest_root ||
+			`${ window.location.origin }/wp-json/`;
 		const callbackUrl = `${ restRoot }clipisode/v1/outputs/${ output.id }/upload?token=${ output.upload_token }`;
 
 		const jobId = generateJobId();
@@ -309,7 +389,13 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 		wsRef.current = ws;
 
 		ws.onopen = () => {
-			ws.send( JSON.stringify( { type: 'hello', client: 'clipisode-admin', version: 1 } ) );
+			ws.send(
+				JSON.stringify( {
+					type: 'hello',
+					client: 'clipisode-admin',
+					version: 1,
+				} )
+			);
 		};
 
 		ws.onmessage = ( event ) => {
@@ -368,7 +454,9 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 
 		ws.onclose = () => {
 			if ( wsRef.current ) {
-				setRenderError( 'Connection to the Clipisode desktop app was lost. Make sure it is running and try again.' );
+				setRenderError(
+					'Connection to the Clipisode desktop app was lost. Make sure it is running and try again.'
+				);
 				setRenderState( 'error' );
 				wsRef.current = null;
 				jobIdRef.current = null;
@@ -383,7 +471,12 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 	const cancelRendering = () => {
 		const ws = wsRef.current;
 		if ( ws && ws.readyState === WebSocket.OPEN ) {
-			ws.send( JSON.stringify( { type: 'cancel_job', job_id: jobIdRef.current } ) );
+			ws.send(
+				JSON.stringify( {
+					type: 'cancel_job',
+					job_id: jobIdRef.current,
+				} )
+			);
 		}
 		wsRef.current?.close();
 		wsRef.current = null;
@@ -399,14 +492,30 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 		);
 	}
 
-	const isTrimmed = ( clip: ClipItem ) => clip.trimStart > 0 || clip.trimEnd < clip.duration;
-	const totalDuration = includedClips.reduce( ( sum, c ) => sum + ( c.trimEnd - c.trimStart ), 0 );
+	const isTrimmed = ( clip: ClipItem ) =>
+		clip.trimStart > 0 || clip.trimEnd < clip.duration;
+	const totalDuration = includedClips.reduce(
+		( sum, c ) => sum + ( c.trimEnd - c.trimStart ),
+		0
+	);
 
 	return (
 		<>
 			<div className="clipisode-page-header">
-				<Button variant="tertiary" onClick={ () => navigate( topicId ? String( topicId ) : 'media' ) }>
-					{ topic ? <>{ '← Back to\u00a0' }<strong>{ topic.title }</strong></> : '← Back to Media' }
+				<Button
+					variant="tertiary"
+					onClick={ () =>
+						navigate( topicId ? String( topicId ) : 'media' )
+					}
+				>
+					{ topic ? (
+						<>
+							{ '← Back to\u00a0' }
+							<strong>{ topic.title }</strong>
+						</>
+					) : (
+						'← Back to Media'
+					) }
 				</Button>
 				<h1>Create Clipisode</h1>
 				<span />
@@ -415,7 +524,10 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 			{ renderState === 'idle' && (
 				<>
 					<div className="clipisode-section">
-						<h2>Clips ({ includedClips.length }) &middot; { formatTime( totalDuration ) }</h2>
+						<h2>
+							Clips ({ includedClips.length }) &middot;{ ' ' }
+							{ formatTime( totalDuration ) }
+						</h2>
 
 						<table className="clipisode-table">
 							<thead>
@@ -433,32 +545,70 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 									<tr
 										key={ clip.id }
 										draggable
-										onDragStart={ () => handleDragStart( index ) }
-										onDragEnter={ () => handleDragEnter( index ) }
+										onDragStart={ () =>
+											handleDragStart( index )
+										}
+										onDragEnter={ () =>
+											handleDragEnter( index )
+										}
 										onDragEnd={ handleDragEnd }
-										onDragOver={ ( e ) => e.preventDefault() }
-								>
-									<td style={ { cursor: 'grab', userSelect: 'none', fontSize: 18, textAlign: 'center' } }>&#x2630;</td>
+										onDragOver={ ( e ) =>
+											e.preventDefault()
+										}
+									>
+										<td
+											style={ {
+												cursor: 'grab',
+												userSelect: 'none',
+												fontSize: 18,
+												textAlign: 'center',
+											} }
+										>
+											&#x2630;
+										</td>
 										<td>
 											<button
 												type="button"
-												style={ { background: 'none', border: 'none', padding: 0, color: '#2271b1', cursor: 'pointer', font: 'inherit', textAlign: 'left' } }
-												onClick={ () => setPreviewClip( clip ) }
+												style={ {
+													background: 'none',
+													border: 'none',
+													padding: 0,
+													color: '#2271b1',
+													cursor: 'pointer',
+													font: 'inherit',
+													textAlign: 'left',
+												} }
+												onClick={ () =>
+													setPreviewClip( clip )
+												}
 											>
 												{ clip.name }
 											</button>
 										</td>
 										<td>
-											<span className={ `clipisode-status-badge ${ clip.role === 'intro' ? 'approved' : '' }` }>
+											<span
+												className={ `clipisode-status-badge ${
+													clip.role === 'intro'
+														? 'approved'
+														: ''
+												}` }
+											>
 												{ clip.role }
 											</span>
 										</td>
-										<td>{ clip.duration > 0 ? formatTime( clip.duration ) : '—' }</td>
+										<td>
+											{ clip.duration > 0
+												? formatTime( clip.duration )
+												: '—' }
+										</td>
 										<td>
 											{ isTrimmed( clip )
-												? `${ formatTime( clip.trimStart ) } – ${ formatTime( clip.trimEnd ) }`
-												: 'Full'
-											}
+												? `${ formatTime(
+														clip.trimStart
+												  ) } – ${ formatTime(
+														clip.trimEnd
+												  ) }`
+												: 'Full' }
 										</td>
 										<td>
 											<Button
@@ -466,20 +616,26 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 												label="Trim"
 												size="compact"
 												disabled={ clip.duration <= 0 }
-												onClick={ () => setTrimmingClip( clip ) }
+												onClick={ () =>
+													setTrimmingClip( clip )
+												}
 											/>
 											<Button
 												icon={ copy }
 												label="Duplicate"
 												size="compact"
-												onClick={ () => duplicateClip( clip, index ) }
+												onClick={ () =>
+													duplicateClip( clip, index )
+												}
 											/>
 											<Button
 												icon={ trash }
 												label="Remove"
 												size="compact"
 												isDestructive
-												onClick={ () => removeClip( clip.id ) }
+												onClick={ () =>
+													removeClip( clip.id )
+												}
 											/>
 										</td>
 									</tr>
@@ -502,7 +658,10 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 								label="Theme"
 								value={ selectedTheme }
 								options={ [
-									...availableThemes.map( ( t ) => ( { value: t.id, label: t.label } ) ),
+									...availableThemes.map( ( t ) => ( {
+										value: t.id,
+										label: t.label,
+									} ) ),
 									{ value: 'none', label: 'No Theme' },
 								] }
 								onChange={ setSelectedTheme }
@@ -511,13 +670,19 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 							/>
 						</div>
 						<div className="clipisode-create-actions__buttons">
-							<Button variant="secondary" onClick={ () => setShowAddMedia( true ) }>
+							<Button
+								variant="secondary"
+								onClick={ () => setShowAddMedia( true ) }
+							>
 								Add Media
 							</Button>
 							<Button
 								variant="primary"
 								onClick={ startRendering }
-								disabled={ includedClips.length === 0 || ! clipisodeName.trim() }
+								disabled={
+									includedClips.length === 0 ||
+									! clipisodeName.trim()
+								}
 							>
 								Create Clipisode
 							</Button>
@@ -525,9 +690,15 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 								<Button
 									variant="tertiary"
 									onClick={ () => {
-										const restRoot = window.clipisodeAdmin?.rest_root || `${ window.location.origin }/wp-json/`;
-										const manifest = buildManifest( `${ restRoot }clipisode/v1/outputs/<id>/upload?token=<token>` );
-										setDebugManifest( JSON.stringify( manifest, null, 2 ) );
+										const restRoot =
+											window.clipisodeAdmin?.rest_root ||
+											`${ window.location.origin }/wp-json/`;
+										const manifest = buildManifest(
+											`${ restRoot }clipisode/v1/outputs/<id>/upload?token=<token>`
+										);
+										setDebugManifest(
+											JSON.stringify( manifest, null, 2 )
+										);
 									} }
 									disabled={ includedClips.length === 0 }
 								>
@@ -539,20 +710,36 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 				</>
 			) }
 
-			{ ( renderState === 'connecting' || renderState === 'processing' ) && (
+			{ ( renderState === 'connecting' ||
+				renderState === 'processing' ) && (
 				<div className="clipisode-output-status">
 					<Spinner />
-					<div className="clipisode-output-phase">{ renderPhase || 'Connecting...' }</div>
-					{ renderMessage && <div className="clipisode-output-message">{ renderMessage }</div> }
+					<div className="clipisode-output-phase">
+						{ renderPhase || 'Connecting...' }
+					</div>
+					{ renderMessage && (
+						<div className="clipisode-output-message">
+							{ renderMessage }
+						</div>
+					) }
 					{ renderProgress > 0 && (
 						<div className="clipisode-output-progress">
 							<div className="clipisode-output-progress-track">
-								<div className="clipisode-output-progress-bar" style={ { width: `${ renderProgress }%` } } />
+								<div
+									className="clipisode-output-progress-bar"
+									style={ { width: `${ renderProgress }%` } }
+								/>
 							</div>
-							<span className="clipisode-output-progress-label">{ Math.round( renderProgress ) }%</span>
+							<span className="clipisode-output-progress-label">
+								{ Math.round( renderProgress ) }%
+							</span>
 						</div>
 					) }
-					<Button variant="tertiary" isDestructive onClick={ cancelRendering }>
+					<Button
+						variant="tertiary"
+						isDestructive
+						onClick={ cancelRendering }
+					>
 						Cancel
 					</Button>
 				</div>
@@ -560,8 +747,13 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 
 			{ renderState === 'error' && (
 				<div className="clipisode-output-status">
-					<div className="clipisode-output-error">{ renderError }</div>
-					<Button variant="secondary" onClick={ () => setRenderState( 'idle' ) }>
+					<div className="clipisode-output-error">
+						{ renderError }
+					</div>
+					<Button
+						variant="secondary"
+						onClick={ () => setRenderState( 'idle' ) }
+					>
 						Try Again
 					</Button>
 				</div>
@@ -571,9 +763,18 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 				<div className="clipisode-output-status">
 					<div className="clipisode-output-phase">Complete</div>
 					{ renderOutputUrl && (
-						<video src={ renderOutputUrl } controls playsInline style={ { maxWidth: '50%' } } />
+						<video
+							src={ renderOutputUrl }
+							controls
+							playsInline
+							style={ { maxWidth: '50%' } }
+						/>
 					) }
-					<Button variant="primary" onClick={ () => setRenderState( 'idle' ) } style={ { marginTop: 12 } }>
+					<Button
+						variant="primary"
+						onClick={ () => setRenderState( 'idle' ) }
+						style={ { marginTop: 12 } }
+					>
 						Create Another
 					</Button>
 				</div>
@@ -611,7 +812,12 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 						controls
 						autoPlay
 						playsInline
-						style={ { display: 'block', maxWidth: '100%', maxHeight: 'calc(90vh - 120px)', borderRadius: 4 } }
+						style={ {
+							display: 'block',
+							maxWidth: '100%',
+							maxHeight: 'calc(90vh - 120px)',
+							borderRadius: 4,
+						} }
 					/>
 				</Modal>
 			) }
@@ -622,7 +828,14 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 					onRequestClose={ () => setDebugManifest( null ) }
 					style={ { maxWidth: '720px', maxHeight: '90vh' } }
 				>
-					<div style={ { display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12 } }>
+					<div
+						style={ {
+							display: 'flex',
+							justifyContent: 'flex-end',
+							gap: 8,
+							marginBottom: 12,
+						} }
+					>
 						<Button
 							variant="secondary"
 							onClick={ () => {
@@ -634,7 +847,9 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 						<Button
 							variant="secondary"
 							onClick={ () => {
-								const blob = new Blob( [ debugManifest ], { type: 'application/json' } );
+								const blob = new Blob( [ debugManifest ], {
+									type: 'application/json',
+								} );
 								const url = URL.createObjectURL( blob );
 								const a = document.createElement( 'a' );
 								a.href = url;
@@ -648,7 +863,16 @@ export default function CreateClipisode( { topicId, mediaIds, navigate }: Create
 							Download
 						</Button>
 					</div>
-					<pre style={ { whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12, lineHeight: 1.5, maxHeight: 'calc(90vh - 160px)', overflow: 'auto' } }>
+					<pre
+						style={ {
+							whiteSpace: 'pre-wrap',
+							wordBreak: 'break-all',
+							fontSize: 12,
+							lineHeight: 1.5,
+							maxHeight: 'calc(90vh - 160px)',
+							overflow: 'auto',
+						} }
+					>
 						{ debugManifest }
 					</pre>
 				</Modal>
