@@ -297,11 +297,27 @@ if ( empty( $screens[ $screen_type ] ) ) {
 	exit;
 }
 
-// Track click on the link itself, not on individual screen views, so the
-// click count stays comparable with the legacy /invitation/{slug} flow.
-$wpdb->query( $wpdb->prepare(
-	"UPDATE $links_table SET clicks = clicks + 1 WHERE id = %d", $link->id
-) );
+// Pageview counting deliberately does NOT happen here.
+//
+// This template previously ran `UPDATE ... SET clicks = clicks + 1` on every
+// guest request. Two reasons that had to go:
+//
+//   1. It serialised every visitor to one link behind a single row lock. A
+//      brand sharing an invitation to a large audience is exactly when the
+//      flow must stay fast, and that is exactly when the contention peaks.
+//   2. It cannot survive edge caching. This response is now designed to be
+//      served from VIP's page cache (30 min TTL, stale up to 12 h), so PHP
+//      runs for a small and unpredictable fraction of real views. A counter
+//      incremented here measures cache misses, not audience — a number
+//      that looks authoritative and silently lies.
+//
+// Replacement, by tier: base installs read pageviews from the site's own
+// analytics (Jetpack Stats) rather than keeping a private counter; VIP
+// installs log to and report from Parse.ly. The `clicks` column stays for
+// now so historical values survive, but nothing writes to it.
+//
+// See docs/decision-log.md, "Analytics: stop counting pageviews in the
+// database".
 
 // Upload nonce keyed to this slug. Same shape the legacy
 // /invitation/{slug} flow used (action == 'clipisode_upload_' . $slug)
