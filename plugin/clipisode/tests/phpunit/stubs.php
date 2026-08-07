@@ -78,6 +78,61 @@ if ( ! function_exists( 'current_user_can' ) ) {
 	}
 }
 
+/**
+ * In-memory options table.
+ *
+ * Faithful on the one behaviour Clipisode_Database depends on for correctness:
+ * add_option() must fail when the option already exists, because that INSERT
+ * against a UNIQUE option_name is what makes the schema-upgrade lock atomic.
+ */
+$clipisode_test_options = [];
+
+if ( ! function_exists( 'clipisode_test_reset_options' ) ) {
+	function clipisode_test_reset_options(): void {
+		global $clipisode_test_options;
+		$clipisode_test_options = [];
+	}
+}
+
+if ( ! function_exists( 'get_option' ) ) {
+	function get_option( string $option, $default_value = false ) {
+		global $clipisode_test_options;
+		return array_key_exists( $option, $clipisode_test_options )
+			? $clipisode_test_options[ $option ]
+			: $default_value;
+	}
+}
+
+if ( ! function_exists( 'add_option' ) ) {
+	function add_option( string $option, $value = '', string $deprecated = '', $autoload = true ): bool {
+		global $clipisode_test_options;
+		if ( array_key_exists( $option, $clipisode_test_options ) ) {
+			return false;
+		}
+		$clipisode_test_options[ $option ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'update_option' ) ) {
+	function update_option( string $option, $value, $autoload = null ): bool {
+		global $clipisode_test_options;
+		$clipisode_test_options[ $option ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'delete_option' ) ) {
+	function delete_option( string $option ): bool {
+		global $clipisode_test_options;
+		if ( ! array_key_exists( $option, $clipisode_test_options ) ) {
+			return false;
+		}
+		unset( $clipisode_test_options[ $option ] );
+		return true;
+	}
+}
+
 if ( ! class_exists( 'WP_Post_Type' ) ) {
 	class WP_Post_Type {
 		public string $name;

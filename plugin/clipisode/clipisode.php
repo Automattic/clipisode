@@ -55,6 +55,19 @@ add_action( 'init', function (): void {
 	}
 }, 99 );
 
+/**
+ * Schema self-heal, at priority 0 so tables exist before anything queries them.
+ *
+ * Activation hooks fire only on activate/deactivate — never on an in-place
+ * plugin update, and only once against a single site when network-activated on
+ * multisite. Relying on them meant a schema change could never reach an
+ * existing site, and that subsites other than the one activated from had no
+ * tables at all. Clipisode_Database::maybe_upgrade() covers every case from one
+ * code path; see its docblock.
+ */
+add_action( 'init', [ Clipisode_Database::class, 'maybe_upgrade' ], 0 );
+add_action( 'wp_initialize_site', [ Clipisode_Database::class, 'initialize_site' ], 99 );
+
 add_action( 'init', [ Clipisode_Post_Types::class, 'register' ] );
 add_action( 'init', [ new Clipisode_Media(), 'register_hooks' ] );
 add_action( 'admin_menu', [ new Clipisode_Admin(), 'register_menus' ] );
