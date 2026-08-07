@@ -697,7 +697,6 @@ state = storeApi.state;
 // vdom and run preact's render against the region root fragment. That drives
 // the same code path hydrateRegions() would have driven, just from our side.
 //
-// This is the same pattern the spike (plugin/clipisode/spike/store.js) uses.
 // See Gutenberg PR #58227 / issue #58225 for upstream context. Once a fix
 // ships in a future WordPress version we can drop this workaround entirely.
 // ----------------------------------------------------------------------------

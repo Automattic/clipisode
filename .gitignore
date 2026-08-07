@@ -12,3 +12,5 @@ composer.lock
 
 # Screenshot scratch folders (per-theme working images)
 z_screenshots/
+# PHPUnit run cache (local, per-machine)
+.phpunit.result.cache

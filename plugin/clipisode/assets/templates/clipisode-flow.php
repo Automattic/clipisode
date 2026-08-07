@@ -577,7 +577,7 @@ Clipisode_Post_Types::enqueue_default_theme_style();
 // router are enqueued explicitly so each gets its own <script type="module">
 // tag rather than being pulled in only as a side effect of import statements.
 // Note: enqueuing the router is what triggers the WP 6.9 hydration race -
-// store.js handles it with the same manualHydrate workaround the spike uses.
+// store.js handles it with its manualHydrate workaround.
 //
 // Version is filemtime() of the actual file on disk so Studio Safari (and
 // any other aggressive cache) reliably pulls the latest store.js whenever
