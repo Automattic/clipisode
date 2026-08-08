@@ -1,14 +1,15 @@
 <?php
 /**
- * Template for /clipisode-flow/{slug} — guest-facing invitation flow rendered
+ * Template for /{prefix}/{slug} — the guest-facing invitation flow, rendered
  * from the clipisode_screen CPT.
  *
- * This is the parallel "v2" pipeline being built alongside the legacy
- * /invitation/{slug} flow. The legacy URL keeps working unchanged while this
- * one is under construction; once IAPI screen transitions and upload survival
- * are wired up here we'll repoint /invitation/{slug} at this template.
+ * This is the only invitation flow. The URL prefix comes from the
+ * clipisode_invitation_prefix option (default "invitation") so non-English
+ * sites can serve it at a locale-appropriate path. The earlier stage-block
+ * pipeline, and the hardcoded /clipisode-flow/ route this template was built
+ * on, were both removed — see docs/specs/shipped/kill-v1-invitation-flow.md.
  *
- * Step 9 wiring summary
+ * Wiring summary
  *   Saved screen content uses only plain core blocks (Group/Heading/Paragraph
  *   /Button) so the editor never throws "unexpected or invalid content".
  *   Three pieces of dynamic infrastructure live here, OUTSIDE the screen
@@ -26,6 +27,8 @@
  */
 
 defined( 'ABSPATH' ) || exit;
+
+// phpcs:disable WordPress.DB.DirectDatabaseQuery -- Custom tables have no WP_Query equivalent, and these are writes or single-row key lookups. Full reasoning in includes/class-rest-api.php.
 
 global $wpdb;
 
@@ -2476,12 +2479,17 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 				novalidate
 			>
 				<?php
-				// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- Fragments built above from literal markup, esc_html__()/esc_attr__() strings, and esc_attr()'d computed values; no raw request or topic data.
+				// Each fragment below is assembled from literal markup, esc_html__()/
+				// esc_attr__() strings, and esc_attr()'d computed class and style
+				// values. None carries raw request or topic data.
+				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 				echo $before_button;
+				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 				echo $fileinfo_html . $progress_html . $name_field_html . $handle_field_html;
+				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 				echo $button_open . $button_rest;
+				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 				echo $error_html;
-				// phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
 				?>
 			</form>
 			<?php
@@ -2660,12 +2668,16 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 				novalidate
 			>
 				<?php
-				// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- Same construction as the Name screen above; literals, translated strings, and esc_attr()'d values only.
+				// Same construction as the Name screen above: literals, translated
+				// strings, and esc_attr()'d values only.
+				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 				echo $email_before_submit;
+				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 				echo $email_field_html;
+				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 				echo $email_submit_open . $email_submit_rest;
+				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 				echo $email_error_html;
-				// phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
 				?>
 			</form>
 			<?php

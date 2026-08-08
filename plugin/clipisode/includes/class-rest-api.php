@@ -2,6 +2,28 @@
 
 defined( 'ABSPATH' ) || exit;
 
+/*
+ * Clipisode owns seven custom tables (see Clipisode_Database), so $wpdb is the
+ * only API available for them — there is no WP_Query equivalent. That makes
+ * WordPress.DB.DirectDatabaseQuery structurally unavoidable in this file rather
+ * than a smell, which is why it is disabled here instead of being annotated on
+ * every one of ~60 call sites.
+ *
+ * NoCaching is disabled deliberately, not deferred. Every query site in the
+ * plugin except seven is either a write or a single-row lookup on a primary or
+ * unique key; wrapping those in the object cache would buy microseconds while
+ * adding an invalidation path to every write endpoint, and a stale read after an
+ * admin save is a worse defect than the warning it silences. The seven that do
+ * scan more than one row are GROUP BY aggregates over the whole replies table.
+ * Those need a better query rather than a cache, and are tracked in
+ * docs/decision-log.md under "Admin topic list aggregates the whole replies
+ * table".
+ *
+ * The caching that does pay for itself is already in place: screen block
+ * rendering is memoised by Clipisode_Post_Types::render_flow_screen().
+ */
+// phpcs:disable WordPress.DB.DirectDatabaseQuery -- Custom tables; see above.
+
 class Clipisode_REST_API {
 
 	private const NAMESPACE = 'clipisode/v1';
