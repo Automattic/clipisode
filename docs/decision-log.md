@@ -50,9 +50,32 @@ survive, but nothing writes to it. Replacement, by tier:
    that's a correctness bug, not just a slow path: the first visitor's device type
    gets cached and served to everyone. Fix: render both intro screens into one
    cached response and choose client-side. One cache entry, no UA vary.
-3. **`do_blocks()` ran on every cache miss.** Fix: cache rendered per-screen HTML
-   in the object cache, keyed on screen post ID + `post_modified` + prefix option +
-   plugin version. Screens change rarely, so hit rate approaches 100%.
+
+   **Specced, not built** — `docs/specs/planned/cacheable-intro-screen-selection.md`.
+   Turned out smaller than expected (every screen is already in the DOM; the server
+   only picks which one gets `is-active`), but it carries one decision that isn't
+   mechanical: the QR bundle is currently enqueued behind exactly the branch being
+   removed, to keep ~24 KB off mobile guests. Three options costed in the spec, with
+   a recommendation. VIP's own PHPCS ruleset independently flags `wp_is_mobile()` as
+   an error citing full-page caching — though its suggested fix splits the cache,
+   which is worse than not varying at all.
+3. **`do_blocks()` ran on every cache miss — for every screen, on every request.**
+   Ten block-tree renders per request, when screens change only on an author edit.
+
+   **Done.** `Clipisode_Post_Types::render_flow_screen()` memoises it in the object
+   cache. Lives beside `set_flow_topic_context()` because that context is what makes
+   the output cacheable-but-varying.
+
+   The cache key was the whole risk here. Rendered output is per-topic and per-link,
+   not per-screen, because token substitution (`{topic_title}`, `{invitation_url}`)
+   happens inside the `render_block` filter. A key that didn't vary on topic context
+   would serve one brand's rendered screen on another brand's invitation — a
+   cross-tenant leak, not a perf regression. The key covers the raw markup (hashed),
+   the topic context, the intro video URL, and `CLIPISODE_VERSION`. Everything
+   request-specific (nonce, form widgets, QR mount, live URL) is applied after the
+   cached value returns. `FlowScreenRenderCacheTest` pins this, including the leak
+   case; verified by removing topic context from the key and confirming the
+   cross-tenant tests fail.
 4. **A `wp_verify_nonce` token was baked into the HTML.** See below.
 
 Anything per-visitor moves to the client. Name pre-fill reads `localStorage` in JS
@@ -251,10 +274,28 @@ demo.
 
 ### VIP code-review gates
 
-**Decided.** Adopt the `WordPressVIPMinimum` PHPCS ruleset now, while the surface is
-small. Known hits: direct `$wpdb` calls without `wp_cache_*` wrapping, a
-`posts_per_page => -1` in `delete_theme_screens()`, and custom tables + `dbDelta`
-needing VIP sign-off with a controlled migration path rather than activation hooks.
+**Done — wired as advisory.** `WordPressVIPMinimum` (the ruleset VIP applies during
+platform review) plus `composer lint` / `lint:summary` / `lint:sniffs` / `lint:fix`.
+Deliberately **not** part of `composer test`, so it reports without blocking work.
+
+Baseline: **381 errors, 188 warnings across 9 files.** Triage, worst first:
+
+- **280 of ~570 are `NonPrefixedVariableFound`** — almost entirely the two template
+  files declaring working variables in global scope. Wrapping each template body in
+  a closure would clear nearly half the total in one change. Best value per effort
+  by a wide margin, but it touches the template being actively edited, so it should
+  wait for the screen sweep to finish.
+- **`DirectDatabaseQuery` (69) + `NoCaching` (59)** — the custom-table architecture.
+  This is the real work and it overlaps the object-caching pass.
+- **`InterpolatedNotPrepared` (40)** — table names interpolated into SQL. Safe as
+  written, but WP 6.2+ has the `%i` identifier placeholder and this plugin requires
+  6.5, so these can be genuinely fixed rather than suppressed.
+- **Not previously noticed:** 31 `OutputNotEscaped`, 8 stray `error_log()` calls,
+  and 5 `NoPaging` hits beyond the one found by hand.
+
+`class-database.php` was brought to **zero** violations as the worked example of the
+intended pattern: fix what's genuinely fixable (`%i` placeholders), and annotate the
+rest inline with a specific reason rather than disabling sniffs globally.
 
 ### "Theme" means two different things
 
