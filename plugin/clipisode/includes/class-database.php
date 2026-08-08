@@ -83,8 +83,14 @@ class Clipisode_Database {
 	 * Without this the subsite's first request would do it instead, which
 	 * works but leaves a window where anything querying during site setup
 	 * (seeding, an admin redirect) hits missing tables.
+	 *
+	 * VIPCS warns that switch_to_blog() changes only the database context and
+	 * does not load the target site's plugins, theme, or hooks. That is exactly
+	 * what is wanted here: creating tables needs the new site's $wpdb->prefix
+	 * and nothing else. One switch per site creation, never in a loop.
 	 */
 	public static function initialize_site( WP_Site $site ): void {
+		// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.switch_to_blog_switch_to_blog -- DB context is all this needs; see docblock.
 		switch_to_blog( (int) $site->blog_id );
 		try {
 			self::maybe_upgrade();
@@ -130,10 +136,20 @@ class Clipisode_Database {
 		delete_option( self::LOCK_OPTION );
 	}
 
+	/**
+	 * Seeds a default host row on a site that has none.
+	 *
+	 * Runs at activation only, so the uncached count is a one-shot rather than a
+	 * request-path query — caching it would add an invalidation problem for no
+	 * gain. %i (identifier placeholder) is used for the table name rather than
+	 * interpolating it; available since WP 6.2 and this plugin requires 6.5.
+	 */
 	private static function ensure_default_host(): void {
 		global $wpdb;
 		$table = $wpdb->prefix . 'clipisode_hosts';
-		$count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $table" );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom table, activation-time one-shot; see docblock.
+		$count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $table ) );
 		if ( $count > 0 ) {
 			return;
 		}
@@ -143,6 +159,7 @@ class Clipisode_Database {
 			return;
 		}
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Custom table; $wpdb->insert() is the supported API for one.
 		$wpdb->insert( $table, [
 			'name'       => $user->display_name,
 			'is_default' => 1,

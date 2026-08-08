@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<ruleset name="Clipisode">
+	<description>
+		VIP-readiness linting for the Clipisode plugin.
+
+		Advisory by design: this is NOT wired into `composer test`, so it never
+		blocks day-to-day work. Run it with `composer lint`. The point is to see
+		what WP VIP's own review will flag, while the codebase is small enough to
+		fix incrementally, rather than discovering it during a customer onboarding.
+
+		Run `composer lint:summary` for a per-sniff count — that is the useful
+		view for deciding what to tackle next.
+	</description>
+
+	<file>.</file>
+
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<exclude-pattern>*/node_modules/*</exclude-pattern>
+	<exclude-pattern>*/build/*</exclude-pattern>
+	<exclude-pattern>*/tests/*</exclude-pattern>
+
+	<arg name="extensions" value="php"/>
+	<arg name="colors"/>
+	<arg value="sp"/>
+	<arg name="parallel" value="8"/>
+
+	<config name="testVersion" value="8.1-"/>
+	<config name="minimum_wp_version" value="6.5"/>
+
+	<!--
+		WordPressVIPMinimum is the ruleset VIP applies during platform review.
+		It is the one that matters for shipping to VIP-hosted
+		publishers and brands. Everything else here is deliberately left off for now so the
+		signal isn't buried in formatting noise.
+	-->
+	<rule ref="WordPressVIPMinimum"/>
+
+	<!--
+		Recognised prefixes, so the sniffs that check for global-namespace
+		pollution don't flag Clipisode's own functions, classes, and options.
+	-->
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="clipisode"/>
+				<element value="Clipisode"/>
+				<element value="CLIPISODE"/>
+			</property>
+		</properties>
+	</rule>
+</ruleset>

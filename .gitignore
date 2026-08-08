@@ -14,3 +14,7 @@ composer.lock
 z_screenshots/
 # PHPUnit run cache (local, per-machine)
 .phpunit.result.cache
+
+# PHPCS run cache (local, per-machine)
+.phpcs-cache
+phpcs.xml
