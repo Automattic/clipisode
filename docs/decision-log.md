@@ -9,7 +9,7 @@ Status legend: **Decided** (agreed, not built) · **In progress** · **Done** ·
 
 ---
 
-## 2026-08-07 — PHPCS cleanup: 569 → 265
+## 2026-08-07 — PHPCS cleanup: 569 → 0
 
 Worked the VIP-readiness lint baseline down by 304 violations. Everything that
 remains is one deferred item, described at the end.
@@ -88,24 +88,55 @@ reported despite correct annotations; isolated by bisecting a copy of the file.
 Avoid mixing the two forms in one file, and **verify per-file counts rather than
 inferring from the total** — the total moving in the right direction hid this.
 
-### What remains: 265 violations, one item
+### The last 265: template bodies wrapped in closures
 
-All 265 are `NonPrefixedVariableFound` (264) plus one `GlobalVariablesOverride`,
-and all of them are in `assets/templates/clipisode-flow.php` (239) and
+The final batch was 264 `NonPrefixedVariableFound` plus one
+`GlobalVariablesOverride`, all in `assets/templates/clipisode-flow.php` (239) and
 `assets/templates/preview.php` (26). Both are template files, so every top-level
-`$slug`, `$link`, `$topic` really is a global — VIP's complaint is legitimate, not
-a false positive.
+`$slug`, `$link`, `$topic` really was a global — VIP's complaint was legitimate,
+not a false positive, and `$link` collides with a global WordPress itself uses.
+Wrapping each body in a closure makes them locals.
 
-The fix is to wrap each template body in a closure, which converts them to locals
-and clears all 265 at once. **Still deferred, for two reasons:** the screen markup
-sweep has not started yet and `clipisode-flow.php` is where it lands, and a
-whole-file structural change to the guest-facing template cannot be verified
-without a browser. `preview.php` alone would clear only 26 and carries the same
-untestable risk, so it is not worth splitting.
+**This was deferred twice as unverifiable without a browser, and that was wrong.**
+It is verifiable, cheaply, and the method is worth reusing — see the next section.
 
-Do this after the sweep settles, and verify the invitation flow and the preview
-page in a browser afterwards — not just with `composer test`, which stubs
-WordPress and would not catch a scope mistake.
+Result: **PHPCS is at zero.** From 569 at the start of the day.
+
+### The render harness — reusable, and it does not need Studio running
+
+The Studio site at `~/Studio/alvey-clipisode` symlinks this plugin and runs on
+SQLite. That means WordPress boots straight from PHP CLI against the real dev
+database once the `DB_*` constants are stubbed — **the Studio app does not have to
+be running**, which also sidesteps its battery drain. Nothing listens on a port;
+PHP reads `wp-content/database/.ht.sqlite` directly.
+
+The harness sets the flow's query vars, `require`s the template, captures output,
+and writes it to a file. Comparing before/after across several paths is then a
+`cmp`. Used here on seven: mobile intro, desktop intro (both `wp_is_mobile`
+branches), name, email, success, warning_wide, and a second topic to vary the
+substituted tokens. All seven byte-identical across the closure change.
+`preview.php` too, rendered against a temporary `clipisode_outputs` row deleted in
+a `finally` block.
+
+**This is the fastest regression test for the flow, and the right tool for the
+intro-selection change** in `docs/specs/planned/cacheable-intro-screen-selection.md`
+— whose acceptance criterion is literally "byte-identical HTML for a desktop and a
+mobile user agent," which is exactly what this measures.
+
+Two traps if you rebuild it:
+
+- An iPhone UA string without the `Mobile/` token does **not** trip
+  `wp_is_mobile()`. An early run silently exercised the desktop branch twice and
+  reported both intros identical.
+- WordPress needs `DB_NAME` / `DB_USER` / `DB_PASSWORD` / `DB_HOST` defined even
+  though the SQLite drop-in ignores them. Without stubs you get "Error establishing
+  a database connection" and no hint why.
+
+Before the change, two static checks confirmed a closure was safe — both are the
+things that would actually alter behaviour. No WordPress global is read without a
+`global` declaration (`$wpdb` is the only one either template touches), and there
+is no top-level `return`; the only `return` statements in the flow template are
+inside its inline `<script>` block. `exit` behaves identically inside a closure.
 
 ---
 
@@ -539,6 +570,26 @@ transitions (the spike) → build the `clipisode_screen` CPT and the seeding pip
 → write the product brief → delete v1 → iterate on the block-editor authoring
 experience.
 
+**The inner loop, confirmed by Brian 2026-08-07** (promoted from `[inferred]`):
+start in the HTML seed files in the repo → promote them to CPT content → open in the
+block editor and check which elements are actually editable versus locked → go back
+to the HTML and clean up → repeat. Many times. That repetition is why the seed files
+and the lock model co-evolved, and why the conventions ended up documented in
+`assets/themes/default/README.md` rather than designed up front.
+
+**Why Studio was in the picture** `[confirmed]`. Brian used Studio during this phase
+specifically so he could push the site to a WordPress.com or Pressable host and then
+**test screens from real Android phones without configuring each phone to proxy to
+his laptop**. That was the whole point — device testing, not local convenience. It
+was not ideal, and Studio drains laptop battery noticeably even while plugged in.
+Studio has not been run since roughly June.
+
+Practical consequence for picking this back up: **the CLI render harness described
+above does not need the Studio app running**, because it reads the SQLite file
+directly. Use it for anything that can be checked from rendered HTML, and save
+Studio-plus-a-hosted-site for what genuinely requires a real device — camera
+capture, the upload path, and the Interactivity API on old Android.
+
 **Decisions from this phase survive only where they were written down**, which is
 mostly `assets/themes/default/README.md` and the shipped kill-v1 spec. Those are
 good: the README's "Hard-won lessons" and the kill-v1 spec's audit corrections are
@@ -556,9 +607,19 @@ drafted, stale by the time it was committed.
 
 ### Phase 6 — Readiness and lint, Aug 7 `[commit]`
 
-This log's other entries. 13 commits: schema versioning and multisite, the
-pageview-write removal, screen-render memoisation, the PHPCS pass from 569 to 0
-violations, and the two specs.
+This log's other entries. 14 commits in one day:
+
+- Schema versioning with a per-site `db_version` check and a `wp_initialize_site`
+  hook, fixing multisite, which was broken outright.
+- Four query-path indexes; the synchronous pageview write removed.
+- Screen block rendering memoised in the object cache.
+- **PHPCS from 569 violations to 0.** Along the way it surfaced four real defects,
+  not style: unsanitized `$_GET` in an admin redirect, a `pre_get_posts` hook with
+  no `is_main_query()` check, and two `esc_attr()` calls where `esc_url()` belongs.
+- Disposable spike code removed from every build, with a test guarding against a
+  repeat.
+- Two specs written (cacheable intro selection, screen sweep checklist) and this
+  history backfilled.
 
 ### Gaps this reconstruction cannot fill
 
