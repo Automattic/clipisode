@@ -441,11 +441,141 @@ moderation-scale problems measurable.
 
 ---
 
-## Background: how the screen system got here
+## Reconstructed history: February – July 2026
 
-- **February 2026** — 4-day sprint with two devs (Max and Christoph) built all the
-  mobile flow screens as one stacked post of blocks.
-- **~June 2026** — solo work converted those into individual `clipisode_screen` CPT
-  posts, so each screen is editable on its own in the block editor. The goal is that
-  brands can rebrand the entire reply flow themselves.
-- **Now** — that conversion is unfinished, and finishing it is priority one.
+Backfilled on 2026-08-07 for writing up work that predates this log. **Read the
+confidence markers** — this is reconstruction, not a record kept at the time.
+
+- **[commit]** — verifiable from git: dates, authors, commit messages, file changes.
+- **[artifact]** — inferred from a date written inside a document, or from a file's
+  modification time. Reliable for ordering, approximate for exact days.
+- **[inferred]** — reasoning from what the code does. Treat as a hypothesis.
+
+The important structural fact: **the solo phase has no granular commit history.**
+All of it landed as one squash commit, `c5495d6 "adding all of the stuff I worked
+on months ago"` (2026-07-21, 111 files, +16,482 / −4,114). Everything about that
+period is therefore `[artifact]` or `[inferred]`. The February–April phase, by
+contrast, has 105 individual commits and is well documented by them.
+
+### Phase 0 — Groundwork, Feb 12 (Thu) `[commit]`
+
+`ff23c86` "Initial pass at a PRD" and `4bd0460` "Add Clipisode transcoding MVP:
+macOS app, web UI, docs". The macOS transcoder existed *before* the WordPress
+plugin — the plugin was built toward a renderer that already worked.
+
+### Phase 1 — The sprint, Feb 17 (Tue) – Feb 20 (Fri) `[commit]`
+
+**This is the "4-day sprint," and the dates confirm it exactly:** four working days,
+69 commits, +19,946 / −2,569 lines. A few more landed Sat Feb 21.
+
+Division of labour is unambiguous in the numbers:
+
+- **Max Schmeling** — the macOS transcoder. 65 file-touches in `transcoding/macos`
+  against 35 in the plugin. Compositing, overlays, effects, video orientation,
+  coordinate systems, single-audio-track export, animations.
+- **Christoph Khouri** — the WordPress plugin. 336 file-touches in
+  `plugin/clipisode` against 45 in macOS. Tables, REST API, admin React app,
+  invitation flow, blocks, media abstraction.
+- **Brian** — one commit, `00bfa0d` "updated text about invitation pages" (Feb 22).
+
+What shipped, in commit order: the plugin skeleton → hosts table → invitation links
+and terms pages → **the `invitation-block` plugin (`a4c2190`, the v1 flow)** →
+invitation flow blocks + REST → Themes CPT → terms modal → desktop stage with QR →
+outputs and muxing UI + the WebSocket test server → upload nonce and output upload
+tokens → `/invitation/{slug}` routing → the `clipisode_media` table and media
+abstraction → the Clipisode list, with "mux" renamed to "render".
+
+Two renames worth knowing when reading old commits: **"Clip" became "Reply"**
+(`590fa12`) and **"mux" became "render"** (`68558ad`).
+
+**This is the phase that produced the stacked-blocks flow** — v1, later deleted.
+
+### Phase 2 — Consolidation, Feb 21–27 `[commit]`
+
+Multi-theme support and theme selector, template relocation, block/theme directory
+restructure, default-host support, desktop invitation layout work. Then the repo's
+own scaffolding: `df58f43` added root `AGENTS.md`/`CLAUDE.md`, `e69417b` added the
+PHPUnit and Jest setup, `573707c` condensed AGENTS.md.
+
+`5d77a73` "Remove database seeding on activation" is worth flagging — activation-time
+behaviour was deliberately reduced here, which is part of why the schema had no
+version-gated migration path until 2026-08-07.
+
+### Phase 3 — Christoph continues, Mar 4 – Apr 24 `[commit]`
+
+18 commits, no sprint pace. Clip duplication, media picker modal, video preview
+modals, social metadata and Topic Image, UI density work, then `47438d6`
+"Add clipisode preview pages & CPT layout editor" (Mar 6) — the `clipisode_preview`
+CPT. Mar 18: WebSocket failure messaging and existing-media picking. Then a gap, and
+a final three commits on **Apr 24**: manifest builder, debug-mode setting, and
+copy/download for the debug manifest.
+
+**Apr 24 is the last commit by anyone other than Brian.** The macOS transcoder has
+not been substantively touched since late February.
+
+### Phase 4 — Brian solo: the screen-CPT conversion, ~Apr 16 – May 6 `[artifact]`
+
+**Correction worth carrying into any writeup: this reads as late April to early May,
+not June.** The work was *committed* on Jul 21, which is probably where "June" comes
+from, but every dated artifact inside it clusters in that earlier window:
+
+| Evidence | Date | What it indicates |
+|---|---|---|
+| Dates inside `z-example.md`, `invitation-link-social-previews-plan.md` | Apr 16 | The `docs/specs/` format was established |
+| `alvey-clipisode` Studio symlink created | Apr 23 | Local dev site stood up |
+| `old-clipisode-theme-documentation.md`, `invitation-link-cpts-plan.md` mtimes | Apr 25 | Old-platform JSON config surface documented as the product reference |
+| `cursor.md` mtime | Apr 26 | LLM-generated v1 architecture analysis + refactor plan |
+| `spike/spike.php` mtime | Apr 26 | IAPI + upload-survival spike written |
+| `spike/store.js` mtime | Apr 30 | Spike iterated — the store pattern being proven |
+| `reset-invitation-link-customization.md` mtime | May 2 | The product brief for block-editor customization |
+| `short-invitation-urls.md` internal date | May 5 | Short-URL feature specced (never built) |
+| `z_screenshots/` mtime | May 5 | Screen design iteration |
+| `assets/themes/default/` dir mtime | May 6 | Seed templates last restructured |
+| Date inside `kill-v1-invitation-flow.md` | May 6 | **v1 flow deleted** |
+
+The sequence that implies `[inferred]`: research the old platform's customization
+surface → prove the Interactivity API can survive an upload across screen
+transitions (the spike) → build the `clipisode_screen` CPT and the seeding pipeline
+→ write the product brief → delete v1 → iterate on the block-editor authoring
+experience.
+
+**Decisions from this phase survive only where they were written down**, which is
+mostly `assets/themes/default/README.md` and the shipped kill-v1 spec. Those are
+good: the README's "Hard-won lessons" and the kill-v1 spec's audit corrections are
+genuine decision records. The rest — why a given lock model, why intro stayed
+Group-rooted — is recoverable only from `docs/handoff.md` §4, which Brian wrote from
+memory in July and which this log has already found one error in (see the
+font-size rule in the sweep checklist).
+
+### Phase 5 — Commit and hand off, Jul 21 `[commit]`
+
+`c5495d6` squashed the entire solo phase into one commit. `7756463` added
+`docs/handoff.md`, written to make the codebase legible to a new developer and their
+coding agent. The handoff's own §6.10 said "nothing is committed" — accurate when
+drafted, stale by the time it was committed.
+
+### Phase 6 — Readiness and lint, Aug 7 `[commit]`
+
+This log's other entries. 13 commits: schema versioning and multisite, the
+pageview-write removal, screen-render memoisation, the PHPCS pass from 569 to 0
+violations, and the two specs.
+
+### Gaps this reconstruction cannot fill
+
+- **Why the stacked-blocks approach was chosen in February.** No spec predates the
+  code; the PRD (`ff23c86`) describes the product, not the block architecture.
+- **What was tried and abandoned during the solo phase.** A squash commit erases
+  that. The one exception is documented: `core/cover` + `core/html` on the intro
+  screen broke editor validation, which is why `migrate_legacy_intro_post()` exists.
+- **Whether Max and Christoph made architectural calls that were later reversed.**
+  Their commit messages describe changes, not the reasoning behind them.
+
+### Where the screen-CPT conversion stands
+
+- **February** — the sprint built all mobile flow screens as one stacked post of
+  blocks.
+- **Late April / early May** — solo work split those into individual
+  `clipisode_screen` CPT posts, so each screen is editable on its own in the block
+  editor, and deleted v1. The goal: brands rebrand the whole reply flow themselves.
+- **Now** — that conversion is unfinished. See
+  `docs/specs/active/screen-markup-sweep-checklist.md` for exactly what is left.
