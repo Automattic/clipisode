@@ -1960,7 +1960,7 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			// the bundle disabled at least see something explanatory
 			// instead of an empty box.
 			$qr_html = '<div class="clipisode-introd-qr"'
-				. ' data-clipisode-qr-url="' . esc_attr( $current_url ) . '"'
+				. ' data-clipisode-qr-url="' . esc_url( $current_url ) . '"'
 				. ' role="img"'
 				. ' aria-label="' . esc_attr__( 'QR code linking to this invitation', 'clipisode' ) . '">'
 				. '<span class="clipisode-introd-qr-fallback">'
@@ -2476,10 +2476,12 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 				novalidate
 			>
 				<?php
+				// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- Fragments built above from literal markup, esc_html__()/esc_attr__() strings, and esc_attr()'d computed values; no raw request or topic data.
 				echo $before_button;
 				echo $fileinfo_html . $progress_html . $name_field_html . $handle_field_html;
 				echo $button_open . $button_rest;
 				echo $error_html;
+				// phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
 				?>
 			</form>
 			<?php
@@ -2658,14 +2660,17 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 				novalidate
 			>
 				<?php
+				// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped -- Same construction as the Name screen above; literals, translated strings, and esc_attr()'d values only.
 				echo $email_before_submit;
 				echo $email_field_html;
 				echo $email_submit_open . $email_submit_rest;
 				echo $email_error_html;
+				// phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
 				?>
 			</form>
 			<?php
 		} else {
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Block-rendered HTML from render_flow_screen(); escaping would print markup as text.
 			echo $rendered_content;
 		}
 		?>
@@ -2700,8 +2705,8 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 		class="clipisode-terms-close"
 		aria-label="<?php esc_attr_e( 'Close terms', 'clipisode' ); ?>"
 		data-wp-on--click="actions.closeTerms"
-	><?php echo $close_svg; // Inline SVG markup; no user data. ?></button>
-	<div class="clipisode-terms-content"><?php echo $terms_html; // KSES is applied by the_content filter chain. ?></div>
+	><?php echo $close_svg; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Inline SVG markup defined in this file; no user data. ?></button>
+	<div class="clipisode-terms-content"><?php echo $terms_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built from the_content() output, so KSES has already run. ?></div>
 </div>
 
 <?php
