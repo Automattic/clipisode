@@ -131,6 +131,55 @@ and the deferred QR paint is acceptable on a screen whose entire job is "scan
 this with your phone." A is a reasonable shortcut if we want the caching win
 landed today and are willing to revisit.
 
+### Why not C — resolved 2026-08-07
+
+C was considered seriously in the form "root URL redirects desktop visitors to
+`/desktop`, and `/desktop` redirects phones back." It was rejected. Recording the
+reasoning so it isn't re-litigated.
+
+**A UA-based redirect has the identical cache-poisoning bug as UA-based
+rendering.** A redirect is just another HTTP response, and responses get cached.
+The edge caches "desktop → `/desktop`" and then every visitor is bounced there,
+phones included. 301 is cacheable by default; 302 is not per RFC 7231 but is
+commonly cached depending on edge configuration, so this would depend on VIP's
+config rather than on a guarantee. Making it safe means marking the root
+`no-store`, which puts every guest view back into PHP — exactly what this work
+removes.
+
+**This does not conflict with the byte-identical criterion in §5, though.** That
+criterion is *per URL*. Two URLs each serving byte-identical HTML are both
+perfectly cacheable. What breaks caching is any UA-dependent response *at a
+cacheable URL* — HTML or redirect. C is therefore viable only with client-side
+redirects, which cost desktop a flash plus an extra navigation.
+
+**The editability argument for C does not hold.** `intro` and `intro_desktop` are
+already separate `clipisode_screen` posts, independently editable in the block
+editor. Splitting the URL buys nothing there.
+
+**C's real advantage, measured.** It does solve §4 statically — desktop is its own
+URL, so the QR script is enqueued unconditionally with no UA detection and no lazy
+loading, and mobile ships neither the desktop markup nor the bundle. But
+`intro_desktop.html` is ~4 KB of block markup, roughly 1.5 KB gzipped once
+rendered, and B lazy-loads the QR script anyway. **C's mobile saving over B is
+~1–2 KB gzipped** — not worth a new rewrite, canonical/OG handling, the QR URL
+special case, and bidirectional redirects.
+
+**The sharing problem is what settles it.** After redirecting, the desktop user's
+address bar reads `/desktop`. That is the URL they copy to a friend. So `/desktop`
+needs to bounce phones back, which is a second UA decision and a second
+cacheability problem.
+
+**Would flip to C if:** the desktop screen becomes a real experience (its own
+player, a reply gallery, a sponsor unit) rather than an interstitial, so its
+payload stops being rounding error — or if we want genuinely different OG cards
+per surface.
+
+**Worth taking from C now:** add `/desktop` as an *addressable* route with **no
+redirects at all**. Nothing sends anyone there automatically; it just gives
+authors and clients a stable URL for previewing and sharing the desktop screen,
+which is friendlier than `?screen=intro_desktop`. Purely additive, fully
+cacheable, compatible with B. Land it alongside B.
+
 ## 5. Verification
 
 Cannot be verified by unit test — it's viewport behaviour in a real browser.
