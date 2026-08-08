@@ -1908,7 +1908,10 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 		// per state (idle / pending / submitting / error / done) while
 		// the static markup still carries the author's IDLE label as a
 		// no-flash first paint.
-		$rendered_content = do_blocks( $content );
+		// Memoised in the object cache — see
+		// Clipisode_Post_Types::render_flow_screen(). Everything below this
+		// line is request-specific post-processing and stays uncached.
+		$rendered_content = Clipisode_Post_Types::render_flow_screen( $st, $content );
 		if ( $st === 'name' ) {
 			$rendered_content = preg_replace_callback(
 				'#(<div\b[^>]*\bclipisode-name-submit\b[^>]*>\s*)<a\b([^>]*)>#i',

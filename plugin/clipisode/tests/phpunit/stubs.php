@@ -133,6 +133,59 @@ if ( ! function_exists( 'delete_option' ) ) {
 	}
 }
 
+if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
+	define( 'HOUR_IN_SECONDS', 3600 );
+}
+
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	function wp_json_encode( $data, int $flags = 0, int $depth = 512 ) {
+		return json_encode( $data, $flags, $depth );
+	}
+}
+
+/**
+ * In-memory object cache, plus a counter for how many times do_blocks() ran.
+ *
+ * The counter is what makes cache-key correctness testable: a key that failed
+ * to vary on the topic context would show as a cache hit across two different
+ * topics, which is a cross-tenant content leak rather than a mere perf bug.
+ */
+$clipisode_test_cache = [];
+
+$clipisode_test_do_blocks_calls = 0;
+
+if ( ! function_exists( 'clipisode_test_reset_cache' ) ) {
+	function clipisode_test_reset_cache(): void {
+		global $clipisode_test_cache, $clipisode_test_do_blocks_calls;
+		$clipisode_test_cache           = [];
+		$clipisode_test_do_blocks_calls = 0;
+	}
+}
+
+if ( ! function_exists( 'wp_cache_get' ) ) {
+	function wp_cache_get( $key, string $group = '', bool $force = false, &$found = null ) {
+		global $clipisode_test_cache;
+		$found = isset( $clipisode_test_cache[ $group ][ $key ] );
+		return $found ? $clipisode_test_cache[ $group ][ $key ] : false;
+	}
+}
+
+if ( ! function_exists( 'wp_cache_set' ) ) {
+	function wp_cache_set( $key, $data, string $group = '', int $expire = 0 ): bool {
+		global $clipisode_test_cache;
+		$clipisode_test_cache[ $group ][ $key ] = $data;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'do_blocks' ) ) {
+	function do_blocks( string $content ): string {
+		global $clipisode_test_do_blocks_calls;
+		++$clipisode_test_do_blocks_calls;
+		return '<rendered>' . $content . '</rendered>';
+	}
+}
+
 if ( ! class_exists( 'WP_Post_Type' ) ) {
 	class WP_Post_Type {
 		public string $name;

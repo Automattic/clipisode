@@ -184,6 +184,73 @@ class Clipisode_Post_Types {
 		self::$flow_topic_context = null;
 	}
 
+	const FLOW_RENDER_CACHE_GROUP = 'clipisode_flow';
+
+	/**
+	 * do_blocks() for an invitation-flow screen, memoised in the object cache.
+	 *
+	 * The public flow renders every screen in the theme on every request — ten
+	 * do_blocks() passes over full block trees, each walking the block parser
+	 * and running the render_block filter chain. Screens change only when an
+	 * author edits one in the block editor, so nearly all of that work is
+	 * repeated identically.
+	 *
+	 * This matters even though the flow response is itself edge-cached: a
+	 * 30-minute page-cache TTL means misses and revalidations still reach PHP,
+	 * ?screen= variants bypass the warm entry, and the first request after any
+	 * purge pays full price. VIP's object cache is shared across web servers,
+	 * so one render warms every one of them.
+	 *
+	 * The cache key covers everything the output depends on:
+	 *
+	 *   - the raw block markup, hashed. Covers author edits without needing to
+	 *     read post_modified separately, and covers the healing rewrites the
+	 *     flow template performs before calling this.
+	 *   - the topic context, because token substitution ({topic_title},
+	 *     {invitation_url}, {network}, …) happens inside the render_block
+	 *     filter, making output per-topic and per-link rather than per-screen.
+	 *   - the resolved intro video URL, for the same reason.
+	 *   - CLIPISODE_VERSION, so a plugin release that changes the filter chain
+	 *     cannot serve output produced by the previous one.
+	 *
+	 * Anything request-specific — the nonce, injected form widgets, the QR
+	 * mount, the live invitation URL — is applied by the caller AFTER this
+	 * returns, and so is deliberately outside the cached value.
+	 */
+	public static function render_flow_screen( string $screen_type, string $content ): string {
+		if ( $content === '' ) {
+			return '';
+		}
+
+		$key = 'screen_' . md5(
+			implode(
+				'|',
+				[
+					$screen_type,
+					CLIPISODE_VERSION,
+					md5( $content ),
+					md5( (string) wp_json_encode( self::get_flow_topic_context() ) ),
+					self::get_flow_intro_video_url(),
+				]
+			)
+		);
+
+		$cached = wp_cache_get( $key, self::FLOW_RENDER_CACHE_GROUP );
+		if ( is_string( $cached ) ) {
+			return $cached;
+		}
+
+		$rendered = do_blocks( $content );
+
+		// Content-hashed keys are never updated in place, only superseded, so a
+		// TTL is what stops superseded entries accumulating. Twelve hours is
+		// comfortably longer than any edge-cache lifetime, so a warm entry
+		// outlives the responses built from it.
+		wp_cache_set( $key, $rendered, self::FLOW_RENDER_CACHE_GROUP, 12 * HOUR_IN_SECONDS );
+
+		return $rendered;
+	}
+
 	/**
 	 * Replaces {host_name} / {topic_title} tokens (and a small set of other
 	 * known keys) inside a string with the current topic's values. Used in
