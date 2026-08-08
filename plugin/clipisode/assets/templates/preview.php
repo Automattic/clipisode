@@ -10,6 +10,14 @@ defined( 'ABSPATH' ) || exit;
 
 // phpcs:disable WordPress.DB.DirectDatabaseQuery -- Custom tables have no WP_Query equivalent, and these are writes or single-row key lookups. Full reasoning in includes/class-rest-api.php.
 
+/*
+ * Template body runs inside a closure so its working variables stay local
+ * rather than becoming globals — WordPress includes templates at global scope.
+ * $wpdb is the only WordPress global this file touches. Same reasoning and same
+ * shape as assets/templates/clipisode-flow.php.
+ */
+( static function (): void {
+
 global $wpdb;
 
 $output_id = (int) get_query_var( 'clipisode_preview_id' );
@@ -134,3 +142,6 @@ echo $rendered;
 <?php wp_footer(); ?>
 </body>
 </html>
+<?php
+
+} )();

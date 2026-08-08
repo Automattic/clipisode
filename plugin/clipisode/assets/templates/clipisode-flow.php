@@ -30,6 +30,27 @@ defined( 'ABSPATH' ) || exit;
 
 // phpcs:disable WordPress.DB.DirectDatabaseQuery -- Custom tables have no WP_Query equivalent, and these are writes or single-row key lookups. Full reasoning in includes/class-rest-api.php.
 
+/*
+ * The whole template body runs inside a closure.
+ *
+ * WordPress includes a template at global scope, so without this every working
+ * variable here ($slug, $link, $topic, $screens, ...) would become a global.
+ * That pollutes the global namespace on every invitation request, and one of
+ * them — $link — collides with a global WordPress itself uses. VIP's
+ * PrefixAllGlobals and GlobalVariablesOverride sniffs both flag it, and they
+ * are right to.
+ *
+ * A closure makes them locals. $wpdb is pulled in explicitly below; it is the
+ * only WordPress global this template touches, which is what made the wrapper
+ * safe to add (verified before the change by checking every WP global name
+ * against the declarations in this file).
+ *
+ * `exit` inside the closure still terminates the request exactly as before.
+ * There is no top-level `return` to reinterpret — the only `return` statements
+ * in the file are inside the inline <script> block near the end.
+ */
+( static function (): void {
+
 global $wpdb;
 
 $slug = sanitize_text_field( get_query_var( 'clipisode_invite' ) );
@@ -2963,3 +2984,6 @@ wp_footer();
 ?>
 </body>
 </html>
+<?php
+
+} )();
