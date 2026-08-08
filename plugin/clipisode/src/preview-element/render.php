@@ -1,6 +1,14 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
+/*
+ * Block render templates are included from inside WP_Block::render(), so the
+ * variables below are method-scoped locals, not globals. PrefixAllGlobals and
+ * GlobalVariablesOverride both assume file-level code runs at global scope and
+ * cannot see the enclosing method, which makes them false positives here.
+ */
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound, WordPress.WP.GlobalVariablesOverride.Prohibited -- Method scope; see above.
+
 // phpcs:disable WordPress.DB.DirectDatabaseQuery -- Custom tables have no WP_Query equivalent, and these are writes or single-row key lookups. Full reasoning in includes/class-rest-api.php.
 
 $type      = $attributes['type'] ?? '';
@@ -62,7 +70,6 @@ switch ( $type ) {
 	case 'cta':
 		$invitation_url = '';
 		if ( $topic ) {
-			global $wpdb;
 			$link = $wpdb->get_row( $wpdb->prepare(
 				"SELECT slug FROM {$wpdb->prefix}clipisode_invitation_links WHERE topic_id = %d AND status = 'open' ORDER BY created_at DESC LIMIT 1",
 				$topic->id

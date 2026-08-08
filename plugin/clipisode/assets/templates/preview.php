@@ -82,6 +82,7 @@ if ( preg_match( '/<!-- wp:clipisode\/preview-flow \{.*?"outputId"/', $content )
 	);
 }
 
+// phpcs:ignore WordPressVIPMinimum.UserExperience.AdminBarRemoval.RemovalDetected -- Standalone public preview document, not a theme page.
 show_admin_bar( false );
 $rendered = do_blocks( $content );
 

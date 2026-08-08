@@ -652,10 +652,14 @@ class Clipisode_Post_Types {
 		// One-time success/error notice from the previous request, if
 		// the user just clicked a button. We pass status via a query
 		// arg so the notice survives the redirect after admin_post.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only query arg used for routing or display; changes no state.
 		$result = isset( $_GET['clipisode_tool_result'] )
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only query arg used for routing or display; changes no state.
 			? sanitize_key( wp_unslash( $_GET['clipisode_tool_result'] ) )
 			: '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only query arg used for routing or display; changes no state.
 		$detail = isset( $_GET['clipisode_tool_detail'] )
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only query arg used for routing or display; changes no state.
 			? sanitize_text_field( wp_unslash( $_GET['clipisode_tool_detail'] ) )
 			: '';
 
@@ -920,11 +924,15 @@ class Clipisode_Post_Types {
 	}
 
 	public static function get_brand_terms_id(): ?int {
+		// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.get_posts_get_posts -- suppress_filters is set to false below, which is what the sniff asks for; it cannot see array args.
 		$posts = get_posts( [
+			'suppress_filters' => false,
 			'post_type'   => 'clipisode_terms',
 			'post_status' => 'publish',
 			'numberposts' => 1,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key, WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Meta lookup over a hand-authored CPT bounded to tens of rows, not a content-scale table.
 			'meta_key'    => self::TERMS_TYPE_META,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Paired with the meta_key above; bounded hand-authored CPT.
 			'meta_value'  => 'brand',
 		] );
 
@@ -932,11 +940,15 @@ class Clipisode_Post_Types {
 	}
 
 	public static function get_default_invitation_id(): ?int {
+		// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.get_posts_get_posts -- suppress_filters is set to false below, which is what the sniff asks for; it cannot see array args.
 		$posts = get_posts( [
+			'suppress_filters' => false,
 			'post_type'   => 'clipisode_invite',
 			'post_status' => 'publish',
 			'numberposts' => 1,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key, WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Meta lookup over a hand-authored CPT bounded to tens of rows, not a content-scale table.
 			'meta_key'    => self::DEFAULT_INVITATION_META,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Paired with the meta_key above; bounded hand-authored CPT.
 			'meta_value'  => '1',
 		] );
 
@@ -1106,12 +1118,16 @@ class Clipisode_Post_Types {
 			return null;
 		}
 
+		// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.get_posts_get_posts -- suppress_filters is set to false below, which is what the sniff asks for; it cannot see array args.
 		$ids = get_posts( [
+			'suppress_filters' => false,
 			'post_type'   => 'clipisode_screen',
 			'post_status' => [ 'publish', 'draft', 'pending', 'private' ],
 			'numberposts' => 1,
 			'post_parent' => $theme_id,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key, WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Meta lookup over a hand-authored CPT bounded to tens of rows, not a content-scale table.
 			'meta_key'    => self::SCREEN_TYPE_META,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Paired with the meta_key above; bounded hand-authored CPT.
 			'meta_value'  => $screen_type,
 			'fields'      => 'ids',
 		] );
@@ -1134,12 +1150,16 @@ class Clipisode_Post_Types {
 		// type, so the real cardinality here is 0 or 1; anything above that is
 		// already a duplicate this function exists to clean up. 100 is far
 		// beyond any plausible count while keeping the query bounded.
+		// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.get_posts_get_posts -- suppress_filters is set to false below, which is what the sniff asks for; it cannot see array args.
 		$ids = get_posts( [
+			'suppress_filters' => false,
 			'post_type'   => 'clipisode_screen',
 			'post_status' => 'trash',
 			'numberposts' => 100,
 			'post_parent' => $theme_id,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key, WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Meta lookup over a hand-authored CPT bounded to tens of rows, not a content-scale table.
 			'meta_key'    => self::SCREEN_TYPE_META,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Paired with the meta_key above; bounded hand-authored CPT.
 			'meta_value'  => $screen_type,
 			'fields'      => 'ids',
 		] );
@@ -1537,6 +1557,7 @@ class Clipisode_Post_Types {
 	private static function default_screen_content( string $screen_type ): string {
 		$file = CLIPISODE_PLUGIN_DIR . "assets/themes/default/{$screen_type}.html";
 		if ( file_exists( $file ) ) {
+			// phpcs:ignore WordPressVIPMinimum.Performance.FetchingRemoteData.FileGetContentsUnknown -- Reads a file shipped inside this plugin, never a remote URL.
 			$content = file_get_contents( $file );
 			if ( $content !== false && trim( $content ) !== '' ) {
 				$content = self::strip_doc_comments( $content );
@@ -1717,6 +1738,7 @@ class Clipisode_Post_Types {
 		if ( ! file_exists( $path ) ) {
 			return [];
 		}
+		// phpcs:ignore WordPressVIPMinimum.Performance.FetchingRemoteData.FileGetContentsUnknown -- Reads a file shipped inside this plugin, never a remote URL.
 		$raw = file_get_contents( $path );
 		if ( ! is_string( $raw ) || $raw === '' ) {
 			return [];
@@ -1929,6 +1951,7 @@ class Clipisode_Post_Types {
 	 * an edit-screen request, bail."
 	 */
 	private static function current_screen_post_type(): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only query arg used for routing or display; changes no state.
 		$post_id = isset( $_GET['post'] ) ? (int) $_GET['post'] : 0;
 		if ( $post_id ) {
 			$post = get_post( $post_id );
@@ -1936,7 +1959,9 @@ class Clipisode_Post_Types {
 				return $post->post_type;
 			}
 		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only query arg used for routing or display; changes no state.
 		if ( isset( $_GET['post_type'] ) ) {
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only query arg used for routing or display; changes no state.
 			return sanitize_key( wp_unslash( $_GET['post_type'] ) );
 		}
 		return '';
@@ -2534,6 +2559,7 @@ class Clipisode_Post_Types {
 		if ( $post_type !== 'clipisode_screen' ) {
 			return;
 		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only query arg used for routing or display; changes no state.
 		$post_id = isset( $_GET['post'] ) ? (int) $_GET['post'] : 0;
 		$screen_type = $post_id ? (string) get_post_meta( $post_id, self::SCREEN_TYPE_META, true ) : '';
 		if ( $post_id > 0 && $screen_type !== '' ) {
@@ -3661,11 +3687,15 @@ body.editor-styles-wrapper .clipisode-closed-root .wp-block-button__link {
 	}
 
 	public static function get_default_preview_id(): ?int {
+		// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.get_posts_get_posts -- suppress_filters is set to false below, which is what the sniff asks for; it cannot see array args.
 		$posts = get_posts( [
+			'suppress_filters' => false,
 			'post_type'   => 'clipisode_preview',
 			'post_status' => 'publish',
 			'numberposts' => 1,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key, WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Meta lookup over a hand-authored CPT bounded to tens of rows, not a content-scale table.
 			'meta_key'    => self::DEFAULT_PREVIEW_META,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Paired with the meta_key above; bounded hand-authored CPT.
 			'meta_value'  => '1',
 		] );
 
@@ -3715,6 +3745,7 @@ BLOCKS;
 
 		$template_path = CLIPISODE_PLUGIN_DIR . 'assets/templates/default-brand-terms.html';
 		$content       = file_exists( $template_path )
+			// phpcs:ignore WordPressVIPMinimum.Performance.FetchingRemoteData.FileGetContentsUnknown -- Reads a file shipped inside this plugin, never a remote URL.
 			? file_get_contents( $template_path )
 			: '<p>By submitting a video you grant the brand a perpetual, worldwide license to use your submission.</p>';
 

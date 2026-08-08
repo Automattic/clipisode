@@ -9,6 +9,106 @@ Status legend: **Decided** (agreed, not built) · **In progress** · **Done** ·
 
 ---
 
+## 2026-08-07 — PHPCS cleanup: 569 → 265
+
+Worked the VIP-readiness lint baseline down by 304 violations. Everything that
+remains is one deferred item, described at the end.
+
+### Real defects found and fixed
+
+The lint pass earned its keep — these are bugs, not style:
+
+- **Unsanitized admin input.** `Clipisode_Admin::redirect_cpt_list()` read
+  `$_GET['post_type']` raw into a comparison. Now `sanitize_key( wp_unslash() )`.
+- **`pre_get_posts` hook modified every attachment query.**
+  `Clipisode_Media::hide_from_media_list()` had no `is_main_query()` check, so it
+  filtered secondary attachment queries on `upload.php` too, not just the list
+  table it targets. The AJAX grid is handled separately by
+  `hide_from_media_grid()`, so the main-query check matches the original intent.
+- **Two wrong escaping functions.** `esc_attr()` was used where `esc_url()`
+  belongs — on a `<video src>` in the preview block, and on the
+  `data-clipisode-qr-url` attribute in the flow template. `esc_attr()` blocks
+  attribute breakout but does not check the scheme, so it does not stop a
+  `javascript:` URL. The QR one matters more than it looks: that value derives
+  from the request URI.
+- **Silenced filesystem call.** `@unlink( $tmp )` is now `wp_delete_file( $tmp )`
+  — WordPress's wrapper, permitted on VIP, and no longer swallowing errors.
+- **Dead locals.** Four unused `$wpdb->prefix` assignments in `list_replies()`
+  and `list_media()`, plus a redundant second `global $wpdb`.
+- **Stale docblock.** `clipisode-flow.php` still described itself as a "parallel
+  v2 pipeline being built alongside the legacy `/invitation/{slug}` flow" and
+  promised a future cutover. v1 was deleted months ago.
+
+### Genuine hardening, not suppression
+
+- **All 43 interpolated table names now use `%i`** identifier placeholders. WP
+  6.2 added `%i` and this plugin requires 6.5, so these were fixable rather than
+  ignorable. Placeholder and argument counts were verified statically across all
+  42 `prepare()` calls in the changed files.
+- **`list_replies()` and `list_media()` always prepare now.** Both previously
+  called `prepare()` only when `$values` was non-empty, so an unfiltered request
+  ran an unprepared statement. Harmless as written — the only interpolated values
+  were `$wpdb->prefix` table names — but it meant one code path was sometimes
+  prepared and sometimes not.
+- **Five unbounded `get_posts()` calls are bounded.** VIPCS rejects values above
+  100 as well as `-1`, so each is capped at 100 with a comment giving the expected
+  cardinality. For the three admin list endpoints the complete fix is real
+  pagination, tracked with the reply-list pagination work above.
+- **`suppress_filters => false`** on all nine `get_posts()` calls, which is what
+  puts them on the cached query path.
+- **`preview.php` moved to escape-at-output.** It held OG and Twitter card values
+  pre-escaped in variables and echoed them raw. Safe, but backwards: it hides the
+  escaping from review and silently double-escapes if anyone later adds
+  `esc_attr()` at the output site.
+
+### Decisions recorded rather than changes made
+
+**Direct database queries stay direct, and uncached.** `$wpdb` is the only API for
+a custom table, so `DirectQuery` is structurally unavoidable in the six files that
+touch Clipisode's seven tables. `NoCaching` is declined *deliberately*, not
+deferred: classifying all 67 query sites showed 60 are writes or single-row lookups
+on a primary or unique key. Caching those buys microseconds while adding an
+invalidation path to every write endpoint, and a stale read after an admin save is
+a worse defect than the warning it silences. The 7 that genuinely scan more than
+one row are the `GROUP BY` aggregates over the whole replies table — those need a
+better query, not a cache, and are already tracked above.
+
+**VIPCS independently confirmed two things already in this log.** It flags
+`wp_is_mobile()` as an error citing full-page caching, and it flags
+`$_SERVER['HTTP_USER_AGENT']` under a "server-side caching" rule. Both are the
+same UA branch that `docs/specs/planned/cacheable-intro-screen-selection.md`
+removes. Annotated pointing at that spec rather than pretending they are fine.
+
+### A PHPCS trap worth knowing
+
+An open-ended file-level `phpcs:disable` combined with a later `phpcs:enable` for
+a *different* sniff silently stops subsequent `phpcs:ignore` comments in that file
+from taking effect. Three verified-safe echoes in `clipisode-flow.php` kept being
+reported despite correct annotations; isolated by bisecting a copy of the file.
+Avoid mixing the two forms in one file, and **verify per-file counts rather than
+inferring from the total** — the total moving in the right direction hid this.
+
+### What remains: 265 violations, one item
+
+All 265 are `NonPrefixedVariableFound` (264) plus one `GlobalVariablesOverride`,
+and all of them are in `assets/templates/clipisode-flow.php` (239) and
+`assets/templates/preview.php` (26). Both are template files, so every top-level
+`$slug`, `$link`, `$topic` really is a global — VIP's complaint is legitimate, not
+a false positive.
+
+The fix is to wrap each template body in a closure, which converts them to locals
+and clears all 265 at once. **Still deferred, for two reasons:** the screen markup
+sweep has not started yet and `clipisode-flow.php` is where it lands, and a
+whole-file structural change to the guest-facing template cannot be verified
+without a browser. `preview.php` alone would clear only 26 and carries the same
+untestable risk, so it is not worth splitting.
+
+Do this after the sweep settles, and verify the invitation flow and the preview
+page in a browser afterwards — not just with `composer test`, which stubs
+WordPress and would not catch a scope mistake.
+
+---
+
 ## 2026-08-07 — Readiness review for high-traffic brand sites
 
 First pass over the codebase specifically asking "what breaks when a major

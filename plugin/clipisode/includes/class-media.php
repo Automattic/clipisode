@@ -25,6 +25,7 @@ class Clipisode_Media {
 	}
 
 	public function hide_from_media_grid( array $query ): array {
+		// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- NOT EXISTS on a single key over the admin Media Library query; the alternative is exposing Clipisode-managed video in the picker.
 		$query['meta_query']   = $query['meta_query'] ?? [];
 		$query['meta_query'][] = [
 			'key'     => self::META_KEY,
@@ -36,6 +37,9 @@ class Clipisode_Media {
 	public function hide_from_media_list( WP_Query $query ): void {
 		global $pagenow;
 		if ( 'upload.php' !== $pagenow ) {
+			return;
+		}
+		if ( ! $query->is_main_query() ) {
 			return;
 		}
 		if ( 'attachment' !== $query->get( 'post_type' ) ) {

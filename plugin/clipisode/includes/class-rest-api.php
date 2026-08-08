@@ -307,6 +307,7 @@ class Clipisode_REST_API {
 
 	// --- Terms ---
 
+	// phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UnusedVariable -- Signature is fixed by the REST callback contract.
 	public function get_brand_terms( WP_REST_Request $request ): WP_REST_Response {
 		$brand_id = Clipisode_Post_Types::get_brand_terms_id();
 		if ( ! $brand_id ) {
@@ -324,17 +325,22 @@ class Clipisode_REST_API {
 		] );
 	}
 
+	// phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UnusedVariable -- Signature is fixed by the REST callback contract.
 	public function list_custom_terms( WP_REST_Request $request ): WP_REST_Response {
 		// Bounded rather than -1. Terms posts are hand-authored, so 100 is a
 		// generous ceiling; real pagination for the admin list endpoints is
 		// tracked with the reply-list pagination work in docs/decision-log.md.
+		// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.get_posts_get_posts -- suppress_filters is set to false below, which is what the sniff asks for; it cannot see array args.
 		$posts = get_posts( [
+			'suppress_filters' => false,
 			'post_type'   => 'clipisode_terms',
 			'post_status' => 'publish',
 			'numberposts' => 100,
 			'orderby'     => 'title',
 			'order'       => 'ASC',
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key, WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Meta lookup over a hand-authored CPT bounded to tens of rows, not a content-scale table.
 			'meta_key'    => Clipisode_Post_Types::TERMS_TYPE_META,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Paired with the meta_key above; bounded hand-authored CPT.
 			'meta_value'  => 'custom',
 		] );
 
@@ -395,6 +401,7 @@ class Clipisode_REST_API {
 
 	// --- Hosts ---
 
+	// phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UnusedVariable -- Signature is fixed by the REST callback contract.
 	public function list_hosts( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
 		$table = $wpdb->prefix . 'clipisode_hosts';
@@ -549,6 +556,7 @@ class Clipisode_REST_API {
 		return $topic;
 	}
 
+	// phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UnusedVariable -- Signature is fixed by the REST callback contract.
 	public function list_topics( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
 		$table     = $wpdb->prefix . 'clipisode_topics';
@@ -1021,7 +1029,6 @@ class Clipisode_REST_API {
 		global $wpdb;
 		$table     = $wpdb->prefix . 'clipisode_replies';
 		$topic_tbl = $wpdb->prefix . 'clipisode_topics';
-		$media_tbl = $wpdb->prefix . 'clipisode_media';
 
 		$where  = [];
 		$values = [];
@@ -1173,7 +1180,7 @@ class Clipisode_REST_API {
 
 		$result = Clipisode_Media::create_from_sideload( 'video', 'intro', $file_array );
 		if ( is_wp_error( $result ) ) {
-			@unlink( $tmp );
+			wp_delete_file( $tmp );
 			return new WP_REST_Response( [ 'message' => $result->get_error_message() ], 400 );
 		}
 
@@ -1202,10 +1209,7 @@ class Clipisode_REST_API {
 	public function list_media( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
 
-		$media_tbl   = $wpdb->prefix . 'clipisode_media';
-		$topics_tbl  = $wpdb->prefix . 'clipisode_topics';
-		$outputs_tbl = $wpdb->prefix . 'clipisode_outputs';
-		$replies_tbl = $wpdb->prefix . 'clipisode_replies';
+		$media_tbl = $wpdb->prefix . 'clipisode_media';
 
 		$where  = [];
 		$values = [];
@@ -1378,6 +1382,7 @@ class Clipisode_REST_API {
 
 	// --- Themes (CPT) ---
 
+	// phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UnusedVariable -- Signature is fixed by the REST callback contract.
 	public function list_themes( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
 		$topics_table = $wpdb->prefix . 'clipisode_topics';
@@ -1385,7 +1390,9 @@ class Clipisode_REST_API {
 		Clipisode_Post_Types::ensure_default_invitation();
 
 		// Bounded rather than -1; see list_custom_terms() for the rationale.
+		// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.get_posts_get_posts -- suppress_filters is set to false below, which is what the sniff asks for; it cannot see array args.
 		$posts = get_posts( [
+			'suppress_filters' => false,
 			'post_type'   => 'clipisode_invite',
 			'post_status' => 'publish',
 			'numberposts' => 100,
@@ -1554,7 +1561,9 @@ class Clipisode_REST_API {
 		// Bounded rather than -1. SCREEN_TYPES caps a theme at ten screens and
 		// the seeder prevents duplicates, so 100 is ten times the by-design
 		// maximum while keeping the query bounded.
+		// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.get_posts_get_posts -- suppress_filters is set to false below, which is what the sniff asks for; it cannot see array args.
 		$screen_ids = get_posts( [
+			'suppress_filters' => false,
 			'post_type'      => 'clipisode_screen',
 			'post_status'    => 'any',
 			'post_parent'    => $theme_id,
@@ -1574,11 +1583,14 @@ class Clipisode_REST_API {
 
 	// --- Preview Layouts ---
 
+	// phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UnusedVariable -- Signature is fixed by the REST callback contract.
 	public function list_preview_layouts( WP_REST_Request $request ): WP_REST_Response {
 		Clipisode_Post_Types::ensure_default_preview();
 
 		// Bounded rather than -1; see list_custom_terms() for the rationale.
+		// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.get_posts_get_posts -- suppress_filters is set to false below, which is what the sniff asks for; it cannot see array args.
 		$posts = get_posts( [
+			'suppress_filters' => false,
 			'post_type'   => 'clipisode_preview',
 			'post_status' => 'publish',
 			'numberposts' => 100,
