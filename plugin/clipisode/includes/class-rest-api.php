@@ -303,10 +303,13 @@ class Clipisode_REST_API {
 	}
 
 	public function list_custom_terms( WP_REST_Request $request ): WP_REST_Response {
+		// Bounded rather than -1. Terms posts are hand-authored, so 100 is a
+		// generous ceiling; real pagination for the admin list endpoints is
+		// tracked with the reply-list pagination work in docs/decision-log.md.
 		$posts = get_posts( [
 			'post_type'   => 'clipisode_terms',
 			'post_status' => 'publish',
-			'numberposts' => -1,
+			'numberposts' => 100,
 			'orderby'     => 'title',
 			'order'       => 'ASC',
 			'meta_key'    => Clipisode_Post_Types::TERMS_TYPE_META,
@@ -373,7 +376,7 @@ class Clipisode_REST_API {
 	public function list_hosts( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
 		$table = $wpdb->prefix . 'clipisode_hosts';
-		$rows  = $wpdb->get_results( "SELECT * FROM $table ORDER BY name ASC" );
+		$rows  = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i ORDER BY name ASC', $table ) );
 
 		$hosts = array_map( function ( $row ) {
 			return [
@@ -397,7 +400,8 @@ class Clipisode_REST_API {
 		}
 
 		$existing = $wpdb->get_var( $wpdb->prepare(
-			"SELECT id FROM $table WHERE name = %s",
+			'SELECT id FROM %i WHERE name = %s',
+			$table,
 			$name
 		) );
 
@@ -487,18 +491,21 @@ class Clipisode_REST_API {
 		$media_table    = $wpdb->prefix . 'clipisode_media';
 
 		$raw_outputs = $wpdb->get_results( $wpdb->prepare(
-			"SELECT o.*,
+			'SELECT o.*,
 				COALESCE(c.clips_count, 0) AS clips_count,
 				m.file_size
-			FROM $outputs_table o
+			FROM %i o
 			LEFT JOIN (
 				SELECT output_id, COUNT(*) AS clips_count
-				FROM $contents_table
+				FROM %i
 				GROUP BY output_id
 			) c ON c.output_id = o.id
-			LEFT JOIN $media_table m ON m.id = o.media_id
+			LEFT JOIN %i m ON m.id = o.media_id
 			WHERE o.topic_id = %d
-			ORDER BY o.created_at DESC",
+			ORDER BY o.created_at DESC',
+			$outputs_table,
+			$contents_table,
+			$media_table,
 			(int) $topic->id
 		) );
 
@@ -526,16 +533,19 @@ class Clipisode_REST_API {
 		$replies_tbl = $wpdb->prefix . 'clipisode_replies';
 		$links_tbl = $wpdb->prefix . 'clipisode_invitation_links';
 
-		$topics = $wpdb->get_results( "
-			SELECT t.*,
+		$topics = $wpdb->get_results( $wpdb->prepare(
+			'SELECT t.*,
 				COALESCE(cl.replies_count, 0) AS replies_count,
 				COALESCE(lk.links_count, 0) AS links_count,
 				COALESCE(lk.clicks, 0) AS clicks
-			FROM $table t
-			LEFT JOIN (SELECT topic_id, COUNT(*) AS replies_count FROM $replies_tbl GROUP BY topic_id) cl ON cl.topic_id = t.id
-			LEFT JOIN (SELECT topic_id, COUNT(*) AS links_count, SUM(clicks) AS clicks FROM $links_tbl GROUP BY topic_id) lk ON lk.topic_id = t.id
-			ORDER BY t.created_at DESC
-		" );
+			FROM %i t
+			LEFT JOIN (SELECT topic_id, COUNT(*) AS replies_count FROM %i GROUP BY topic_id) cl ON cl.topic_id = t.id
+			LEFT JOIN (SELECT topic_id, COUNT(*) AS links_count, SUM(clicks) AS clicks FROM %i GROUP BY topic_id) lk ON lk.topic_id = t.id
+			ORDER BY t.created_at DESC',
+			$table,
+			$replies_tbl,
+			$links_tbl
+		) );
 
 		$topics = array_map( [ $this, 'enrich_topic' ], $topics );
 
@@ -549,16 +559,20 @@ class Clipisode_REST_API {
 		$links_tbl = $wpdb->prefix . 'clipisode_invitation_links';
 
 		$id    = (int) $request['id'];
-		$topic = $wpdb->get_row( $wpdb->prepare( "
-			SELECT t.*,
+		$topic = $wpdb->get_row( $wpdb->prepare(
+			'SELECT t.*,
 				COALESCE(cl.replies_count, 0) AS replies_count,
 				COALESCE(lk.links_count, 0) AS links_count,
 				COALESCE(lk.clicks, 0) AS clicks
-			FROM $table t
-			LEFT JOIN (SELECT topic_id, COUNT(*) AS replies_count FROM $replies_tbl GROUP BY topic_id) cl ON cl.topic_id = t.id
-			LEFT JOIN (SELECT topic_id, COUNT(*) AS links_count, SUM(clicks) AS clicks FROM $links_tbl GROUP BY topic_id) lk ON lk.topic_id = t.id
-			WHERE t.id = %d
-		", $id ) );
+			FROM %i t
+			LEFT JOIN (SELECT topic_id, COUNT(*) AS replies_count FROM %i GROUP BY topic_id) cl ON cl.topic_id = t.id
+			LEFT JOIN (SELECT topic_id, COUNT(*) AS links_count, SUM(clicks) AS clicks FROM %i GROUP BY topic_id) lk ON lk.topic_id = t.id
+			WHERE t.id = %d',
+			$table,
+			$replies_tbl,
+			$links_tbl,
+			$id
+		) );
 
 		if ( ! $topic ) {
 			return new WP_REST_Response( [ 'message' => 'Topic not found.' ], 404 );
@@ -622,7 +636,8 @@ class Clipisode_REST_API {
 			$new_media_id = $new_media_id ? (int) $new_media_id : null;
 
 			$old_media_id = (int) $wpdb->get_var( $wpdb->prepare(
-				"SELECT intro_media_id FROM $table WHERE id = %d",
+				'SELECT intro_media_id FROM %i WHERE id = %d',
+				$table,
 				$id
 			) );
 
@@ -637,7 +652,8 @@ class Clipisode_REST_API {
 			$new_si_id = $new_si_id ? (int) $new_si_id : null;
 
 			$old_si_id = (int) $wpdb->get_var( $wpdb->prepare(
-				"SELECT social_image_media_id FROM $table WHERE id = %d",
+				'SELECT social_image_media_id FROM %i WHERE id = %d',
+				$table,
 				$id
 			) );
 
@@ -671,7 +687,7 @@ class Clipisode_REST_API {
 		}
 		global $wpdb;
 		$table = $wpdb->prefix . 'clipisode_hosts';
-		$exists = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM $table WHERE name = %s", $name ) );
+		$exists = $wpdb->get_var( $wpdb->prepare( 'SELECT id FROM %i WHERE name = %s', $table, $name ) );
 		if ( ! $exists ) {
 			$wpdb->insert( $table, [ 'name' => $name ] );
 		}
@@ -730,7 +746,8 @@ class Clipisode_REST_API {
 		}
 
 		$existing = $wpdb->get_var( $wpdb->prepare(
-			"SELECT id FROM $table WHERE slug = %s",
+			'SELECT id FROM %i WHERE slug = %s',
+			$table,
 			$slug
 		) );
 
@@ -740,7 +757,8 @@ class Clipisode_REST_API {
 
 		$i = 1;
 		while ( $wpdb->get_var( $wpdb->prepare(
-			"SELECT id FROM $table WHERE slug = %s",
+			'SELECT id FROM %i WHERE slug = %s',
+			$table,
 			$slug . '-' . $i
 		) ) ) {
 			$i++;
@@ -783,7 +801,7 @@ class Clipisode_REST_API {
 		$table = $wpdb->prefix . 'clipisode_outputs';
 		$id    = (int) $request['id'];
 
-		$output = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $id ) );
+		$output = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', $table, $id ) );
 		if ( ! $output ) {
 			return new WP_REST_Response( [ 'message' => 'Output not found.' ], 404 );
 		}
@@ -803,7 +821,7 @@ class Clipisode_REST_API {
 		$id    = (int) $request['id'];
 		$token = sanitize_text_field( $request->get_param( 'token' ) );
 
-		$output = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $id ) );
+		$output = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', $table, $id ) );
 		if ( ! $output ) {
 			return new WP_REST_Response( [ 'message' => 'Output not found.' ], 404 );
 		}
@@ -845,7 +863,7 @@ class Clipisode_REST_API {
 		$id    = (int) $request['id'];
 
 		$rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT * FROM $table WHERE output_id = %d ORDER BY position ASC", $id
+			'SELECT * FROM %i WHERE output_id = %d ORDER BY position ASC', $table, $id
 		) );
 
 		return new WP_REST_Response( $rows );
@@ -884,13 +902,16 @@ class Clipisode_REST_API {
 		$replies_tbl = $wpdb->prefix . 'clipisode_replies';
 		$topic_id  = (int) $request['topic_id'];
 
-		$links = $wpdb->get_results( $wpdb->prepare( "
-			SELECT l.*, COALESCE(cl.replies_count, 0) AS replies_count
-			FROM $table l
-			LEFT JOIN (SELECT invitation_link_id, COUNT(*) AS replies_count FROM $replies_tbl GROUP BY invitation_link_id) cl ON cl.invitation_link_id = l.id
+		$links = $wpdb->get_results( $wpdb->prepare(
+			'SELECT l.*, COALESCE(cl.replies_count, 0) AS replies_count
+			FROM %i l
+			LEFT JOIN (SELECT invitation_link_id, COUNT(*) AS replies_count FROM %i GROUP BY invitation_link_id) cl ON cl.invitation_link_id = l.id
 			WHERE l.topic_id = %d
-			ORDER BY l.created_at DESC
-		", $topic_id ) );
+			ORDER BY l.created_at DESC',
+			$table,
+			$replies_tbl,
+			$topic_id
+		) );
 
 		return new WP_REST_Response( $links );
 	}
@@ -919,7 +940,7 @@ class Clipisode_REST_API {
 			return new WP_REST_Response( [ 'message' => 'Failed to generate a unique slug.' ], 500 );
 		}
 
-		$link = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $wpdb->insert_id ) );
+		$link = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', $table, $wpdb->insert_id ) );
 		$link->replies_count = 0;
 		return new WP_REST_Response( $link, 201 );
 	}
@@ -940,7 +961,7 @@ class Clipisode_REST_API {
 				return new WP_REST_Response( [ 'message' => 'Slug must be 1–20 alphanumeric characters.' ], 400 );
 			}
 			$existing = $wpdb->get_var( $wpdb->prepare(
-				"SELECT id FROM $table WHERE slug = %s AND id != %d", $new_slug, $id
+				'SELECT id FROM %i WHERE slug = %s AND id != %d', $table, $new_slug, $id
 			) );
 			if ( $existing ) {
 				return new WP_REST_Response( [ 'message' => 'That slug is already in use.' ], 409 );
@@ -954,10 +975,13 @@ class Clipisode_REST_API {
 
 		$replies_tbl = $wpdb->prefix . 'clipisode_replies';
 		$link = $wpdb->get_row( $wpdb->prepare(
-			"SELECT l.*, COALESCE(cl.replies_count, 0) AS replies_count
-			 FROM $table l
-			 LEFT JOIN (SELECT invitation_link_id, COUNT(*) AS replies_count FROM $replies_tbl GROUP BY invitation_link_id) cl ON cl.invitation_link_id = l.id
-			 WHERE l.id = %d", $id
+			'SELECT l.*, COALESCE(cl.replies_count, 0) AS replies_count
+			 FROM %i l
+			 LEFT JOIN (SELECT invitation_link_id, COUNT(*) AS replies_count FROM %i GROUP BY invitation_link_id) cl ON cl.invitation_link_id = l.id
+			 WHERE l.id = %d',
+			$table,
+			$replies_tbl,
+			$id
 		) );
 		return new WP_REST_Response( $link );
 	}
@@ -1002,19 +1026,18 @@ class Clipisode_REST_API {
 
 		$order = $request->get_param( 'order' ) === 'asc' ? 'ASC' : 'DESC';
 
-		$query = "
-			SELECT cl.*, t.title AS topic_title
-			FROM $table cl
-			LEFT JOIN $topic_tbl t ON t.id = cl.topic_id
-			$where_sql
-			ORDER BY cl.created_at $order
-		";
+		// Always prepared, not only when $values is non-empty: the two table
+		// names go through %i and the filter placeholders in $where_sql are
+		// consumed by $values after them. $order is a literal ASC/DESC chosen
+		// above, which %i cannot express (it quotes identifiers, not keywords).
+		$sql = 'SELECT cl.*, t.title AS topic_title
+			FROM %i cl
+			LEFT JOIN %i t ON t.id = cl.topic_id
+			' . $where_sql . '
+			ORDER BY cl.created_at ' . $order;
 
-		if ( $values ) {
-			$query = $wpdb->prepare( $query, ...$values );
-		}
-
-		$replies = $wpdb->get_results( $query );
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- $where_sql is assembled only from the hardcoded fragments above, each carrying its own %d/%s bound from $values; $order is a literal ASC or DESC.
+		$replies = $wpdb->get_results( $wpdb->prepare( $sql, $table, $topic_tbl, ...$values ) );
 
 		foreach ( $replies as $reply ) {
 			$reply->video_url = $reply->media_id
@@ -1034,12 +1057,15 @@ class Clipisode_REST_API {
 		$topic_tbl = $wpdb->prefix . 'clipisode_topics';
 		$id        = (int) $request['id'];
 
-		$reply = $wpdb->get_row( $wpdb->prepare( "
-			SELECT cl.*, t.title AS topic_title
-			FROM $table cl
-			LEFT JOIN $topic_tbl t ON t.id = cl.topic_id
-			WHERE cl.id = %d
-		", $id ) );
+		$reply = $wpdb->get_row( $wpdb->prepare(
+			'SELECT cl.*, t.title AS topic_title
+			FROM %i cl
+			LEFT JOIN %i t ON t.id = cl.topic_id
+			WHERE cl.id = %d',
+			$table,
+			$topic_tbl,
+			$id
+		) );
 
 		if ( ! $reply ) {
 			return new WP_REST_Response( [ 'message' => 'Reply not found.' ], 404 );
@@ -1190,19 +1216,16 @@ class Clipisode_REST_API {
 
 		$where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) : '';
 
-		$query = "
-			SELECT m.*,
-				(SELECT COUNT(*) FROM $media_tbl c WHERE c.parent_id = m.id) AS children_count
-			FROM $media_tbl m
-			$where_sql
-			ORDER BY m.created_at DESC
-		";
+		// Always prepared; see list_replies() for why. $media_tbl appears twice
+		// in the statement, so it is passed twice.
+		$sql = 'SELECT m.*,
+				(SELECT COUNT(*) FROM %i c WHERE c.parent_id = m.id) AS children_count
+			FROM %i m
+			' . $where_sql . '
+			ORDER BY m.created_at DESC';
 
-		if ( $values ) {
-			$query = $wpdb->prepare( $query, ...$values );
-		}
-
-		$rows = $wpdb->get_results( $query );
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- $where_sql is assembled only from the hardcoded fragments above, each carrying its own %d/%s bound from $values.
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $media_tbl, $media_tbl, ...$values ) );
 
 		foreach ( $rows as $row ) {
 			$row->url = ( $row->storage === 'local' && $row->attachment_id )
@@ -1254,7 +1277,7 @@ class Clipisode_REST_API {
 		$id    = (int) $request['id'];
 		$table = $wpdb->prefix . 'clipisode_media';
 
-		$media = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $id ) );
+		$media = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', $table, $id ) );
 		if ( ! $media ) {
 			return new WP_REST_Response( [ 'message' => 'Media not found.' ], 404 );
 		}
@@ -1339,17 +1362,19 @@ class Clipisode_REST_API {
 
 		Clipisode_Post_Types::ensure_default_invitation();
 
+		// Bounded rather than -1; see list_custom_terms() for the rationale.
 		$posts = get_posts( [
 			'post_type'   => 'clipisode_invite',
 			'post_status' => 'publish',
-			'numberposts' => -1,
+			'numberposts' => 100,
 			'orderby'     => 'date',
 			'order'       => 'ASC',
 		] );
 
 		$invitations = array_map( function ( $post ) use ( $wpdb, $topics_table ) {
 			$topic_count = (int) $wpdb->get_var( $wpdb->prepare(
-				"SELECT COUNT(*) FROM $topics_table WHERE invitation_id = %d",
+				'SELECT COUNT(*) FROM %i WHERE invitation_id = %d',
+				$topics_table,
 				$post->ID
 			) );
 			$is_default = (bool) get_post_meta( $post->ID, Clipisode_Post_Types::DEFAULT_INVITATION_META, true );
@@ -1429,7 +1454,8 @@ class Clipisode_REST_API {
 
 		$topics_table = $wpdb->prefix . 'clipisode_topics';
 		$in_use = (int) $wpdb->get_var( $wpdb->prepare(
-			"SELECT COUNT(*) FROM $topics_table WHERE invitation_id = %d",
+			'SELECT COUNT(*) FROM %i WHERE invitation_id = %d',
+			$topics_table,
 			$id
 		) );
 
@@ -1503,11 +1529,14 @@ class Clipisode_REST_API {
 	 * clean of orphan screens whose parent theme no longer exists.
 	 */
 	private function delete_theme_screens( int $theme_id ): int {
+		// Bounded rather than -1. SCREEN_TYPES caps a theme at ten screens and
+		// the seeder prevents duplicates, so 100 is ten times the by-design
+		// maximum while keeping the query bounded.
 		$screen_ids = get_posts( [
 			'post_type'      => 'clipisode_screen',
 			'post_status'    => 'any',
 			'post_parent'    => $theme_id,
-			'posts_per_page' => -1,
+			'posts_per_page' => 100,
 			'fields'         => 'ids',
 		] );
 
@@ -1526,10 +1555,11 @@ class Clipisode_REST_API {
 	public function list_preview_layouts( WP_REST_Request $request ): WP_REST_Response {
 		Clipisode_Post_Types::ensure_default_preview();
 
+		// Bounded rather than -1; see list_custom_terms() for the rationale.
 		$posts = get_posts( [
 			'post_type'   => 'clipisode_preview',
 			'post_status' => 'publish',
-			'numberposts' => -1,
+			'numberposts' => 100,
 			'orderby'     => 'date',
 			'order'       => 'ASC',
 		] );

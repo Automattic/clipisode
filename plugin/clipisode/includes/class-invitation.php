@@ -110,7 +110,7 @@ class Clipisode_Invitation {
 
 		$links_table = $wpdb->prefix . 'clipisode_invitation_links';
 		$link = $wpdb->get_row( $wpdb->prepare(
-			"SELECT status FROM $links_table WHERE slug = %s", $slug
+			'SELECT status FROM %i WHERE slug = %s', $links_table, $slug
 		) );
 
 		if ( ! $link ) {
@@ -170,7 +170,7 @@ class Clipisode_Invitation {
 
 		$links_table = $wpdb->prefix . 'clipisode_invitation_links';
 		$link = $wpdb->get_row( $wpdb->prepare(
-			"SELECT * FROM $links_table WHERE slug = %s", $slug
+			'SELECT * FROM %i WHERE slug = %s', $links_table, $slug
 		) );
 
 		if ( ! $link ) {
@@ -183,7 +183,7 @@ class Clipisode_Invitation {
 
 		$topics_table = $wpdb->prefix . 'clipisode_topics';
 		$topic = $wpdb->get_row( $wpdb->prepare(
-			"SELECT * FROM $topics_table WHERE id = %d", $link->topic_id
+			'SELECT * FROM %i WHERE id = %d', $topics_table, $link->topic_id
 		) );
 
 		if ( ! $topic ) {

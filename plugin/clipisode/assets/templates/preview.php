@@ -16,7 +16,8 @@ $slug      = sanitize_text_field( get_query_var( 'clipisode_preview_slug' ) );
 
 $outputs_table = $wpdb->prefix . 'clipisode_outputs';
 $output = $wpdb->get_row( $wpdb->prepare(
-	"SELECT * FROM $outputs_table WHERE id = %d AND media_id = %d AND slug = %s",
+	'SELECT * FROM %i WHERE id = %d AND media_id = %d AND slug = %s',
+	$outputs_table,
 	$output_id, $media_id, $slug
 ) );
 
@@ -37,7 +38,7 @@ $topic = null;
 if ( $output->topic_id ) {
 	$topics_table = $wpdb->prefix . 'clipisode_topics';
 	$topic = $wpdb->get_row( $wpdb->prepare(
-		"SELECT * FROM $topics_table WHERE id = %d", $output->topic_id
+		'SELECT * FROM %i WHERE id = %d', $topics_table, $output->topic_id
 	) );
 }
 

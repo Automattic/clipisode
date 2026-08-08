@@ -96,13 +96,13 @@ class Clipisode_Media {
 		$table = $wpdb->prefix . 'clipisode_media';
 
 		$children = $wpdb->get_col( $wpdb->prepare(
-			"SELECT id FROM $table WHERE parent_id = %d", $id
+			'SELECT id FROM %i WHERE parent_id = %d', $table, $id
 		) );
 		foreach ( $children as $child_id ) {
 			self::delete( (int) $child_id );
 		}
 
-		$media = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $id ) );
+		$media = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', $table, $id ) );
 		if ( ! $media ) {
 			return;
 		}

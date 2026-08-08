@@ -300,7 +300,7 @@ class Clipisode_Post_Types {
 		$source = CLIPISODE_PLUGIN_DIR . 'assets/themes/default/icon.png';
 		if ( ! file_exists( $source ) ) {
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				error_log( '[clipisode] Default logo source missing: ' . $source );
+				error_log( '[clipisode] Default logo source missing: ' . $source ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Guarded by WP_DEBUG; deliberate failure diagnostic, see method docblock.
 			}
 			return 0;
 		}
@@ -316,7 +316,7 @@ class Clipisode_Post_Types {
 		$uploads = wp_upload_dir();
 		if ( ! empty( $uploads['error'] ) ) {
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				error_log( '[clipisode] wp_upload_dir error: ' . $uploads['error'] );
+				error_log( '[clipisode] wp_upload_dir error: ' . $uploads['error'] ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Guarded by WP_DEBUG; deliberate failure diagnostic, see method docblock.
 			}
 			return 0;
 		}
@@ -325,7 +325,7 @@ class Clipisode_Post_Types {
 		$dest_path     = trailingslashit( $uploads['path'] ) . $dest_filename;
 		if ( ! copy( $source, $dest_path ) ) {
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				error_log( '[clipisode] Failed to copy logo to uploads: ' . $dest_path );
+				error_log( '[clipisode] Failed to copy logo to uploads: ' . $dest_path ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Guarded by WP_DEBUG; deliberate failure diagnostic, see method docblock.
 			}
 			return 0;
 		}
@@ -343,7 +343,7 @@ class Clipisode_Post_Types {
 
 		if ( is_wp_error( $attachment_id ) || ! $attachment_id ) {
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				error_log( '[clipisode] wp_insert_attachment failed for logo' );
+				error_log( '[clipisode] wp_insert_attachment failed for logo' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Guarded by WP_DEBUG; deliberate failure diagnostic, see method docblock.
 			}
 			return 0;
 		}
@@ -377,7 +377,7 @@ class Clipisode_Post_Types {
 		$source = CLIPISODE_PLUGIN_DIR . 'assets/editor/sample/sample-qr.png';
 		if ( ! file_exists( $source ) ) {
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				error_log( '[clipisode] Default QR source missing: ' . $source );
+				error_log( '[clipisode] Default QR source missing: ' . $source ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Guarded by WP_DEBUG; deliberate failure diagnostic, see method docblock.
 			}
 			return 0;
 		}
@@ -389,7 +389,7 @@ class Clipisode_Post_Types {
 		$uploads = wp_upload_dir();
 		if ( ! empty( $uploads['error'] ) ) {
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				error_log( '[clipisode] wp_upload_dir error: ' . $uploads['error'] );
+				error_log( '[clipisode] wp_upload_dir error: ' . $uploads['error'] ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Guarded by WP_DEBUG; deliberate failure diagnostic, see method docblock.
 			}
 			return 0;
 		}
@@ -398,7 +398,7 @@ class Clipisode_Post_Types {
 		$dest_path     = trailingslashit( $uploads['path'] ) . $dest_filename;
 		if ( ! copy( $source, $dest_path ) ) {
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				error_log( '[clipisode] Failed to copy QR to uploads: ' . $dest_path );
+				error_log( '[clipisode] Failed to copy QR to uploads: ' . $dest_path ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Guarded by WP_DEBUG; deliberate failure diagnostic, see method docblock.
 			}
 			return 0;
 		}
@@ -416,7 +416,7 @@ class Clipisode_Post_Types {
 
 		if ( is_wp_error( $attachment_id ) || ! $attachment_id ) {
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-				error_log( '[clipisode] wp_insert_attachment failed for QR' );
+				error_log( '[clipisode] wp_insert_attachment failed for QR' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Guarded by WP_DEBUG; deliberate failure diagnostic, see method docblock.
 			}
 			return 0;
 		}
@@ -1130,10 +1130,14 @@ class Clipisode_Post_Types {
 			return [];
 		}
 
+		// Bounded rather than -1. A theme holds at most one screen post per
+		// type, so the real cardinality here is 0 or 1; anything above that is
+		// already a duplicate this function exists to clean up. 100 is far
+		// beyond any plausible count while keeping the query bounded.
 		$ids = get_posts( [
 			'post_type'   => 'clipisode_screen',
 			'post_status' => 'trash',
-			'numberposts' => -1,
+			'numberposts' => 100,
 			'post_parent' => $theme_id,
 			'meta_key'    => self::SCREEN_TYPE_META,
 			'meta_value'  => $screen_type,
