@@ -42,9 +42,21 @@ export interface ThemeGroup {
 	id: string;
 	label: string;
 	scope: 'composition' | 'clip';
+	card?: 'title' | 'ending';
 	description?: string;
 	appliesTo?: ClipFilter;
 	fields: ThemeField[];
+}
+
+export interface ThemeMediaSlot {
+	id: string;
+	label: string;
+	description?: string;
+	mode: 'sequence' | 'background';
+	minClips?: number;
+	maxClips?: number;
+	roles?: CompositionClip[ 'role' ][];
+	tag?: string;
 }
 
 export interface ThemeTag {
@@ -66,11 +78,10 @@ export interface ThemeDefinition {
 	tags: ThemeTag[];
 	canvas: { backgroundField?: string; backgroundColor?: string };
 	timeline: {
-		title?: { enabledField: string; durationField: string };
-		ending?: { enabledField: string; durationField: string };
-		backgroundTag?: string;
+		title?: { label: string; enabledField: string; durationField: string };
+		ending?: { label: string; enabledField: string; durationField: string };
+		mediaSlots: ThemeMediaSlot[];
 		backgroundField?: string;
-		endTag?: string;
 	};
 }
 
@@ -91,6 +102,7 @@ export interface CompositionClip {
 	included: boolean;
 	tags?: string[];
 	values?: ThemeValues;
+	slotId?: string;
 }
 
 export type ClipisodeCompositionProps = {

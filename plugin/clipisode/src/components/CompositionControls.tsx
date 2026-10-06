@@ -51,7 +51,11 @@ export default function CompositionControls( {
 				}
 			/>
 			<ThemeFields
-				groups={ getVisibleGroups( theme, 'composition', settings ) }
+				groups={ getVisibleGroups(
+					theme,
+					'composition',
+					settings
+				).filter( ( group ) => ! group.card ) }
 				values={ settings }
 				clips={ clips }
 				idPrefix="composition"

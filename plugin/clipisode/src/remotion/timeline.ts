@@ -5,7 +5,7 @@ import type {
 	CompositionTimeline,
 	TimelineSegment,
 } from './types';
-import { getThemeDefinition } from './theme-schema';
+import { clipsInSlot, getMediaSlot, getThemeDefinition } from './theme-schema';
 
 export const FPS = 30;
 
@@ -50,21 +50,10 @@ export function buildTimeline(
 		cursor += durationInFrames;
 	}
 
-	const sequenceClips = clips.filter(
-		( clip ) =>
-			! timeline.backgroundTag ||
-			! clip.tags?.includes( timeline.backgroundTag )
-	);
-	const orderedClips = timeline.endTag
-		? [
-				...sequenceClips.filter(
-					( clip ) => ! clip.tags?.includes( timeline.endTag )
-				),
-				...sequenceClips.filter(
-					( clip ) => clip.tags?.includes( timeline.endTag )
-				),
-		  ]
-		: sequenceClips;
+	const theme = getThemeDefinition( settings.themeId );
+	const orderedClips = timeline.mediaSlots
+		.filter( ( slot ) => slot.mode === 'sequence' )
+		.flatMap( ( slot ) => clipsInSlot( theme, clips, slot.id ) );
 	for ( const clip of orderedClips ) {
 		if ( ! clip.included ) {
 			continue;
@@ -120,7 +109,8 @@ export function getCardBackgroundClip(
 	clips: CompositionClip[],
 	settings: CompositionSettings
 ): CompositionClip | undefined {
-	const { timeline } = getThemeDefinition( settings.themeId );
+	const theme = getThemeDefinition( settings.themeId );
+	const { timeline } = theme;
 	const id = timeline.backgroundField
 		? settings[ timeline.backgroundField ]
 		: null;
@@ -131,7 +121,7 @@ export function getCardBackgroundClip(
 		( item ) =>
 			item.id === id &&
 			item.included &&
-			item.tags?.includes( timeline.backgroundTag )
+			getMediaSlot( theme, item )?.mode === 'background'
 	);
 	if ( ! clip ) {
 		throw new Error( 'Select an included background clip for the cards.' );

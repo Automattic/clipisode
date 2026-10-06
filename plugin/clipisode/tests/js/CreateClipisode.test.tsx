@@ -72,6 +72,12 @@ const savedOutput = () => ( {
 } );
 const mockApi = apiFetch as jest.MockedFunction< typeof apiFetch >;
 
+const openTitleCard = async () => {
+	fireEvent.click(
+		await screen.findByRole( 'button', { name: 'Configure Opening card' } )
+	);
+};
+
 const mockEditorApi = (
 	implementation: (
 		options: Parameters< typeof apiFetch >[ 0 ]
@@ -116,6 +122,7 @@ describe( 'Clipisode editor', () => {
 		const { unmount } = render(
 			<CreateClipisode outputId={ 42 } navigate={ jest.fn() } />
 		);
+		await openTitleCard();
 		await screen.findByDisplayValue( 'The original title' );
 		expect(
 			screen.getByText(
@@ -185,6 +192,7 @@ describe( 'Clipisode editor', () => {
 		expect( websocket ).not.toHaveBeenCalled();
 		unmount();
 		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
+		await openTitleCard();
 		await screen.findByDisplayValue( 'Voices from the team' );
 		expect( screen.getByLabelText( 'Accent color' ) ).toHaveValue(
 			'#123456'
@@ -213,6 +221,7 @@ describe( 'Clipisode editor', () => {
 			return savedOutput() as never;
 		} );
 		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
+		await openTitleCard();
 		await screen.findByDisplayValue( 'The original title' );
 		fireEvent.change( screen.getByLabelText( 'Title' ), {
 			target: { value: 'Keep my edit' },
@@ -307,6 +316,7 @@ describe( 'Clipisode editor', () => {
 			} )
 		);
 		expect( window.location.hash ).toBe( '#/compose/99' );
+		await openTitleCard();
 		fireEvent.change( screen.getByLabelText( 'Title' ), {
 			target: { value: 'Changed title' },
 		} );
@@ -367,7 +377,7 @@ describe( 'Clipisode editor', () => {
 			screen.queryByRole( 'button', { name: 'Save preview' } )
 		).not.toBeInTheDocument();
 		expect(
-			screen.queryByRole( 'button', { name: 'Add media' } )
+			screen.queryByRole( 'button', { name: 'Add media to Story clips' } )
 		).not.toBeInTheDocument();
 		expect( screen.queryByLabelText( 'Title' ) ).not.toBeInTheDocument();
 		expect( mockPlayer ).not.toHaveBeenCalled();
@@ -380,6 +390,7 @@ describe( 'Clipisode editor', () => {
 				: ( savedOutput() as never )
 		);
 		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
+		await openTitleCard();
 		await screen.findByDisplayValue( 'The original title' );
 		fireEvent.click( screen.getByLabelText( 'Include clip 1' ) );
 		fireEvent.click( screen.getByLabelText( 'Include clip 2' ) );
@@ -403,6 +414,7 @@ describe( 'Clipisode editor', () => {
 			return savedOutput() as never;
 		} );
 		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
+		await openTitleCard();
 		await screen.findByDisplayValue( 'The original title' );
 		fireEvent.change( screen.getByLabelText( 'Title' ), {
 			target: { value: '<b>Hello</b>' },
@@ -432,6 +444,7 @@ describe( 'Clipisode editor', () => {
 			return savedOutput() as never;
 		} );
 		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
+		await openTitleCard();
 		await screen.findByDisplayValue( 'The original title' );
 		fireEvent.click(
 			screen.getByRole( 'button', { name: 'Save preview' } )
@@ -473,6 +486,7 @@ describe( 'Clipisode editor', () => {
 				  } as never )
 		);
 		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
+		await openTitleCard();
 		await screen.findByDisplayValue( 'The original title' );
 		fireEvent.click( screen.getByRole( 'tab', { name: 'Export' } ) );
 		await waitFor( () =>
@@ -524,6 +538,7 @@ describe( 'Clipisode editor', () => {
 			return savedOutput() as never;
 		} );
 		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
+		await openTitleCard();
 		await screen.findByDisplayValue( 'The original title' );
 		fireEvent.click( screen.getByRole( 'tab', { name: 'Export' } ) );
 		await waitFor( () =>
@@ -550,6 +565,7 @@ describe( 'Clipisode editor', () => {
 				: ( savedOutput() as never )
 		);
 		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
+		await openTitleCard();
 		await screen.findByDisplayValue( 'The original title' );
 		fireEvent.change( screen.getByLabelText( 'Video theme' ), {
 			target: { value: 'wpvip' },
@@ -611,6 +627,7 @@ describe( 'Clipisode editor', () => {
 				: ( savedOutput() as never )
 		);
 		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
+		await openTitleCard();
 		await screen.findByDisplayValue( 'The original title' );
 		fireEvent.click(
 			screen.getByRole( 'button', { name: 'Select clip 2: Guest' } )
@@ -656,6 +673,7 @@ describe( 'Clipisode editor', () => {
 				: ( savedOutput() as never )
 		);
 		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
+		await openTitleCard();
 		await screen.findByDisplayValue( 'The original title' );
 		fireEvent.click(
 			screen.getByRole( 'button', { name: 'Select clip 2: Guest' } )

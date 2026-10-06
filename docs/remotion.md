@@ -5,8 +5,8 @@ The wp-admin composer uses `@remotion/player` to play a React composition direct
 ## Preview workflow
 
 1. Select approved replies on a topic and choose **Create Clipisode**, or select videos in the media library and create a clipisode from them.
-2. Arrange the clips, adjust their trims and names, and select which clips to include.
-3. Choose a theme and customize the fields it exposes. Theme controls are grouped, can appear conditionally, and can apply to the whole composition or an individual clip. The player previews the current settings.
+2. Arrange clips in the sequence below the preview. Add or remove media in the insertion areas supplied by the theme, and adjust trims, names, and inclusion from the sequence and clip inspector.
+3. Choose a theme and customize the fields it exposes. Select title or ending cards in the sequence to configure them. Other theme controls and per-clip controls are grouped in the inspector. The player previews the current settings.
 4. Save the preview. Reopen it using **Edit preview** in the Clipisodes list or the topic's Clipisodes section.
 5. Choose **Render in browser**, keep the tab open through rendering and upload, then choose **Download MP4**. A configured renderer also provides **Render with service**.
 
@@ -21,7 +21,8 @@ The preview loads source media through `Clipisode_Media` URLs and plays their or
 | `src/pages/CreateClipisode.tsx` | Composer controls, source selection, player, and save/load requests |
 | `assets/composition-themes.json` | Shared theme, field, group, and clip-tag definitions |
 | `src/components/CompositionControls.tsx` | Schema-driven theme settings and preset selection |
-| `src/components/CompositionPreview.tsx` | Player controls, error state, and chapter navigation |
+| `src/components/CompositionPreview.tsx` | Player controls and error state |
+| `src/components/CompositionSequence.tsx` | Theme-defined cards, media slots, and clip editing actions |
 | `src/components/CompositionExport.tsx` | Browser rendering, upload retry, service status polling, and MP4 download |
 | `src/lib/browser-renderer.ts` | Browser capability check and Remotion MP4 export |
 | `src/lib/video-metadata.ts` | Browser source duration loading |
@@ -39,11 +40,11 @@ The preview loads source media through `Clipisode_Media` URLs and plays their or
 
 ## Composition contract
 
-`ClipisodeCompositionProps` contains `clips` and `settings`. Each clip has a unique instance `id`, a WordPress `mediaId`, a `role` (`intro` or `reply`), a display `name`, its source `duration`, `trimStart`, `trimEnd`, and an `included` flag. A clip can also have theme-defined `tags` and a `values` object for its clip-scoped fields. Source times and card durations are measured in seconds. The API supplies the current source `url` when loading a saved composition; source URLs are not persisted in the composition JSON.
+`ClipisodeCompositionProps` contains `clips` and `settings`. Each clip has a unique instance `id`, a WordPress `mediaId`, a `role` (`intro` or `reply`), a display `name`, its source `duration`, `trimStart`, `trimEnd`, and an `included` flag. A clip can also have a theme-defined `slotId`, `tags`, and a `values` object for its clip-scoped fields. Source times and card durations are measured in seconds. The API supplies the current source `url` when loading a saved composition; source URLs are not persisted in the composition JSON.
 
-The array order is the playback order. Duplicated source videos have separate clip instance IDs and can have different trims and names. Excluded clips remain saved so they can be included again later.
+The theme's sequence slots determine playback order; clips within each slot retain their array order. Duplicated source videos have separate clip instance IDs and can have different trims and names. Excluded clips remain saved so they can be included again later.
 
-The timeline runs at 30 frames per second. Trim start and end are rounded to integer source-frame boundaries, with the end boundary exclusive. The selected range must produce at least one frame. Included clips run consecutively between any enabled title and ending cards. A theme can identify background and end clips by tag: background clips are omitted from the main sequence, and end clips follow the other clips before the ending card. The selected background clip loops without audio behind cards. Animations use the current sequence frame, so seeking and replaying show the same composition state.
+The timeline runs at 30 frames per second. Trim start and end are rounded to integer source-frame boundaries, with the end boundary exclusive. The selected range must produce at least one frame. Sequence slots play in theme order between any enabled title and ending cards. Background slots are omitted from the main sequence. The selected background clip loops without audio behind cards. Animations use the current sequence frame, so seeking and replaying show the same composition state.
 
 Canvas formats are portrait (1080 × 1920), square (1080 × 1080), and landscape (1920 × 1080). These dimensions belong to the composition. Other settings belong to the selected theme's schema; for example, a theme can expose `videoFit` to select a crop that fills the canvas (`cover`) or displays the complete source within it (`contain`).
 
@@ -80,11 +81,11 @@ Invalid settings or unavailable source media produce explicit errors. A saved pr
 
 `assets/composition-themes.json` is the single schema consumed by the React controls and PHP validation. Its top-level `themes` array contains each theme's ID, label, description, renderer, groups, tags, timeline rules, and canvas settings. The inspector renders field types generically; it does not contain a field list or field switches for each theme. PHP reads the same definitions rather than maintaining a separate theme or settings allow-list.
 
-Each group declares an `id`, `label`, a `scope` of `composition` or `clip`, and its `fields`. It can include a description. A clip group can use `appliesTo.roles` and `appliesTo.tags` to limit where it appears. Each field declares its `id`, label, type, and default, with optional help text and a placeholder. Supported types are `text`, `textarea`, `number`, `range`, `select`, `toggle`, `color`, `image`, `clip`, and `multiselect`. Numeric fields can set `min`, `max`, and `step`; optional fields use `optional`; fixed choices use `options` containing `{ label, value }` objects.
+Each group declares an `id`, `label`, a `scope` of `composition` or `clip`, and its `fields`. It can include a description. Composition groups with `card: "title"` or `card: "ending"` appear when that card is selected in the sequence. A clip group can use `appliesTo.roles` and `appliesTo.tags` to limit where it appears. Each field declares its `id`, label, type, and default, with optional help text and a placeholder. Supported types are `text`, `textarea`, `number`, `range`, `select`, `toggle`, `color`, `image`, `clip`, and `multiselect`. Numeric fields can set `min`, `max`, and `step`; optional fields use `optional`; fixed choices use `options` containing `{ label, value }` objects.
 
 Fields can use `when: { field, equals, scope }` to show a control only when another value matches. The optional scope selects a composition or clip value. Hidden or inapplicable values remain stored and must retain their declared types, but are only required when their fields apply and are visible. An optional value can be `null`. A clip selector or multiselect can declare `source: { kind: "clips", filter: { roles, tags } }`; its choices are derived from the currently included clips, so adding, removing, naming, including, or tagging clips updates the choices. Clip references use instance IDs, allowing two uses of the same media file to be selected independently.
 
-Theme tags declare an ID and label, with optional descriptions and role restrictions. `exclusiveGroup` makes related tags mutually exclusive and `maxClips` limits how many clips can carry a tag. Tags can select clip controls and renderer behavior. Timeline declarations connect title and ending cards to the relevant enable and duration fields; `backgroundTag` and `endTag` identify clips assigned those timeline roles, and `backgroundField` names the field that selects a background clip. Canvas declarations select a background field or a fixed background color.
+Theme tags declare an ID and label, with optional descriptions and role restrictions. `exclusiveGroup` makes related tags mutually exclusive and `maxClips` limits how many clips can carry a tag. Tags can select clip controls and renderer behavior. Timeline declarations connect title and ending cards to their labels, enable fields, and duration fields. `mediaSlots` is an ordered list of insertion areas. Each slot has an `id`, `label`, and `mode` (`sequence` or `background`); optional `minClips`, `maxClips`, and `roles` restrict what it accepts. Omit `maxClips` for an unlimited sequence, or declare two sequence slots with `maxClips: 1` each for two fixed spots. An optional slot `tag` associates existing tagged clips with that spot. `backgroundField` names the field that selects a background clip. Canvas declarations select a background field or a fixed background color.
 
 To add a theme:
 

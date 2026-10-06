@@ -53,8 +53,11 @@ class Clipisode_Composition {
 				return self::invalid( 'Every clip must have a unique ID.' );
 			}
 			$ids[ $clip['id'] ] = true;
-			if ( array_diff( array_keys( $clip ), [ 'id', 'mediaId', 'role', 'name', 'url', 'duration', 'trimStart', 'trimEnd', 'included', 'tags', 'values' ] ) ) {
+			if ( array_diff( array_keys( $clip ), [ 'id', 'mediaId', 'role', 'name', 'url', 'duration', 'trimStart', 'trimEnd', 'included', 'tags', 'values', 'slotId' ] ) ) {
 				return self::invalid( 'Unknown clip property.' );
+			}
+			if ( array_key_exists( 'slotId', $clip ) && ! is_string( $clip['slotId'] ) ) {
+				return self::invalid( 'Invalid sequence spot.' );
 			}
 			if ( ! isset( $clip['mediaId'] ) || ! is_int( $clip['mediaId'] ) || $clip['mediaId'] <= 0 || ! Clipisode_Media::get_video_url( $clip['mediaId'] ) ) {
 				return self::invalid( 'Every clip must reference an available video.' );
@@ -110,6 +113,57 @@ class Clipisode_Composition {
 				'trimStart' => (float) $clip['trimStart'], 'trimEnd' => (float) $clip['trimEnd'],
 				'included' => $clip['included'], 'tags' => $tags, 'values' => $values,
 			];
+			if ( isset( $clip['slotId'] ) ) {
+				$clips[ count( $clips ) - 1 ]['slotId'] = $clip['slotId'];
+			}
+		}
+		$slots = $theme['timeline']['mediaSlots'];
+		$slot_ids = array_column( $slots, null, 'id' );
+		$slot_counts = [];
+		$slot_included_counts = [];
+		$slot_modes = [];
+		foreach ( $clips as $clip ) {
+			if ( isset( $clip['slotId'] ) && ! isset( $slot_ids[ $clip['slotId'] ] ) ) {
+				return self::invalid( 'Unavailable sequence spot.' );
+			}
+			$slot = null;
+			foreach ( $slots as $candidate ) {
+				if ( isset( $candidate['tag'] ) && in_array( $candidate['tag'], $clip['tags'], true ) ) {
+					$slot = $candidate;
+					break;
+				}
+			}
+			if ( ! $slot && isset( $clip['slotId'] ) ) {
+				$slot = $slot_ids[ $clip['slotId'] ];
+			}
+			if ( ! $slot ) {
+				foreach ( $slots as $candidate ) {
+					if ( 'sequence' === $candidate['mode'] ) {
+						$slot = $candidate;
+						break;
+					}
+				}
+			}
+			if ( ! $slot ) {
+				return self::invalid( 'The theme has no sequence spot for this clip.' );
+			}
+			if ( isset( $slot['roles'] ) && ! in_array( $clip['role'], $slot['roles'], true ) ) {
+				return self::invalid( "This clip role is unavailable in {$slot['label']}." );
+			}
+			$slot_modes[ $clip['id'] ] = $slot['mode'];
+			$slot_counts[ $slot['id'] ] = ( $slot_counts[ $slot['id'] ] ?? 0 ) + 1;
+			if ( $clip['included'] ) {
+				$slot_included_counts[ $slot['id'] ] = ( $slot_included_counts[ $slot['id'] ] ?? 0 ) + 1;
+			}
+		}
+		foreach ( $slots as $slot ) {
+			$count = $slot_counts[ $slot['id'] ] ?? 0;
+			if ( isset( $slot['maxClips'] ) && $count > $slot['maxClips'] ) {
+				return self::invalid( "Too many clips are assigned to {$slot['label']}." );
+			}
+			if ( isset( $slot['minClips'] ) && ( $slot_included_counts[ $slot['id'] ] ?? 0 ) < $slot['minClips'] ) {
+				return self::invalid( "{$slot['label']} needs more included clips." );
+			}
 		}
 
 		$fields = self::fields( $theme, 'composition' );
@@ -142,9 +196,8 @@ class Clipisode_Composition {
 				$has_segment = true;
 			}
 		}
-		$background_tag = $theme['timeline']['backgroundTag'] ?? null;
 		foreach ( $clips as $clip ) {
-			$has_segment = $has_segment || ( $clip['included'] && ! in_array( $background_tag, $clip['tags'], true ) );
+			$has_segment = $has_segment || ( $clip['included'] && 'sequence' === $slot_modes[ $clip['id'] ] );
 		}
 		if ( ! $has_segment ) {
 			return self::invalid( 'The composition must include a video or a title or ending card.' );

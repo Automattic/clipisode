@@ -1,9 +1,11 @@
 import {
+	assignClipsToSlots,
 	changeTheme,
 	createClipValues,
 	createDefaultSettings,
 	getFieldOptions,
 	getFieldValue,
+	clipsInSlot,
 	getThemeDefinition,
 	getVisibleGroups,
 	themeDefinitions,
@@ -15,6 +17,7 @@ import type {
 	ThemeDefinition,
 	ThemeField,
 } from '../../src/remotion/types';
+import { buildTimeline } from '../../src/remotion/timeline';
 
 const clip = (
 	id: string,
@@ -133,7 +136,9 @@ const theme: ThemeDefinition = {
 			maxClips: 1,
 		},
 	],
-	timeline: {},
+	timeline: {
+		mediaSlots: [ { id: 'main', label: 'Clips', mode: 'sequence' } ],
+	},
 	canvas: { backgroundColor: '#000000' },
 };
 
@@ -153,6 +158,65 @@ const settings = (
 } );
 
 describe( 'theme schemas', () => {
+	it( 'uses theme-defined spots to order clips and enforce fixed capacities', () => {
+		const fixed: ThemeDefinition = {
+			...theme,
+			id: 'two-spots',
+			timeline: {
+				mediaSlots: [
+					{
+						id: 'first',
+						label: 'First',
+						mode: 'sequence',
+						minClips: 1,
+						maxClips: 1,
+					},
+					{
+						id: 'second',
+						label: 'Second',
+						mode: 'sequence',
+						minClips: 1,
+						maxClips: 1,
+					},
+				],
+			},
+		};
+		const second = clip( 'second', { slotId: 'second' } );
+		const first = clip( 'first', { slotId: 'first' } );
+		expect(
+			assignClipsToSlots( fixed, [ clip( 'a' ), clip( 'b' ) ] ).map(
+				( item ) => item.slotId
+			)
+		).toEqual( [ 'first', 'second' ] );
+		const fixedSettings = settings( { themeId: fixed.id } );
+		themeDefinitions.push( fixed );
+		try {
+			expect( clipsInSlot( fixed, [ second, first ], 'first' ) ).toEqual(
+				[ first ]
+			);
+			expect(
+				validateThemeValues( fixed, fixedSettings, [ second, first ] )
+			).toEqual( [] );
+			expect(
+				buildTimeline( [ second, first ], fixedSettings ).segments.map(
+					( segment ) =>
+						segment.type === 'clip' ? segment.clip.id : segment.type
+				)
+			).toEqual( [ 'first', 'second' ] );
+			expect(
+				validateThemeValues( fixed, fixedSettings, [ first ] )
+			).toContain( 'Second needs at least 1 included clips.' );
+			expect(
+				validateThemeValues( fixed, fixedSettings, [
+					first,
+					clip( 'extra', { slotId: 'first' } ),
+					second,
+				] )
+			).toContain( 'First allows at most 1 clips.' );
+		} finally {
+			themeDefinitions.pop();
+		}
+	} );
 	it( 'exposes each theme’s own grouped controls without imposing branding fields on no-theme videos', () => {
 		const colors = ( definition: ThemeDefinition ) =>
 			definition.groups

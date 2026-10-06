@@ -11,15 +11,34 @@
 			"timeline": {
 				"title": {
 					"enabledField": "showTitle",
-					"durationField": "titleDuration"
+					"durationField": "titleDuration",
+					"label": "Opening card"
 				},
 				"ending": {
 					"enabledField": "showEnding",
-					"durationField": "endingDuration"
+					"durationField": "endingDuration",
+					"label": "Ending card"
 				},
-				"backgroundTag": "background",
 				"backgroundField": "backgroundClip",
-				"endTag": "end"
+				"mediaSlots": [
+					{
+						"id": "main",
+						"label": "Story clips",
+						"mode": "sequence"
+					},
+					{
+						"id": "end",
+						"label": "End clips",
+						"mode": "sequence",
+						"tag": "end"
+					},
+					{
+						"id": "background",
+						"label": "Card background clips",
+						"mode": "background",
+						"tag": "background"
+					}
+				]
 			},
 			"tags": [
 				{
@@ -182,7 +201,8 @@
 								"equals": true
 							}
 						}
-					]
+					],
+					"card": "title"
 				},
 				{
 					"id": "ending",
@@ -218,7 +238,8 @@
 								"equals": true
 							}
 						}
-					]
+					],
+					"card": "ending"
 				},
 				{
 					"id": "clip-caption",
@@ -248,15 +269,34 @@
 			"timeline": {
 				"title": {
 					"enabledField": "showTitle",
-					"durationField": "titleDuration"
+					"durationField": "titleDuration",
+					"label": "Opening card"
 				},
 				"ending": {
 					"enabledField": "showEnding",
-					"durationField": "endingDuration"
+					"durationField": "endingDuration",
+					"label": "Ending card"
 				},
-				"backgroundTag": "background",
 				"backgroundField": "backgroundClip",
-				"endTag": "end"
+				"mediaSlots": [
+					{
+						"id": "main",
+						"label": "Story clips",
+						"mode": "sequence"
+					},
+					{
+						"id": "end",
+						"label": "End clips",
+						"mode": "sequence",
+						"tag": "end"
+					},
+					{
+						"id": "background",
+						"label": "Card background clips",
+						"mode": "background",
+						"tag": "background"
+					}
+				]
 			},
 			"tags": [
 				{
@@ -419,7 +459,8 @@
 								"equals": true
 							}
 						}
-					]
+					],
+					"card": "title"
 				},
 				{
 					"id": "ending",
@@ -455,7 +496,8 @@
 								"equals": true
 							}
 						}
-					]
+					],
+					"card": "ending"
 				},
 				{
 					"id": "clip-caption",
@@ -483,7 +525,7 @@
 							"type": "text",
 							"default": null,
 							"optional": true,
-							"help": "Shown with this reply\u2019s speaker card."
+							"help": "Shown with this reply’s speaker card."
 						}
 					],
 					"appliesTo": {
@@ -502,7 +544,15 @@
 			"canvas": {
 				"backgroundColor": "#000000"
 			},
-			"timeline": {},
+			"timeline": {
+				"mediaSlots": [
+					{
+						"id": "main",
+						"label": "Clips",
+						"mode": "sequence"
+					}
+				]
+			},
 			"tags": [],
 			"groups": [
 				{

@@ -4,6 +4,7 @@ import {
 	CheckboxControl,
 	Notice,
 	Modal,
+	SelectControl,
 	Spinner,
 	TextControl,
 } from '@wordpress/components';
@@ -14,12 +15,16 @@ import AddMediaModal from '../components/AddMediaModal';
 import CompositionControls from '../components/CompositionControls';
 import ThemeFields from '../components/ThemeFields';
 import CompositionPreview from '../components/CompositionPreview';
+import CompositionSequence from '../components/CompositionSequence';
 import CompositionExport from '../components/CompositionExport';
 import {
+	assignClipsToSlots,
 	changeTheme,
 	createClipValues,
 	createDefaultSettings,
 	getThemeDefinition,
+	getMediaSlot,
+	clipsInSlot,
 	getVisibleGroups,
 	themeDefinitions,
 	validateThemeValues,
@@ -108,7 +113,10 @@ export default function CreateClipisode( {
 	const [ savedSnapshot, setSavedSnapshot ] = useState( '' );
 	const [ trimmingClip, setTrimmingClip ] =
 		useState< CompositionClip | null >( null );
-	const [ showAddMedia, setShowAddMedia ] = useState( false );
+	const [ addingToSlot, setAddingToSlot ] = useState< string | null >( null );
+	const [ previewFrame, setPreviewFrame ] = useState< {
+		frame: number;
+	} | null >( null );
 	const [ confirmLeave, setConfirmLeave ] = useState( false );
 	const [ pendingHref, setPendingHref ] = useState< string | null >( null );
 	const [ loadRevision, setLoadRevision ] = useState( 0 );
@@ -118,7 +126,6 @@ export default function CreateClipisode( {
 	const [ inspectorTab, setInspectorTab ] = useState<
 		'theme' | 'clip' | 'export'
 	>( 'theme' );
-	const dragIndex = useRef< number | null >( null );
 	const allowUnload = useRef( false );
 	const mediaKey = mediaIds?.join( ',' ) || '';
 	const snapshot = JSON.stringify( { name, clips, settings } );
@@ -223,6 +230,10 @@ export default function CreateClipisode( {
 						( themeId ||
 							'default' ) as CompositionSettings[ 'themeId' ]
 					);
+					const assignedClips = assignClipsToSlots(
+						getThemeDefinition( initialSettings.themeId ),
+						loadedClips
+					);
 					if ( 'title' in initialSettings ) {
 						initialSettings.title =
 							loadedTopic?.title || 'Your story';
@@ -232,8 +243,8 @@ export default function CreateClipisode( {
 					}
 					setTopic( loadedTopic );
 					setName( loadedTopic?.title || 'Untitled Clipisode' );
-					setClips( loadedClips );
-					setSelectedClipId( loadedClips[ 0 ]?.id ?? null );
+					setClips( assignedClips );
+					setSelectedClipId( assignedClips[ 0 ]?.id ?? null );
 					setSettings( initialSettings );
 				}
 			} catch ( caught ) {
@@ -312,17 +323,25 @@ export default function CreateClipisode( {
 			next.splice( to, 0, item );
 			return next;
 		} );
-	const addMedia = async ( media: MediaItem[] ) => {
-		setShowAddMedia( false );
+	const addMedia = async ( media: MediaItem[], slotId: string ) => {
+		setAddingToSlot( null );
 		setAdding( true );
 		setError( '' );
 		try {
+			const currentTheme = getThemeDefinition(
+				latestSettings.current.themeId
+			);
+			const slot = currentTheme.timeline.mediaSlots.find(
+				( item ) => item.id === slotId
+			)!;
 			const added = await Promise.all(
 				media.map( ( item ) =>
 					makeClip( item, topic, settings.themeId )
 				)
 			);
 			for ( const clip of added ) {
+				clip.slotId = slot.id;
+				clip.tags = slot.tag ? [ slot.tag ] : [];
 				clip.values = createClipValues(
 					latestSettings.current.themeId
 				);
@@ -339,6 +358,9 @@ export default function CreateClipisode( {
 		}
 	};
 	const theme = getThemeDefinition( settings.themeId );
+	const activeAddSlot = theme.timeline.mediaSlots.find(
+		( slot ) => slot.id === addingToSlot
+	);
 	const validationErrors = validateThemeValues( theme, settings, clips );
 	try {
 		if ( buildTimeline( clips, settings ).durationInFrames === 0 ) {
@@ -353,6 +375,24 @@ export default function CreateClipisode( {
 		( clip ) => clip.id === selectedClipId
 	);
 	const selectedClip = clips[ selectedIndex ];
+	const selectedSlot = selectedClip
+		? getMediaSlot( theme, selectedClip )
+		: undefined;
+	const selectedSlotClips = selectedSlot
+		? clipsInSlot( theme, clips, selectedSlot.id )
+		: [];
+	const selectedSlotIndex = selectedSlotClips.findIndex(
+		( clip ) => clip.id === selectedClipId
+	);
+	const moveSelectedInSlot = ( direction: number ) => {
+		const neighbor = selectedSlotClips[ selectedSlotIndex + direction ];
+		if ( neighbor ) {
+			moveClip(
+				selectedIndex,
+				clips.findIndex( ( clip ) => clip.id === neighbor.id )
+			);
+		}
+	};
 	const selectClip = ( id: string ) => {
 		setSelectedClipId( id );
 		setInspectorTab( 'clip' );
@@ -379,7 +419,37 @@ export default function CreateClipisode( {
 			}
 			tags.push( tag.id );
 		}
-		updateClip( selectedClip.id, { tags } );
+		const targetSlot = theme.timeline.mediaSlots.find(
+			( slot ) => slot.tag === tag.id
+		);
+		const primarySlot = theme.timeline.mediaSlots.find(
+			( slot ) => slot.mode === 'sequence'
+		)!;
+		let slotId = selectedClip.slotId;
+		if ( targetSlot ) {
+			slotId = checked ? targetSlot.id : primarySlot.id;
+		}
+		updateClip( selectedClip.id, {
+			tags,
+			slotId,
+		} );
+	};
+	const moveToSlot = ( clip: CompositionClip, slotId: string ) => {
+		const slot = theme.timeline.mediaSlots.find(
+			( item ) => item.id === slotId
+		)!;
+		const slotTags = theme.timeline.mediaSlots
+			.map( ( item ) => item.tag )
+			.filter( Boolean );
+		updateClip( clip.id, {
+			slotId,
+			tags: [
+				...( clip.tags || [] ).filter(
+					( tag ) => ! slotTags.includes( tag )
+				),
+				...( slot.tag ? [ slot.tag ] : [] ),
+			],
+		} );
 	};
 	const duplicateClip = () => {
 		if ( ! selectedClip ) {
@@ -391,6 +461,13 @@ export default function CreateClipisode( {
 			tags: [ ...( selectedClip.tags || [] ) ],
 			values: { ...selectedClip.values },
 		};
+		const slot = getMediaSlot( theme, selectedClip );
+		if (
+			slot?.maxClips !== undefined &&
+			clipsInSlot( theme, clips, slot.id ).length >= slot.maxClips
+		) {
+			return;
+		}
 		setClips( [
 			...clips.slice( 0, selectedIndex + 1 ),
 			duplicate,
@@ -398,16 +475,14 @@ export default function CreateClipisode( {
 		] );
 		setSelectedClipId( duplicate.id );
 	};
-	const removeClip = () => {
-		if ( ! selectedClip ) {
-			return;
+	const removeClip = ( id: string ) => {
+		const index = clips.findIndex( ( clip ) => clip.id === id );
+		setClips( clips.filter( ( clip ) => clip.id !== id ) );
+		if ( selectedClipId === id ) {
+			setSelectedClipId(
+				clips[ index + 1 ]?.id ?? clips[ index - 1 ]?.id ?? null
+			);
 		}
-		setClips( clips.filter( ( clip ) => clip.id !== selectedClip.id ) );
-		setSelectedClipId(
-			clips[ selectedIndex + 1 ]?.id ??
-				clips[ selectedIndex - 1 ]?.id ??
-				null
-		);
 	};
 	const save = async (): Promise< boolean > => {
 		if ( validationErrors.length ) {
@@ -545,112 +620,6 @@ export default function CreateClipisode( {
 				</Notice>
 			) }
 			<div className="clipisode-studio-workspace">
-				<aside
-					className="clipisode-studio-library"
-					aria-label="Clip library"
-				>
-					<div className="clipisode-studio-panel-heading">
-						<h2>
-							Clips <span>{ clips.length }</span>
-						</h2>
-						<Button
-							variant="secondary"
-							size="compact"
-							onClick={ () => setShowAddMedia( true ) }
-							disabled={ adding }
-						>
-							{ adding ? 'Loading…' : 'Add media' }
-						</Button>
-					</div>
-					<p className="clipisode-studio-panel-help">
-						Select a clip to edit. Drag to reorder.
-					</p>
-					<ol className="clipisode-studio-clip-list">
-						{ clips.map( ( clip, index ) => (
-							<li
-								key={ clip.id }
-								className={ `${
-									selectedClipId === clip.id
-										? 'is-selected'
-										: ''
-								} ${ clip.included ? '' : 'is-excluded' }` }
-								draggable
-								onDragStart={ () => {
-									dragIndex.current = index;
-								} }
-								onDragOver={ ( event ) =>
-									event.preventDefault()
-								}
-								onDrop={ ( event ) => {
-									event.preventDefault();
-									if ( dragIndex.current !== null ) {
-										moveClip( dragIndex.current, index );
-									}
-									dragIndex.current = null;
-								} }
-								onDragEnd={ () => {
-									dragIndex.current = null;
-								} }
-							>
-								<button
-									type="button"
-									className="clipisode-studio-clip-select"
-									onClick={ () => selectClip( clip.id ) }
-									aria-pressed={ selectedClipId === clip.id }
-									aria-label={ `Select clip ${ index + 1 }: ${
-										clip.name
-									}` }
-								>
-									<div className="clipisode-studio-thumbnail">
-										<video
-											src={ clip.url }
-											muted
-											playsInline
-											preload="metadata"
-											aria-hidden="true"
-										/>
-										<span>{ index + 1 }</span>
-									</div>
-									<div className="clipisode-studio-clip-summary">
-										<strong>{ clip.name }</strong>
-										<span>
-											{ formatTime(
-												clip.trimEnd - clip.trimStart
-											) }{ ' ' }
-											· { clip.role }
-										</span>
-										{ ( clip.tags || [] ).length > 0 && (
-											<span className="clipisode-studio-tag-summary">
-												{ clip
-													.tags!.map(
-														( id ) =>
-															theme.tags.find(
-																( tag ) =>
-																	tag.id ===
-																	id
-															)?.label || id
-													)
-													.join( ' · ' ) }
-											</span>
-										) }
-									</div>
-								</button>
-								<CheckboxControl
-									label={ `Include clip ${ index + 1 }` }
-									checked={ clip.included }
-									onChange={ ( included ) =>
-										updateClip( clip.id, { included } )
-									}
-								/>
-							</li>
-						) ) }
-					</ol>
-					{ ! clips.length && (
-						<p className="clipisode-empty">
-							Add a video to start your story.
-						</p>
-					) }
-				</aside>
 				<main
 					className="clipisode-studio-monitor"
 					aria-label="Live preview"
@@ -665,8 +634,23 @@ export default function CreateClipisode( {
 					<CompositionPreview
 						clips={ clips }
 						settings={ settings }
+						previewFrame={ previewFrame }
+					/>
+					<CompositionSequence
+						theme={ theme }
+						clips={ clips }
+						settings={ settings }
 						selectedClipId={ selectedClipId }
+						adding={ adding }
+						onAddMedia={ setAddingToSlot }
 						onSelectClip={ selectClip }
+						onUpdateClip={ updateClip }
+						onRemoveClip={ removeClip }
+						onMoveClip={ moveClip }
+						onChangeSettings={ setSettings }
+						onPreviewFrame={ ( frame ) =>
+							setPreviewFrame( { frame } )
+						}
 					/>
 				</main>
 				<aside
@@ -766,6 +750,38 @@ export default function CreateClipisode( {
 										} )
 									}
 								/>
+								{ theme.timeline.mediaSlots.length > 1 && (
+									<SelectControl
+										__next40pxDefaultSize
+										label="Sequence spot"
+										value={ selectedSlot?.id || '' }
+										options={ theme.timeline.mediaSlots
+											.filter(
+												( slot ) =>
+													( ! slot.roles ||
+														slot.roles.includes(
+															selectedClip.role
+														) ) &&
+													( slot.id ===
+														selectedSlot?.id ||
+														slot.maxClips ===
+															undefined ||
+														clipsInSlot(
+															theme,
+															clips,
+															slot.id
+														).length <
+															slot.maxClips )
+											)
+											.map( ( slot ) => ( {
+												value: slot.id,
+												label: slot.label,
+											} ) ) }
+										onChange={ ( slotId ) =>
+											moveToSlot( selectedClip, slotId )
+										}
+									/>
+								) }
 								<div className="clipisode-studio-trim">
 									<div>
 										<span>Selected range</span>
@@ -794,12 +810,9 @@ export default function CreateClipisode( {
 										icon={ arrowUp }
 										label="Move earlier"
 										size="compact"
-										disabled={ selectedIndex === 0 }
+										disabled={ selectedSlotIndex <= 0 }
 										onClick={ () =>
-											moveClip(
-												selectedIndex,
-												selectedIndex - 1
-											)
+											moveSelectedInSlot( -1 )
 										}
 									/>
 									<Button
@@ -807,19 +820,23 @@ export default function CreateClipisode( {
 										label="Move later"
 										size="compact"
 										disabled={
-											selectedIndex === clips.length - 1
+											selectedSlotIndex >=
+											selectedSlotClips.length - 1
 										}
 										onClick={ () =>
-											moveClip(
-												selectedIndex,
-												selectedIndex + 1
-											)
+											moveSelectedInSlot( 1 )
 										}
 									/>
 									<Button
 										icon={ copy }
 										label="Duplicate"
 										size="compact"
+										disabled={
+											selectedSlot?.maxClips !==
+												undefined &&
+											selectedSlotClips.length >=
+												selectedSlot.maxClips
+										}
 										onClick={ duplicateClip }
 									/>
 									<Button
@@ -827,7 +844,9 @@ export default function CreateClipisode( {
 										label="Remove"
 										size="compact"
 										isDestructive
-										onClick={ removeClip }
+										onClick={ () =>
+											removeClip( selectedClip.id )
+										}
 									/>
 								</div>
 								{ theme.tags.some(
@@ -908,7 +927,7 @@ export default function CreateClipisode( {
 							</>
 						) : (
 							<p className="clipisode-empty">
-								Select a clip from the library to edit its
+								Select a clip from the sequence to edit its
 								details.
 							</p>
 						) }
@@ -994,12 +1013,22 @@ export default function CreateClipisode( {
 					onClose={ () => setTrimmingClip( null ) }
 				/>
 			) }
-			{ showAddMedia && (
+			{ activeAddSlot && (
 				<AddMediaModal
+					key={ activeAddSlot.id }
 					existingMediaIds={ clips.map( ( clip ) => clip.mediaId ) }
 					topicId={ currentTopicId ?? undefined }
-					onAdd={ addMedia }
-					onClose={ () => setShowAddMedia( false ) }
+					introMediaId={ topic?.intro_media_id }
+					allowedRoles={ activeAddSlot.roles }
+					maxSelection={
+						activeAddSlot.maxClips === undefined
+							? undefined
+							: activeAddSlot.maxClips -
+							  clipsInSlot( theme, clips, activeAddSlot.id )
+									.length
+					}
+					onAdd={ ( media ) => addMedia( media, activeAddSlot.id ) }
+					onClose={ () => setAddingToSlot( null ) }
 				/>
 			) }
 		</div>

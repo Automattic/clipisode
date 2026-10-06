@@ -6,13 +6,11 @@ import { buildTimeline, FPS, getCompositionSize } from '../remotion/timeline';
 import type { ClipisodeCompositionProps } from '../remotion/types';
 
 interface Props extends ClipisodeCompositionProps {
-	selectedClipId?: string | null;
-	onSelectClip?: ( id: string ) => void;
+	previewFrame?: { frame: number } | null;
 }
 
 export default function CompositionPreview( {
-	selectedClipId,
-	onSelectClip,
+	previewFrame,
 	...props
 }: Props ) {
 	const player = useRef< PlayerRef >( null );
@@ -36,6 +34,11 @@ export default function CompositionPreview( {
 		player.current?.pause();
 		player.current?.seekTo( 0 );
 	}, [ props.clips, timeline.durationInFrames ] );
+	useEffect( () => {
+		if ( previewFrame ) {
+			player.current?.seekTo( previewFrame.frame );
+		}
+	}, [ previewFrame ] );
 	if ( timeline.error ) {
 		return (
 			<Notice status="error" isDismissible={ false }>
@@ -96,63 +99,6 @@ export default function CompositionPreview( {
 				{ ( timeline.durationInFrames / FPS ).toFixed( 1 ) } seconds ·{ ' ' }
 				{ size.width } × { size.height } · { FPS } fps
 			</p>
-			<div className="clipisode-studio-sequence-heading">
-				<h2>Sequence</h2>
-				<span>Click to preview a moment</span>
-			</div>
-			<div
-				className="clipisode-composition-chapters"
-				aria-label="Preview chapters"
-			>
-				{ timeline.segments.map( ( segment, index ) => (
-					<button
-						key={ index }
-						type="button"
-						aria-label={ `Preview ${
-							segment.type === 'clip'
-								? segment.clip.name
-								: { title: 'Title', ending: 'Ending' }[
-										segment.type
-								  ]
-						}` }
-						className={ `clipisode-sequence-item ${
-							segment.type === 'clip' ? 'is-clip' : 'is-card'
-						} ${
-							segment.type === 'clip' &&
-							selectedClipId === segment.clip.id
-								? 'is-selected'
-								: ''
-						}` }
-						style={ { flexGrow: segment.durationInFrames } }
-						onClick={ () => {
-							player.current?.seekTo( segment.start );
-							if ( segment.type === 'clip' ) {
-								onSelectClip?.( segment.clip.id );
-							}
-						} }
-					>
-						{ segment.type === 'clip' && (
-							<video
-								src={ segment.clip.url }
-								muted
-								playsInline
-								preload="metadata"
-								aria-hidden="true"
-							/>
-						) }
-						<strong>
-							{ segment.type === 'clip'
-								? segment.clip.name
-								: { title: 'Title', ending: 'Ending' }[
-										segment.type
-								  ] }
-						</strong>
-						<span>
-							{ ( segment.durationInFrames / FPS ).toFixed( 1 ) }s
-						</span>
-					</button>
-				) ) }
-			</div>
 		</div>
 	);
 }

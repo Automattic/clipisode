@@ -45,6 +45,25 @@ class CompositionSchemaTest extends TestCase {
 		$this->assertContains( 'none', array_column( Clipisode_Composition::themes(), 'id' ) );
 	}
 
+	public function test_theme_defined_sequence_spots_persist_and_enforce_capacity(): void {
+		$theme = $this->theme();
+		$theme['timeline']['mediaSlots'] = [
+			[ 'id' => 'first', 'label' => 'First', 'mode' => 'sequence', 'minClips' => 1, 'maxClips' => 1 ],
+			[ 'id' => 'second', 'label' => 'Second', 'mode' => 'sequence', 'minClips' => 1, 'maxClips' => 1 ],
+		];
+		$composition = CompositionTest::composition();
+		$composition['clips'][0]['slotId'] = 'first';
+		$this->assertInstanceOf( WP_Error::class, $this->with_theme( $composition, $theme ) );
+		$composition['clips'][] = array_merge( $composition['clips'][0], [ 'id' => 'reply-2', 'slotId' => 'second' ] );
+		$clean = $this->with_theme( $composition, $theme );
+		$this->assertSame( 'first', $clean['clips'][0]['slotId'] );
+		$this->assertSame( 'second', $clean['clips'][1]['slotId'] );
+		$composition['clips'][1]['slotId'] = 'first';
+		$this->assertInstanceOf( WP_Error::class, $this->with_theme( $composition, $theme ) );
+		$composition['clips'][1]['slotId'] = 'missing';
+		$this->assertInstanceOf( WP_Error::class, $this->with_theme( $composition, $theme ) );
+	}
+
 	public function test_none_has_only_its_declared_settings(): void {
 		$composition = CompositionTest::composition();
 		$composition['settings'] = $this->settings( $this->theme( 'none' ) );

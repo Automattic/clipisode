@@ -6,6 +6,7 @@ import type {
 	ThemeDefinition,
 	ThemeField,
 	ThemeGroup,
+	ThemeMediaSlot,
 	ThemeValue,
 	ThemeValues,
 } from './types';
@@ -52,6 +53,76 @@ export function createDefaultSettings(
 
 export function createClipValues( themeId: string ): ThemeValues {
 	return defaultsFor( getThemeDefinition( themeId ), 'clip' );
+}
+
+export function getMediaSlot(
+	theme: ThemeDefinition,
+	clip: CompositionClip
+): ThemeMediaSlot | undefined {
+	return (
+		theme.timeline.mediaSlots.find(
+			( slot ) => slot.tag && clip.tags?.includes( slot.tag )
+		) ||
+		theme.timeline.mediaSlots.find( ( slot ) => slot.id === clip.slotId ) ||
+		theme.timeline.mediaSlots.find( ( slot ) => slot.mode === 'sequence' )
+	);
+}
+
+export function clipsInSlot(
+	theme: ThemeDefinition,
+	clips: CompositionClip[],
+	slotId: string
+): CompositionClip[] {
+	return clips.filter(
+		( clip ) => getMediaSlot( theme, clip )?.id === slotId
+	);
+}
+
+export function assignClipsToSlots(
+	theme: ThemeDefinition,
+	clips: CompositionClip[]
+): CompositionClip[] {
+	const counts = new Map< string, number >();
+	return clips.map( ( clip ) => {
+		const tagged = theme.timeline.mediaSlots.find(
+			( slot ) => slot.tag && clip.tags?.includes( slot.tag )
+		);
+		const retained = theme.timeline.mediaSlots.find(
+			( slot ) => slot.id === clip.slotId
+		);
+		const fits = ( slot: ThemeMediaSlot ) =>
+			( ! slot.roles || slot.roles.includes( clip.role ) ) &&
+			( slot.maxClips === undefined ||
+				( counts.get( slot.id ) || 0 ) < slot.maxClips );
+		const slot =
+			tagged ||
+			( retained && fits( retained ) ? retained : undefined ) ||
+			theme.timeline.mediaSlots.find(
+				( item ) => item.mode === 'sequence' && fits( item )
+			) ||
+			theme.timeline.mediaSlots.find(
+				( item ) => item.mode === 'sequence'
+			);
+		if ( ! slot ) {
+			throw new Error(
+				`The theme has no sequence spot for ${ clip.name }.`
+			);
+		}
+		counts.set( slot.id, ( counts.get( slot.id ) || 0 ) + 1 );
+		const slotTags = theme.timeline.mediaSlots
+			.map( ( item ) => item.tag )
+			.filter( ( tag ): tag is string => Boolean( tag ) );
+		return {
+			...clip,
+			slotId: slot.id,
+			tags: [
+				...( clip.tags || [] ).filter(
+					( tag ) => ! slotTags.includes( tag )
+				),
+				...( slot.tag ? [ slot.tag ] : [] ),
+			],
+		};
+	} );
 }
 
 export function matchesClipFilter(
@@ -224,6 +295,41 @@ export function validateThemeValues(
 	if ( ! [ 'portrait', 'square', 'landscape' ].includes( settings.format ) ) {
 		errors.push( 'Choose a valid canvas format.' );
 	}
+	for ( const slot of theme.timeline.mediaSlots ) {
+		const assigned = clipsInSlot( theme, clips, slot.id );
+		if ( slot.maxClips !== undefined && assigned.length > slot.maxClips ) {
+			errors.push(
+				`${ slot.label } allows at most ${ slot.maxClips } clips.`
+			);
+		}
+		if (
+			slot.minClips !== undefined &&
+			assigned.filter( ( clip ) => clip.included ).length < slot.minClips
+		) {
+			errors.push(
+				`${ slot.label } needs at least ${ slot.minClips } included clips.`
+			);
+		}
+		if ( slot.roles ) {
+			for ( const clip of assigned ) {
+				if ( ! slot.roles.includes( clip.role ) ) {
+					errors.push(
+						`${ clip.name } cannot be placed in ${ slot.label }.`
+					);
+				}
+			}
+		}
+	}
+	for ( const clip of clips ) {
+		if (
+			clip.slotId &&
+			! theme.timeline.mediaSlots.some(
+				( slot ) => slot.id === clip.slotId
+			)
+		) {
+			errors.push( `${ clip.name } has an unavailable sequence spot.` );
+		}
+	}
 	const validate = (
 		scope: ThemeGroup[ 'scope' ],
 		values: ThemeValues,
@@ -339,15 +445,16 @@ export function changeTheme(
 			)
 		),
 	} ) );
+	const slottedClips = assignClipsToSlots( next, nextClips );
 	return {
 		settings: {
 			themeId: nextThemeId,
 			format: settings.format,
-			...transfer( 'composition', settings, nextClips ),
+			...transfer( 'composition', settings, slottedClips ),
 		},
-		clips: nextClips.map( ( clip ) => ( {
+		clips: slottedClips.map( ( clip ) => ( {
 			...clip,
-			values: transfer( 'clip', clip.values || {}, nextClips ),
+			values: transfer( 'clip', clip.values || {}, slottedClips ),
 		} ) ),
 	};
 }

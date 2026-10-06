@@ -43,10 +43,12 @@ const input = (): ClipisodeCompositionProps => ( {
 describe( 'CompositionPreview', () => {
 	beforeEach( () => jest.clearAllMocks() );
 
-	it( 'supplies trimmed duration and selected aspect ratio to the Remotion player, with chapter seeking', () => {
+	it( 'supplies trimmed duration and selected aspect ratio to the Remotion player, with sequence seeking', () => {
 		const props = input();
 		props.settings.format = 'landscape';
-		render( <CompositionPreview { ...props } /> );
+		render(
+			<CompositionPreview { ...props } previewFrame={ { frame: 90 } } />
+		);
 		expect( mockPlayer ).toHaveBeenLastCalledWith(
 			expect.objectContaining( {
 				inputProps: props,
@@ -58,12 +60,9 @@ describe( 'CompositionPreview', () => {
 				showVolumeControls: true,
 			} )
 		);
-		fireEvent.click(
-			screen.getByRole( 'button', { name: 'Preview Avery' } )
-		);
 		expect( mockSeek ).toHaveBeenLastCalledWith( 90 );
-		fireEvent.click(
-			screen.getByRole( 'button', { name: 'Preview Ending' } )
+		render(
+			<CompositionPreview { ...props } previewFrame={ { frame: 180 } } />
 		);
 		expect( mockSeek ).toHaveBeenLastCalledWith( 180 );
 	} );
