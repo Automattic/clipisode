@@ -945,6 +945,7 @@ export default function CreateClipisode( {
 			{ confirmLeave && (
 				<Modal
 					title="Unsaved preview changes"
+					className="clipisode-leave-modal"
 					onRequestClose={ cancelLeave }
 				>
 					<p>Save your preview changes before leaving?</p>
@@ -953,23 +954,29 @@ export default function CreateClipisode( {
 							{ error }
 						</Notice>
 					) }
-					<Button variant="secondary" onClick={ cancelLeave }>
-						Keep editing
-					</Button>
-					<Button variant="secondary" isDestructive onClick={ leave }>
-						Leave without saving
-					</Button>
-					<Button
-						variant="primary"
-						disabled={ cannotSave }
-						onClick={ async () => {
-							if ( await save() ) {
-								leave();
-							}
-						} }
-					>
-						{ saving ? 'Saving…' : 'Save and leave' }
-					</Button>
+					<div className="clipisode-leave-modal-actions">
+						<Button variant="secondary" onClick={ cancelLeave }>
+							Keep editing
+						</Button>
+						<Button
+							variant="secondary"
+							isDestructive
+							onClick={ leave }
+						>
+							Leave without saving
+						</Button>
+						<Button
+							variant="primary"
+							disabled={ cannotSave }
+							onClick={ async () => {
+								if ( await save() ) {
+									leave();
+								}
+							} }
+						>
+							{ saving ? 'Saving…' : 'Save and leave' }
+						</Button>
+					</div>
 				</Modal>
 			) }
 
