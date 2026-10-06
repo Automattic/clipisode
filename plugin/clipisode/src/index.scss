@@ -947,6 +947,7 @@
 		padding-top: 2px;
 	}
 	.clipisode-sequence-lane {
+		--clipisode-sequence-heading-height: 22px;
 		display: flex;
 		align-items: flex-start;
 		gap: 16px;
@@ -964,6 +965,7 @@
 		cursor: pointer;
 	}
 	.clipisode-sequence-card {
+		margin-top: var(--clipisode-sequence-heading-height);
 		padding: 12px;
 		border: 1px solid #bbc4d0;
 		background: linear-gradient(160deg, #43346a, #1d2334);
@@ -1015,8 +1017,11 @@
 	}
 	.clipisode-sequence-slot-heading {
 		justify-content: space-between;
+		height: 14px;
 		margin-bottom: 8px;
 		font-size: 11px;
+		line-height: 14px;
+		white-space: nowrap;
 		color: #364454;
 		span {
 			color: var(--studio-muted);
