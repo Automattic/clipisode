@@ -28,6 +28,8 @@ export interface Topic {
 
 export interface Output {
 	id: number;
+	topic_id?: number | null;
+	has_composition?: boolean;
 	name: string;
 	slug: string;
 	upload_token?: string;
@@ -36,6 +38,26 @@ export interface Output {
 	clips_count: number;
 	file_size: number | null;
 	created_at: string;
+}
+
+export interface SavedCompositionOutput {
+	id: number;
+	name: string;
+	topic_id: number | null;
+	slug: string;
+	created_at: string;
+	url: string | null;
+	composition: import('./remotion/types').ClipisodeCompositionProps;
+	composition_hash: string | null;
+}
+
+export interface OutputRenderStatus {
+	id: string | null;
+	status: 'idle' | 'queued' | 'rendering' | 'uploading' | 'done' | 'error';
+	progress: number;
+	error: string | null;
+	url?: string | null;
+	external_available: boolean;
 }
 
 export interface Theme {
@@ -163,13 +185,8 @@ declare global {
 			invitation_prefix: string;
 			preview_prefix: string;
 			debug_mode: boolean;
-			themes: Record<
-				string,
-				{
-					label: string;
-					assets: Record< string, { url: string; filename: string } >;
-				}
-			>;
+			remotion_license_key?: string | null;
+			remotion_is_production?: boolean;
 		};
 	}
 }

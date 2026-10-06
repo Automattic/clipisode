@@ -161,8 +161,8 @@ if ( $terms_html === '' ) {
 		. '</section>';
 }
 
-// Screen selection. ?screen=<type> lets us phone-test any of the 10 screens
-// while the IAPI router is still being built; falls back to "intro".
+// Screen selection. ?screen=<type> lets us preview any screen directly;
+// the default is "intro" on mobile and "intro_desktop" on desktop.
 //
 // SCREEN_TYPES are stored as underscored identifiers (e.g. "warning_silent")
 // because that's the canonical form used as meta values on screen posts. URLs
@@ -573,11 +573,8 @@ Clipisode_Post_Types::enqueue_default_theme_style();
 
 // Register and enqueue the IAPI module. We register inline here rather than
 // on a wp_enqueue_scripts hook because this template only loads when the
-// clipisode_flow query var is set, so the guard is implicit. The runtime +
-// router are enqueued explicitly so each gets its own <script type="module">
-// tag rather than being pulled in only as a side effect of import statements.
-// Note: enqueuing the router is what triggers the WP 6.9 hydration race -
-// store.js handles it with the same manualHydrate workaround the spike uses.
+// clipisode_flow query var is set, so the guard is implicit. This flow
+// updates its screens in place and does not use the client-side router.
 //
 // Version is filemtime() of the actual file on disk so Studio Safari (and
 // any other aggressive cache) reliably pulls the latest store.js whenever
@@ -587,11 +584,10 @@ $store_version = file_exists( $store_path ) ? (string) filemtime( $store_path ) 
 wp_register_script_module(
 	'clipisode/flow',
 	plugins_url( 'assets/flow/store.js', CLIPISODE_PLUGIN_DIR . 'clipisode.php' ),
-	[ '@wordpress/interactivity', '@wordpress/interactivity-router' ],
+	[ '@wordpress/interactivity' ],
 	$store_version
 );
 wp_enqueue_script_module( '@wordpress/interactivity' );
-wp_enqueue_script_module( '@wordpress/interactivity-router' );
 wp_enqueue_script_module( 'clipisode/flow' );
 
 // Desktop intro screen needs the bundled QR-code generator (built from
@@ -1837,7 +1833,6 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 <body class="clipisode-flow clipisode-flow-screen-<?php echo esc_attr( str_replace( '_', '-', $screen_type ) ); ?>">
 <div
 	data-wp-interactive="clipisode/flow"
-	data-wp-router-region="flow"
 	data-wp-init="callbacks.init"
 >
 

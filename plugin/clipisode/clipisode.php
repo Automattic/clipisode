@@ -5,7 +5,7 @@
  * Version: 0.1.0
  * Author: Clipisode
  * Text Domain: clipisode
- * Requires at least: 6.5
+ * Requires at least: 6.6
  * Requires PHP: 8.1
  */
 
@@ -18,6 +18,8 @@ define( 'CLIPISODE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-database.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-post-types.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-media.php';
+require_once CLIPISODE_PLUGIN_DIR . 'includes/class-composition.php';
+require_once CLIPISODE_PLUGIN_DIR . 'includes/class-renderer.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-admin.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-rest-api.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-invitation.php';
@@ -56,6 +58,7 @@ add_action( 'init', function (): void {
 }, 99 );
 
 add_action( 'init', [ Clipisode_Post_Types::class, 'register' ] );
+add_action( 'init', [ Clipisode_Database::class, 'maybe_upgrade' ] );
 add_action( 'init', [ new Clipisode_Media(), 'register_hooks' ] );
 add_action( 'admin_menu', [ new Clipisode_Admin(), 'register_menus' ] );
 add_action( 'rest_api_init', [ new Clipisode_REST_API(), 'register_routes' ] );
@@ -65,16 +68,13 @@ add_filter( 'block_editor_settings_all', [ Clipisode_Post_Types::class, 'filter_
 add_filter( 'render_block', [ Clipisode_Post_Types::class, 'filter_flow_block_directives' ], 10, 2 );
 
 add_filter( 'clipisode_themes', function ( array $themes ): array {
-	$themes['default'] = [
-		'label'     => 'Default',
-		'asset_url' => CLIPISODE_PLUGIN_URL . 'assets/themes/standard/',
-		'asset_dir' => CLIPISODE_PLUGIN_DIR . 'assets/themes/standard/',
-	];
-	$themes['wpvip'] = [
-		'label'     => 'WP VIP',
-		'asset_url' => CLIPISODE_PLUGIN_URL . 'assets/themes/wpvip/',
-		'asset_dir' => CLIPISODE_PLUGIN_DIR . 'assets/themes/wpvip/',
-	];
+	$catalog = Clipisode_Composition::themes();
+	if ( is_wp_error( $catalog ) ) {
+		throw new RuntimeException( $catalog->get_error_message() );
+	}
+	foreach ( $catalog as $theme ) {
+		$themes[ $theme['id'] ] = [ 'label' => $theme['label'] ];
+	}
 	return $themes;
 } );
 

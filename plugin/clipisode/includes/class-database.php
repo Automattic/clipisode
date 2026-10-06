@@ -4,6 +4,14 @@ defined( 'ABSPATH' ) || exit;
 
 class Clipisode_Database {
 
+	private const VERSION = '2';
+
+	public static function maybe_upgrade(): void {
+		if ( self::VERSION !== get_option( 'clipisode_database_version' ) ) {
+			self::create_tables();
+		}
+	}
+
 	public static function activate(): void {
 		self::create_tables();
 		self::ensure_default_host();
@@ -130,6 +138,7 @@ name VARCHAR(255) NOT NULL,
 slug VARCHAR(255) NOT NULL,
 upload_token VARCHAR(64) DEFAULT NULL,
 media_id BIGINT UNSIGNED DEFAULT NULL,
+composition LONGTEXT DEFAULT NULL,
 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 PRIMARY KEY  (id),
 UNIQUE KEY slug (slug),
@@ -152,5 +161,8 @@ KEY output_id (output_id),
 KEY media_id (media_id)
 ) $charset;"
 		);
+		if ( $wpdb->get_var( "SHOW COLUMNS FROM {$wpdb->prefix}clipisode_outputs LIKE 'composition'" ) ) {
+			update_option( 'clipisode_database_version', self::VERSION );
+		}
 	}
 }

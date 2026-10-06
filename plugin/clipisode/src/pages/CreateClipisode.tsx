@@ -1,489 +1,578 @@
-import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
+import { useState, useEffect, useRef } from '@wordpress/element';
 import {
 	Button,
+	CheckboxControl,
+	Notice,
 	Modal,
 	SelectControl,
 	Spinner,
 	TextControl,
 } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
-import { crop, copy, trash } from '@wordpress/icons';
+import { crop, copy, trash, arrowUp, arrowDown } from '@wordpress/icons';
 import TrimModal from '../components/TrimModal';
 import AddMediaModal from '../components/AddMediaModal';
-import { themeRegistry } from '../themes';
+import CompositionControls from '../components/CompositionControls';
+import ThemeFields from '../components/ThemeFields';
+import CompositionPreview from '../components/CompositionPreview';
+import CompositionSequence from '../components/CompositionSequence';
+import CompositionExport from '../components/CompositionExport';
 import {
-	WS_URL,
-	generateJobId,
-	getThemeAssets,
-	getAvailableThemes,
-} from '../lib/transcoder';
-import type { Topic, Output, MediaItem } from '../types';
+	assignClipsToSlots,
+	changeTheme,
+	createClipValues,
+	createDefaultSettings,
+	getThemeDefinition,
+	getMediaSlot,
+	clipsInSlot,
+	canMoveClipToSlot,
+	moveClipToSlot,
+	getVisibleGroups,
+	themeDefinitions,
+	validateThemeValues,
+} from '../remotion/theme-schema';
+import { buildTimeline } from '../remotion/timeline';
+import { getVideoDuration } from '../lib/video-metadata';
+import type {
+	CompositionClip,
+	CompositionSettings,
+	ThemeTag,
+} from '../remotion/types';
+import type { Topic, MediaItem, SavedCompositionOutput } from '../types';
 
-interface CreateClipisodeProps {
+interface Props {
 	topicId?: number;
-	mediaIds: number[];
+	mediaIds?: number[];
+	outputId?: number;
 	navigate: ( path: string | number ) => void;
 }
 
-interface ClipItem {
-	id: string;
-	mediaId: number;
-	role: 'intro' | 'reply';
-	name: string;
-	url: string;
-	filename: string;
-	duration: number;
-	trimStart: number;
-	trimEnd: number;
-	included: boolean;
-}
-
-type RenderState = 'idle' | 'connecting' | 'processing' | 'done' | 'error';
-
 function formatTime( seconds: number ): string {
-	const m = Math.floor( seconds / 60 );
-	const s = seconds % 60;
-	return `${ m }:${ s.toFixed( 1 ).padStart( 4, '0' ) }`;
+	return `${ Math.floor( seconds / 60 ) }:${ ( seconds % 60 )
+		.toFixed( 1 )
+		.padStart( 4, '0' ) }`;
 }
 
-function getDuration( url: string ): Promise< number > {
-	return new Promise( ( resolve, reject ) => {
-		const video = document.createElement( 'video' );
-		video.preload = 'metadata';
-		video.onloadedmetadata = () => resolve( video.duration );
-		video.onerror = reject;
-		video.src = url;
-	} );
+function createClipId(): string {
+	return Array.from(
+		crypto.getRandomValues( new Uint32Array( 4 ) ),
+		( value ) => value.toString( 16 )
+	).join( '-' );
+}
+
+async function makeClip(
+	media: MediaItem,
+	topic: Topic | null,
+	themeId: string
+): Promise< CompositionClip > {
+	if ( ! media.url ) {
+		throw new Error( `Media #${ media.id } has no playable URL.` );
+	}
+	const duration = await getVideoDuration( media.url );
+	const intro = Number( topic?.intro_media_id ) === Number( media.id );
+	return {
+		id: createClipId(),
+		mediaId: Number( media.id ),
+		role: intro ? 'intro' : 'reply',
+		name:
+			intro && topic?.hosted_by
+				? topic.hosted_by
+				: media.used_by?.label ||
+				  media.label ||
+				  media.path.split( '/' ).pop()!,
+		url: media.url,
+		duration,
+		trimStart: 0,
+		trimEnd: duration,
+		included: true,
+		tags: [],
+		values: createClipValues( themeId ),
+	};
 }
 
 export default function CreateClipisode( {
 	topicId,
 	mediaIds,
+	outputId,
 	navigate,
-}: CreateClipisodeProps ) {
+}: Props ) {
 	const [ topic, setTopic ] = useState< Topic | null >( null );
-	const [ clips, setClips ] = useState< ClipItem[] >( [] );
+	const [ currentTopicId, setCurrentTopicId ] = useState< number | null >(
+		topicId ?? null
+	);
+	const [ clips, setClips ] = useState< CompositionClip[] >( [] );
+	const [ settings, setSettings ] = useState< CompositionSettings >( () =>
+		createDefaultSettings()
+	);
+	const [ name, setName ] = useState( '' );
+	const [ savedId, setSavedId ] = useState< number | undefined >( outputId );
 	const [ loading, setLoading ] = useState( true );
-	const [ trimmingClip, setTrimmingClip ] = useState< ClipItem | null >(
+	const [ loadError, setLoadError ] = useState( '' );
+	const [ error, setError ] = useState( '' );
+	const [ saving, setSaving ] = useState( false );
+	const [ rendering, setRendering ] = useState( false );
+	const [ adding, setAdding ] = useState( false );
+	const [ savedSnapshot, setSavedSnapshot ] = useState( '' );
+	const [ trimmingClip, setTrimmingClip ] =
+		useState< CompositionClip | null >( null );
+	const [ addingToSlot, setAddingToSlot ] = useState< string | null >( null );
+	const [ previewFrame, setPreviewFrame ] = useState< {
+		frame: number;
+	} | null >( null );
+	const [ confirmLeave, setConfirmLeave ] = useState( false );
+	const [ pendingHref, setPendingHref ] = useState< string | null >( null );
+	const [ loadRevision, setLoadRevision ] = useState( 0 );
+	const [ selectedClipId, setSelectedClipId ] = useState< string | null >(
 		null
 	);
-	const [ previewClip, setPreviewClip ] = useState< ClipItem | null >( null );
-	const availableThemes = getAvailableThemes();
-	const [ selectedTheme, setSelectedTheme ] = useState(
-		availableThemes[ 0 ]?.id || 'default'
-	);
-	const [ renderState, setRenderState ] = useState< RenderState >( 'idle' );
-	const [ renderPhase, setRenderPhase ] = useState( '' );
-	const [ renderMessage, setRenderMessage ] = useState( '' );
-	const [ renderProgress, setRenderProgress ] = useState( 0 );
-	const [ renderError, setRenderError ] = useState( '' );
-	const [ renderOutputUrl, setRenderOutputUrl ] = useState< string | null >(
-		null
-	);
-	const wsRef = useRef< WebSocket | null >( null );
-	const jobIdRef = useRef< string | null >( null );
-	const dragItem = useRef< number | null >( null );
-	const dragOver = useRef< number | null >( null );
-	const dupCounter = useRef( 0 );
-	const [ showAddMedia, setShowAddMedia ] = useState( false );
-	const [ clipisodeName, setClipisodeName ] = useState( '' );
+	const [ inspectorTab, setInspectorTab ] = useState<
+		'theme' | 'clip' | 'export'
+	>( 'theme' );
+	const allowUnload = useRef( false );
+	const mediaKey = mediaIds?.join( ',' ) || '';
+	const snapshot = JSON.stringify( { name, clips, settings } );
+	const latestSnapshot = useRef( snapshot );
+	latestSnapshot.current = snapshot;
+	const latestSettings = useRef( settings );
+	latestSettings.current = settings;
+	const dirty = ! loading && snapshot !== savedSnapshot;
 
 	useEffect( () => {
-		const warn = ( e: BeforeUnloadEvent ) => {
-			if (
-				renderState === 'connecting' ||
-				renderState === 'processing'
-			) {
-				e.preventDefault();
+		let active = true;
+		setLoading( true );
+		setLoadError( '' );
+		setError( '' );
+		const load = async () => {
+			try {
+				if ( outputId ) {
+					const output = await apiFetch< SavedCompositionOutput >( {
+						path: `/clipisode/v1/outputs/${ outputId }`,
+					} );
+					if ( ! output.composition ) {
+						throw new Error(
+							'This output has no editable composition.'
+						);
+					}
+					const loadedTopic = output.topic_id
+						? await apiFetch< Topic >( {
+								path: `/clipisode/v1/topics/${ output.topic_id }`,
+						  } )
+						: null;
+					if ( ! active ) {
+						return;
+					}
+					setName( output.name );
+					setTopic( loadedTopic );
+					const loadedClips = output.composition.clips.filter(
+						( clip ) => clip.included
+					);
+					setClips( loadedClips );
+					setSelectedClipId( loadedClips[ 0 ]?.id ?? null );
+					setSettings( output.composition.settings );
+					setSavedId( output.id );
+					setCurrentTopicId( output.topic_id );
+					setSavedSnapshot(
+						JSON.stringify( {
+							name: output.name,
+							clips: output.composition.clips,
+							settings: output.composition.settings,
+						} )
+					);
+				} else {
+					const [ media, loadedTopic ] = await Promise.all( [
+						mediaKey
+							? apiFetch< MediaItem[] >( {
+									path: `/clipisode/v1/media?ids=${ mediaKey }`,
+							  } )
+							: Promise.resolve( [] ),
+						topicId
+							? apiFetch< Topic >( {
+									path: `/clipisode/v1/topics/${ topicId }`,
+							  } )
+							: Promise.resolve( null ),
+					] );
+					const byId = new Map(
+						media.map( ( item ) => [ Number( item.id ), item ] )
+					);
+					const selected = mediaKey
+						? mediaKey.split( ',' ).map( ( id ) => {
+								const item = byId.get( Number( id ) );
+								if ( ! item ) {
+									throw new Error(
+										`Media #${ id } is no longer available.`
+									);
+								}
+								return item;
+						  } )
+						: [];
+					const loadedClips = await Promise.all(
+						selected.map( ( item ) =>
+							makeClip(
+								item,
+								loadedTopic,
+								loadedTopic?.invitation_renderer_theme ||
+									'default'
+							)
+						)
+					);
+					if ( ! active ) {
+						return;
+					}
+					const themeId = loadedTopic?.invitation_renderer_theme;
+					if (
+						themeId &&
+						! themeDefinitions.some(
+							( theme ) => theme.id === themeId
+						)
+					) {
+						throw new Error(
+							`Video theme "${ themeId }" is not registered.`
+						);
+					}
+					const initialSettings = createDefaultSettings(
+						( themeId ||
+							'default' ) as CompositionSettings[ 'themeId' ]
+					);
+					const assignedClips = assignClipsToSlots(
+						getThemeDefinition( initialSettings.themeId ),
+						loadedClips
+					);
+					if ( 'title' in initialSettings ) {
+						initialSettings.title =
+							loadedTopic?.title || 'Your story';
+					}
+					if ( 'subtitle' in initialSettings ) {
+						initialSettings.subtitle = loadedTopic?.hosted_by || '';
+					}
+					setTopic( loadedTopic );
+					setName( loadedTopic?.title || 'Untitled Clipisode' );
+					setClips( assignedClips );
+					setSelectedClipId( assignedClips[ 0 ]?.id ?? null );
+					setSettings( initialSettings );
+				}
+			} catch ( caught ) {
+				if ( active ) {
+					setLoadError( ( caught as Error ).message );
+				}
+			} finally {
+				if ( active ) {
+					setLoading( false );
+				}
 			}
+		};
+		load();
+		return () => {
+			active = false;
+		};
+	}, [ outputId, topicId, mediaKey, loadRevision ] );
+
+	useEffect( () => {
+		if ( ! dirty ) {
+			return;
+		}
+		const warn = ( event: BeforeUnloadEvent ) => {
+			if ( allowUnload.current ) {
+				return;
+			}
+			event.preventDefault();
+			event.returnValue = '';
 		};
 		window.addEventListener( 'beforeunload', warn );
 		return () => window.removeEventListener( 'beforeunload', warn );
-	}, [ renderState ] );
-
-	const loadData = useCallback( async () => {
-		const mediaItems = await apiFetch< MediaItem[] >( {
-			path: `/clipisode/v1/media?ids=${ mediaIds.join( ',' ) }`,
-		} );
-
-		let t: Topic | null = null;
-		if ( topicId ) {
-			t = await apiFetch< Topic >( {
-				path: `/clipisode/v1/topics/${ topicId }`,
-			} );
-			setTopic( t );
-			setClipisodeName( t.title );
-			if ( t.invitation_renderer_theme ) {
-				const resolvedFromInvitation = themeRegistry[
-					t.invitation_renderer_theme
-				]
-					? t.invitation_renderer_theme
-					: 'default';
-				setSelectedTheme( resolvedFromInvitation );
-			}
-		}
-
-		const mediaById = new Map(
-			mediaItems.map( ( m ) => [ Number( m.id ), m ] )
-		);
-
-		const items: ClipItem[] = mediaIds
-			.map( ( id ) => mediaById.get( id ) )
-			.filter( ( m ): m is MediaItem => !! m && !! m.url )
-			.map( ( m ) => ( {
-				id: `media-${ m.id }`,
-				mediaId: m.id,
-				role: ( t?.intro_media_id === m.id ? 'intro' : 'reply' ) as
-					| 'intro'
-					| 'reply',
-				name:
-					t?.intro_media_id === m.id && t?.hosted_by
-						? t.hosted_by
-						: m.used_by?.label ||
-						  m.label ||
-						  m.path.split( '/' ).pop() ||
-						  `media_${ m.id }`,
-				url: m.url!,
-				filename: m.path.split( '/' ).pop() || `media_${ m.id }.mp4`,
-				duration: 0,
-				trimStart: 0,
-				trimEnd: 0,
-				included: true,
-			} ) );
-
-		const withDurations = await Promise.all(
-			items.map( async ( item ) => {
-				try {
-					const dur = await getDuration( item.url );
-					return { ...item, duration: dur, trimEnd: dur };
-				} catch {
-					return { ...item, duration: 0, trimEnd: 0 };
-				}
-			} )
-		);
-
-		setClips( withDurations );
-		setLoading( false );
-	}, [ topicId, mediaIds ] );
+	}, [ dirty ] );
 
 	useEffect( () => {
-		loadData();
-	}, [ loadData ] );
-
-	const toggleIncluded = ( id: string ) => {
-		setClips( ( prev ) =>
-			prev.map( ( c ) =>
-				c.id === id ? { ...c, included: ! c.included } : c
-			)
-		);
-	};
-
-	const handleTrimDone = ( start: number, end: number ) => {
-		if ( ! trimmingClip ) {
+		if ( ! dirty ) {
 			return;
 		}
-		setClips( ( prev ) =>
-			prev.map( ( c ) =>
-				c.id === trimmingClip.id
-					? { ...c, trimStart: start, trimEnd: end }
-					: c
-			)
-		);
-		setTrimmingClip( null );
-	};
-
-	const duplicateClip = ( clip: ClipItem, index: number ) => {
-		dupCounter.current += 1;
-		const dup: ClipItem = {
-			...clip,
-			id: `${ clip.id }-dup-${ dupCounter.current }`,
-			trimStart: 0,
-			trimEnd: clip.duration,
-			included: true,
-		};
-		setClips( ( prev ) => {
-			const next = [ ...prev ];
-			next.splice( index + 1, 0, dup );
-			return next;
-		} );
-	};
-
-	const removeClip = ( id: string ) => {
-		if ( ! window.confirm( 'Remove this clip from the list?' ) ) {
-			return;
-		}
-		setClips( ( prev ) => prev.filter( ( c ) => c.id !== id ) );
-	};
-
-	const handleAddMedia = async ( items: MediaItem[] ) => {
-		setShowAddMedia( false );
-		const newClips: ClipItem[] = await Promise.all(
-			items.map( async ( m ) => {
-				const url = m.url!;
-				let dur = 0;
-				try {
-					dur = await getDuration( url );
-				} catch {}
-				return {
-					id: `media-${ m.id }`,
-					mediaId: m.id,
-					role: 'reply' as const,
-					name:
-						m.used_by?.label ||
-						m.label ||
-						m.path.split( '/' ).pop() ||
-						`media_${ m.id }`,
-					url,
-					filename:
-						m.path.split( '/' ).pop() || `media_${ m.id }.mp4`,
-					duration: dur,
-					trimStart: 0,
-					trimEnd: dur,
-					included: true,
-				};
-			} )
-		);
-		setClips( ( prev ) => [ ...prev, ...newClips ] );
-	};
-
-	const handleDragStart = ( index: number ) => {
-		dragItem.current = index;
-	};
-
-	const handleDragEnter = ( index: number ) => {
-		dragOver.current = index;
-	};
-
-	const handleDragEnd = () => {
-		if ( dragItem.current === null || dragOver.current === null ) {
-			return;
-		}
-		const from = dragItem.current;
-		const to = dragOver.current;
-		if ( from === to ) {
-			return;
-		}
-
-		setClips( ( prev ) => {
-			const next = [ ...prev ];
-			const [ moved ] = next.splice( from, 1 );
-			next.splice( to, 0, moved );
-			return next;
-		} );
-		dragItem.current = null;
-		dragOver.current = null;
-	};
-
-	const includedClips = clips.filter( ( c ) => c.included );
-	const [ debugManifest, setDebugManifest ] = useState< string | null >(
-		null
-	);
-
-	const buildManifest = ( callbackUrl: string ) => {
-		const videos: Record< string, object > = {};
-		includedClips.forEach( ( clip, i ) => {
-			videos[ `clip_${ i }` ] = {
-				url: clip.url,
-				filename: clip.filename,
-				name: clip.name,
-				trim_start: clip.trimStart,
-				trim_end: clip.trimEnd,
-				duration: clip.duration,
-			};
-		} );
-
-		let elements: unknown[] = [];
-		let assets: Record< string, { url: string; filename: string } > = {};
-
-		if ( selectedTheme !== 'none' ) {
-			const resolvedThemeId = themeRegistry[ selectedTheme ]
-				? selectedTheme
-				: 'default';
-			const getElements = themeRegistry[ resolvedThemeId ];
-			const videoData = {
-				id: String( topicId || 0 ),
-				title: topic?.title || 'Clipisode',
-				clips: includedClips.map( ( clip, i ) => ( {
-					id: `clip_${ i }`,
-					duration: clip.trimEnd - clip.trimStart,
-					displayName: clip.name,
-				} ) ),
-			};
-			elements = getElements( videoData );
-			assets = getThemeAssets( selectedTheme );
-			if ( Object.keys( assets ).length === 0 ) {
-				assets = getThemeAssets( resolvedThemeId );
+		const handleSidebarClick = ( event: MouseEvent ) => {
+			if (
+				event.defaultPrevented ||
+				event.button !== 0 ||
+				event.metaKey ||
+				event.ctrlKey ||
+				event.shiftKey ||
+				event.altKey ||
+				! ( event.target instanceof Element )
+			) {
+				return;
 			}
-		}
-
-		return {
-			type: 'start_job',
-			job_id: '<generated>',
-			callback_url: callbackUrl,
-			videos,
-			assets,
-			elements,
+			const link =
+				event.target.closest< HTMLAnchorElement >(
+					'#adminmenu a[href]'
+				);
+			if ( ! link || link.target === '_blank' ) {
+				return;
+			}
+			event.preventDefault();
+			setPendingHref( link.href );
+			setConfirmLeave( true );
 		};
-	};
+		document.addEventListener( 'click', handleSidebarClick );
+		return () =>
+			document.removeEventListener( 'click', handleSidebarClick );
+	}, [ dirty ] );
 
-	const startRendering = async () => {
-		if ( includedClips.length === 0 || ! clipisodeName.trim() ) {
+	const updateClip = ( id: string, patch: Partial< CompositionClip > ) =>
+		setClips( ( previous ) =>
+			previous.map( ( clip ) =>
+				clip.id === id ? { ...clip, ...patch } : clip
+			)
+		);
+	const moveClip = (
+		clipId: string,
+		slotId: string,
+		targetClipId?: string,
+		after = false
+	) => {
+		const currentSettings = latestSettings.current;
+		const currentTheme = getThemeDefinition( currentSettings.themeId );
+		const next = moveClipToSlot(
+			currentTheme,
+			clips,
+			clipId,
+			slotId,
+			targetClipId,
+			after
+		);
+		if ( next === clips ) {
 			return;
 		}
-
-		setRenderState( 'connecting' );
-		setRenderPhase( '' );
-		setRenderMessage( '' );
-		setRenderProgress( 0 );
-		setRenderError( '' );
-		setRenderOutputUrl( null );
-
-		let output: Output;
+		setClips( next );
+		const backgroundField = currentTheme.timeline.backgroundField;
+		const backgroundClipId = backgroundField
+			? currentSettings[ backgroundField ]
+			: null;
+		if (
+			backgroundField &&
+			typeof backgroundClipId === 'string' &&
+			getMediaSlot(
+				currentTheme,
+				next.find( ( clip ) => clip.id === backgroundClipId )!
+			)?.mode !== 'background'
+		) {
+			setSettings( { ...currentSettings, [ backgroundField ]: null } );
+		}
+	};
+	const addMedia = async ( media: MediaItem[], slotId: string ) => {
+		setAddingToSlot( null );
+		setAdding( true );
+		setError( '' );
 		try {
-			output = await apiFetch< Output >( {
-				path: '/clipisode/v1/outputs',
-				method: 'POST',
+			const currentTheme = getThemeDefinition(
+				latestSettings.current.themeId
+			);
+			const slot = currentTheme.timeline.mediaSlots.find(
+				( item ) => item.id === slotId
+			)!;
+			const added = await Promise.all(
+				media.map( ( item ) =>
+					makeClip( item, topic, settings.themeId )
+				)
+			);
+			for ( const clip of added ) {
+				clip.slotId = slot.id;
+				clip.tags = slot.tag ? [ slot.tag ] : [];
+				clip.values = createClipValues(
+					latestSettings.current.themeId
+				);
+			}
+			setClips( ( previous ) => [ ...previous, ...added ] );
+			if ( added.length ) {
+				setSelectedClipId( added[ 0 ].id );
+				setInspectorTab( 'clip' );
+			}
+		} catch ( caught ) {
+			setError( ( caught as Error ).message );
+		} finally {
+			setAdding( false );
+		}
+	};
+	const theme = getThemeDefinition( settings.themeId );
+	const activeAddSlot = theme.timeline.mediaSlots.find(
+		( slot ) => slot.id === addingToSlot
+	);
+	const validationErrors = validateThemeValues( theme, settings, clips );
+	try {
+		if ( buildTimeline( clips, settings ).durationInFrames === 0 ) {
+			validationErrors.push(
+				'Include a sequence clip or enable a title or ending card.'
+			);
+		}
+	} catch ( caught ) {
+		validationErrors.push( ( caught as Error ).message );
+	}
+	const selectedIndex = clips.findIndex(
+		( clip ) => clip.id === selectedClipId
+	);
+	const selectedClip = clips[ selectedIndex ];
+	const selectedSlot = selectedClip
+		? getMediaSlot( theme, selectedClip )
+		: undefined;
+	const selectedSlotClips = selectedSlot
+		? clipsInSlot( theme, clips, selectedSlot.id )
+		: [];
+	const selectedSlotIndex = selectedSlotClips.findIndex(
+		( clip ) => clip.id === selectedClipId
+	);
+	const moveSelectedInSlot = ( direction: number ) => {
+		const neighbor = selectedSlotClips[ selectedSlotIndex + direction ];
+		if ( neighbor && selectedSlot ) {
+			moveClip(
+				selectedClip.id,
+				selectedSlot.id,
+				neighbor.id,
+				direction > 0
+			);
+		}
+	};
+	const selectClip = ( id: string ) => {
+		setSelectedClipId( id );
+		setInspectorTab( 'clip' );
+	};
+	const chooseTheme = ( themeId: string ) => {
+		const next = changeTheme( settings, clips, themeId );
+		setSettings( next.settings );
+		setClips( next.clips );
+	};
+	const toggleTag = ( tag: ThemeTag, checked: boolean ) => {
+		if ( ! selectedClip ) {
+			return;
+		}
+		let tags = ( selectedClip.tags || [] ).filter(
+			( id ) => id !== tag.id
+		);
+		if ( checked ) {
+			if ( tag.exclusiveGroup ) {
+				tags = tags.filter(
+					( id ) =>
+						theme.tags.find( ( item ) => item.id === id )
+							?.exclusiveGroup !== tag.exclusiveGroup
+				);
+			}
+			tags.push( tag.id );
+		}
+		const targetSlot = theme.timeline.mediaSlots.find(
+			( slot ) => slot.tag === tag.id
+		);
+		const primarySlot = theme.timeline.mediaSlots.find(
+			( slot ) => slot.mode === 'sequence'
+		)!;
+		let slotId = selectedClip.slotId;
+		if ( targetSlot ) {
+			slotId = checked ? targetSlot.id : primarySlot.id;
+		}
+		updateClip( selectedClip.id, {
+			tags,
+			slotId,
+		} );
+	};
+	const moveToSlot = ( clip: CompositionClip, slotId: string ) => {
+		moveClip( clip.id, slotId );
+	};
+	const duplicateClip = () => {
+		if ( ! selectedClip ) {
+			return;
+		}
+		const duplicate = {
+			...selectedClip,
+			id: createClipId(),
+			tags: [ ...( selectedClip.tags || [] ) ],
+			values: { ...selectedClip.values },
+		};
+		const slot = getMediaSlot( theme, selectedClip );
+		if (
+			slot?.maxClips !== undefined &&
+			clipsInSlot( theme, clips, slot.id ).length >= slot.maxClips
+		) {
+			return;
+		}
+		setClips( [
+			...clips.slice( 0, selectedIndex + 1 ),
+			duplicate,
+			...clips.slice( selectedIndex + 1 ),
+		] );
+		setSelectedClipId( duplicate.id );
+	};
+	const removeClip = ( id: string ) => {
+		const index = clips.findIndex( ( clip ) => clip.id === id );
+		setClips( clips.filter( ( clip ) => clip.id !== id ) );
+		if ( selectedClipId === id ) {
+			setSelectedClipId(
+				clips[ index + 1 ]?.id ?? clips[ index - 1 ]?.id ?? null
+			);
+		}
+	};
+	const save = async (): Promise< boolean > => {
+		if ( validationErrors.length ) {
+			return false;
+		}
+		setSaving( true );
+		setError( '' );
+		try {
+			const result = await apiFetch< SavedCompositionOutput >( {
+				path: savedId
+					? `/clipisode/v1/outputs/${ savedId }`
+					: '/clipisode/v1/outputs',
+				method: savedId ? 'PUT' : 'POST',
 				data: {
-					...( topicId ? { topic_id: topicId } : {} ),
-					name: clipisodeName.trim(),
+					name: name.trim(),
+					topic_id: currentTopicId,
+					composition: { clips, settings },
 				},
 			} );
-		} catch {
-			setRenderState( 'error' );
-			setRenderError( 'Failed to create output record.' );
-			return;
-		}
-
-		const contents = includedClips.map( ( clip, i ) => ( {
-			media_id: clip.mediaId,
-			position: i,
-			role: clip.role,
-			trim_start: clip.trimStart,
-			trim_end: clip.trimEnd,
-			duration: clip.duration,
-		} ) );
-
-		try {
-			await apiFetch( {
-				path: `/clipisode/v1/outputs/${ output.id }/contents`,
-				method: 'POST',
-				data: { contents },
-			} );
-		} catch {
-			setRenderState( 'error' );
-			setRenderError( 'Failed to save clip contents.' );
-			return;
-		}
-
-		const restRoot =
-			window.clipisodeAdmin?.rest_root ||
-			`${ window.location.origin }/wp-json/`;
-		const callbackUrl = `${ restRoot }clipisode/v1/outputs/${ output.id }/upload?token=${ output.upload_token }`;
-
-		const jobId = generateJobId();
-		jobIdRef.current = jobId;
-
-		const payload = { ...buildManifest( callbackUrl ), job_id: jobId };
-
-		const ws = new WebSocket( WS_URL );
-		wsRef.current = ws;
-
-		ws.onopen = () => {
-			ws.send(
-				JSON.stringify( {
-					type: 'hello',
-					client: 'clipisode-admin',
-					version: 1,
-				} )
-			);
-		};
-
-		ws.onmessage = ( event ) => {
-			const msg = JSON.parse( event.data );
-			switch ( msg.type ) {
-				case 'hello_ack':
-					setRenderState( 'processing' );
-					setRenderPhase( 'Starting' );
-					setRenderMessage( 'Sending to render service...' );
-					ws.send( JSON.stringify( payload ) );
-					break;
-
-				case 'job_status': {
-					const phaseLabels: Record< string, string > = {
-						downloading: 'Downloading',
-						rendering: 'Rendering',
-						uploading: 'Uploading',
-					};
-					setRenderPhase( phaseLabels[ msg.phase ] || msg.phase );
-					setRenderMessage( msg.message || '' );
-					if ( msg.total > 0 ) {
-						setRenderProgress( ( msg.current / msg.total ) * 100 );
-					}
-					break;
-				}
-
-				case 'job_done':
-					setRenderOutputUrl( msg.output_url || null );
-					setRenderState( 'done' );
-					ws.close();
-					wsRef.current = null;
-					jobIdRef.current = null;
-					break;
-
-				case 'job_error':
-					setRenderError( msg.message || 'Rendering failed.' );
-					setRenderState( 'error' );
-					ws.close();
-					wsRef.current = null;
-					jobIdRef.current = null;
-					break;
-
-				case 'job_cancelled':
-					setRenderState( 'idle' );
-					ws.close();
-					wsRef.current = null;
-					jobIdRef.current = null;
-					break;
-
-				case 'connection_rejected':
-					setRenderError( msg.reason || 'Connection rejected.' );
-					setRenderState( 'error' );
-					break;
+			setSavedId( result.id );
+			const saved = {
+				name: result.name,
+				clips: result.composition.clips,
+				settings: result.composition.settings,
+			};
+			setSavedSnapshot( JSON.stringify( saved ) );
+			if ( latestSnapshot.current === snapshot ) {
+				setName( saved.name );
+				setClips( saved.clips );
+				setSettings( saved.settings );
 			}
-		};
-
-		ws.onclose = () => {
-			if ( wsRef.current ) {
-				setRenderError(
-					'Connection to the Clipisode desktop app was lost. Make sure it is running and try again.'
-				);
-				setRenderState( 'error' );
-				wsRef.current = null;
-				jobIdRef.current = null;
-			}
-		};
-
-		ws.onerror = () => {
-			// onclose always fires after onerror and handles the error state
-		};
-	};
-
-	const cancelRendering = () => {
-		const ws = wsRef.current;
-		if ( ws && ws.readyState === WebSocket.OPEN ) {
-			ws.send(
-				JSON.stringify( {
-					type: 'cancel_job',
-					job_id: jobIdRef.current,
-				} )
-			);
+			// Keep the editor mounted while giving the saved preview a reloadable URL.
+			window.history.replaceState( null, '', `#/compose/${ result.id }` );
+			return true;
+		} catch ( caught ) {
+			setError( ( caught as Error ).message );
+			return false;
+		} finally {
+			setSaving( false );
 		}
-		wsRef.current?.close();
-		wsRef.current = null;
-		jobIdRef.current = null;
-		setRenderState( 'idle' );
 	};
-
+	const goBack = () => {
+		if ( currentTopicId ) {
+			window.location.href = `admin.php?page=clipisode#/${ currentTopicId }`;
+		} else {
+			navigate( '' );
+		}
+	};
+	const requestLeave = () => {
+		setPendingHref( null );
+		setConfirmLeave( true );
+	};
+	const cancelLeave = () => {
+		setConfirmLeave( false );
+		setPendingHref( null );
+	};
+	const leave = () => {
+		allowUnload.current = true;
+		if ( pendingHref ) {
+			window.location.assign( pendingHref );
+		} else {
+			goBack();
+		}
+	};
+	const cannotSave =
+		saving ||
+		rendering ||
+		adding ||
+		! name.trim() ||
+		clips.length === 0 ||
+		validationErrors.length > 0;
 	if ( loading ) {
 		return (
 			<div className="clipisode-spinner-wrap">
@@ -491,293 +580,429 @@ export default function CreateClipisode( {
 			</div>
 		);
 	}
-
-	const isTrimmed = ( clip: ClipItem ) =>
-		clip.trimStart > 0 || clip.trimEnd < clip.duration;
-	const totalDuration = includedClips.reduce(
-		( sum, c ) => sum + ( c.trimEnd - c.trimStart ),
-		0
-	);
-
-	return (
-		<>
-			<div className="clipisode-page-header">
-				<Button
-					variant="tertiary"
-					onClick={ () =>
-						navigate( topicId ? String( topicId ) : 'media' )
-					}
-				>
-					{ topic ? (
-						<>
-							{ '← Back to\u00a0' }
-							<strong>{ topic.title }</strong>
-						</>
-					) : (
-						'← Back to Media'
-					) }
+	if ( loadError ) {
+		return (
+			<>
+				<Button variant="tertiary" onClick={ goBack }>
+					← Back
 				</Button>
-				<h1>Create Clipisode</h1>
-				<span />
-			</div>
-
-			{ renderState === 'idle' && (
-				<>
-					<div className="clipisode-section">
-						<h2>
-							Clips ({ includedClips.length }) &middot;{ ' ' }
-							{ formatTime( totalDuration ) }
-						</h2>
-
-						<table className="clipisode-table">
-							<thead>
-								<tr>
-									<th style={ { width: 30 } }></th>
-									<th>Name</th>
-									<th>Role</th>
-									<th>Duration</th>
-									<th>Trim</th>
-									<th></th>
-								</tr>
-							</thead>
-							<tbody>
-								{ clips.map( ( clip, index ) => (
-									<tr
-										key={ clip.id }
-										draggable
-										onDragStart={ () =>
-											handleDragStart( index )
-										}
-										onDragEnter={ () =>
-											handleDragEnter( index )
-										}
-										onDragEnd={ handleDragEnd }
-										onDragOver={ ( e ) =>
-											e.preventDefault()
-										}
-									>
-										<td
-											style={ {
-												cursor: 'grab',
-												userSelect: 'none',
-												fontSize: 18,
-												textAlign: 'center',
-											} }
-										>
-											&#x2630;
-										</td>
-										<td>
-											<button
-												type="button"
-												style={ {
-													background: 'none',
-													border: 'none',
-													padding: 0,
-													color: '#2271b1',
-													cursor: 'pointer',
-													font: 'inherit',
-													textAlign: 'left',
-												} }
-												onClick={ () =>
-													setPreviewClip( clip )
-												}
-											>
-												{ clip.name }
-											</button>
-										</td>
-										<td>
-											<span
-												className={ `clipisode-status-badge ${
-													clip.role === 'intro'
-														? 'approved'
-														: ''
-												}` }
-											>
-												{ clip.role }
-											</span>
-										</td>
-										<td>
-											{ clip.duration > 0
-												? formatTime( clip.duration )
-												: '—' }
-										</td>
-										<td>
-											{ isTrimmed( clip )
-												? `${ formatTime(
-														clip.trimStart
-												  ) } – ${ formatTime(
-														clip.trimEnd
-												  ) }`
-												: 'Full' }
-										</td>
-										<td>
-											<Button
-												icon={ crop }
-												label="Trim"
-												size="compact"
-												disabled={ clip.duration <= 0 }
-												onClick={ () =>
-													setTrimmingClip( clip )
-												}
-											/>
-											<Button
-												icon={ copy }
-												label="Duplicate"
-												size="compact"
-												onClick={ () =>
-													duplicateClip( clip, index )
-												}
-											/>
-											<Button
-												icon={ trash }
-												label="Remove"
-												size="compact"
-												isDestructive
-												onClick={ () =>
-													removeClip( clip.id )
-												}
-											/>
-										</td>
-									</tr>
-								) ) }
-							</tbody>
-						</table>
-					</div>
-
-					<div className="clipisode-create-actions">
-						<div className="clipisode-create-actions__fields">
-							<TextControl
-								label="Name"
-								value={ clipisodeName }
-								onChange={ setClipisodeName }
-								placeholder="Enter a name"
-								__nextHasNoMarginBottom
-								__next40pxDefaultSize
-							/>
-							<SelectControl
-								label="Theme"
-								value={ selectedTheme }
-								options={ [
-									...availableThemes.map( ( t ) => ( {
-										value: t.id,
-										label: t.label,
-									} ) ),
-									{ value: 'none', label: 'No Theme' },
-								] }
-								onChange={ setSelectedTheme }
-								__nextHasNoMarginBottom
-								__next40pxDefaultSize
-							/>
-						</div>
-						<div className="clipisode-create-actions__buttons">
-							<Button
-								variant="secondary"
-								onClick={ () => setShowAddMedia( true ) }
-							>
-								Add Media
-							</Button>
-							<Button
-								variant="primary"
-								onClick={ startRendering }
-								disabled={
-									includedClips.length === 0 ||
-									! clipisodeName.trim()
-								}
-							>
-								Create Clipisode
-							</Button>
-							{ window.clipisodeAdmin?.debug_mode && (
-								<Button
-									variant="tertiary"
-									onClick={ () => {
-										const restRoot =
-											window.clipisodeAdmin?.rest_root ||
-											`${ window.location.origin }/wp-json/`;
-										const manifest = buildManifest(
-											`${ restRoot }clipisode/v1/outputs/<id>/upload?token=<token>`
-										);
-										setDebugManifest(
-											JSON.stringify( manifest, null, 2 )
-										);
-									} }
-									disabled={ includedClips.length === 0 }
-								>
-									Debug Manifest
-								</Button>
-							) }
-						</div>
-					</div>
-				</>
-			) }
-
-			{ ( renderState === 'connecting' ||
-				renderState === 'processing' ) && (
-				<div className="clipisode-output-status">
-					<Spinner />
-					<div className="clipisode-output-phase">
-						{ renderPhase || 'Connecting...' }
-					</div>
-					{ renderMessage && (
-						<div className="clipisode-output-message">
-							{ renderMessage }
-						</div>
-					) }
-					{ renderProgress > 0 && (
-						<div className="clipisode-output-progress">
-							<div className="clipisode-output-progress-track">
-								<div
-									className="clipisode-output-progress-bar"
-									style={ { width: `${ renderProgress }%` } }
-								/>
-							</div>
-							<span className="clipisode-output-progress-label">
-								{ Math.round( renderProgress ) }%
-							</span>
-						</div>
-					) }
-					<Button
-						variant="tertiary"
-						isDestructive
-						onClick={ cancelRendering }
-					>
-						Cancel
-					</Button>
-				</div>
-			) }
-
-			{ renderState === 'error' && (
-				<div className="clipisode-output-status">
-					<div className="clipisode-output-error">
-						{ renderError }
-					</div>
+				<Notice status="error" isDismissible={ false }>
+					<p>{ loadError }</p>
 					<Button
 						variant="secondary"
-						onClick={ () => setRenderState( 'idle' ) }
+						onClick={ () => setLoadRevision( loadRevision + 1 ) }
 					>
-						Try Again
+						Retry loading
 					</Button>
+				</Notice>
+			</>
+		);
+	}
+	return (
+		<div className="clipisode-studio">
+			<header className="clipisode-studio-header">
+				<Button
+					variant="tertiary"
+					onClick={ dirty ? requestLeave : goBack }
+				>
+					← { currentTopicId ? 'Back to topic' : 'Clipisodes' }
+				</Button>
+				<div className="clipisode-studio-identity">
+					<h1>Clipisode studio</h1>
+					<TextControl
+						__next40pxDefaultSize
+						label="Clipisode name"
+						hideLabelFromVision
+						value={ name }
+						onChange={ setName }
+					/>
 				</div>
-			) }
-
-			{ renderState === 'done' && (
-				<div className="clipisode-output-status">
-					<div className="clipisode-output-phase">Complete</div>
-					{ renderOutputUrl && (
-						<video
-							src={ renderOutputUrl }
-							controls
-							playsInline
-							style={ { maxWidth: '50%' } }
-						/>
-					) }
+				<div className="clipisode-studio-save">
+					<span role="status">
+						{ dirty
+							? 'Unsaved changes'
+							: 'Preview saved. You can reopen it from Clipisodes.' }
+					</span>
 					<Button
 						variant="primary"
-						onClick={ () => setRenderState( 'idle' ) }
-						style={ { marginTop: 12 } }
+						onClick={ save }
+						isBusy={ saving }
+						disabled={ cannotSave }
 					>
-						Create Another
+						{ saving ? 'Saving…' : 'Save preview' }
 					</Button>
 				</div>
+			</header>
+			{ error && (
+				<Notice status="error" isDismissible={ false }>
+					{ error }
+				</Notice>
+			) }
+			<div className="clipisode-studio-workspace">
+				<main
+					className="clipisode-studio-monitor"
+					aria-label="Live preview"
+				>
+					<div className="clipisode-studio-preview-heading">
+						<span>PREVIEW</span>
+						<span>{ clips.length } clips</span>
+					</div>
+					<CompositionPreview
+						clips={ clips }
+						settings={ settings }
+						previewFrame={ previewFrame }
+					/>
+					<CompositionSequence
+						theme={ theme }
+						clips={ clips }
+						settings={ settings }
+						selectedClipId={ selectedClipId }
+						adding={ adding }
+						onAddMedia={ setAddingToSlot }
+						onSelectClip={ selectClip }
+						onRemoveClip={ removeClip }
+						onMoveClip={ moveClip }
+						onChangeSettings={ setSettings }
+						onPreviewFrame={ ( frame ) =>
+							setPreviewFrame( { frame } )
+						}
+					/>
+				</main>
+				<aside
+					className="clipisode-studio-inspector"
+					aria-label="Inspector"
+				>
+					<div
+						className="clipisode-studio-tabs"
+						role="tablist"
+						aria-label="Inspector panels"
+					>
+						{ ( [ 'theme', 'clip', 'export' ] as const ).map(
+							( tab, index, tabs ) => (
+								<button
+									key={ tab }
+									id={ `inspector-tab-${ tab }` }
+									type="button"
+									role="tab"
+									aria-selected={ inspectorTab === tab }
+									aria-controls={ `inspector-panel-${ tab }` }
+									tabIndex={ inspectorTab === tab ? 0 : -1 }
+									onClick={ () => setInspectorTab( tab ) }
+									onKeyDown={ ( event ) => {
+										let direction = 0;
+										if ( event.key === 'ArrowRight' ) {
+											direction = 1;
+										} else if (
+											event.key === 'ArrowLeft'
+										) {
+											direction = -1;
+										}
+										if ( direction ) {
+											event.preventDefault();
+											const next =
+												tabs[
+													( index +
+														direction +
+														tabs.length ) %
+														tabs.length
+												];
+											setInspectorTab( next );
+											document
+												.getElementById(
+													`inspector-tab-${ next }`
+												)
+												?.focus();
+										}
+									} }
+								>
+									{
+										{
+											theme: 'Theme',
+											clip: 'Clip',
+											export: 'Export',
+										}[ tab ]
+									}
+								</button>
+							)
+						) }
+					</div>
+					<div
+						id="inspector-panel-theme"
+						role="tabpanel"
+						aria-labelledby="inspector-tab-theme"
+						hidden={ inspectorTab !== 'theme' }
+						className="clipisode-studio-inspector-panel"
+					>
+						<CompositionControls
+							settings={ settings }
+							clips={ clips }
+							onChange={ setSettings }
+							onThemeChange={ chooseTheme }
+						/>
+					</div>
+					<div
+						id="inspector-panel-clip"
+						role="tabpanel"
+						aria-labelledby="inspector-tab-clip"
+						hidden={ inspectorTab !== 'clip' }
+						className="clipisode-studio-inspector-panel"
+					>
+						{ selectedClip ? (
+							<>
+								<div className="clipisode-studio-selected-heading">
+									<h2>Clip { selectedIndex + 1 }</h2>
+									<span>{ selectedClip.role }</span>
+								</div>
+								<TextControl
+									__next40pxDefaultSize
+									label={ `Speaker for clip ${
+										selectedIndex + 1
+									}` }
+									value={ selectedClip.name }
+									onChange={ ( value ) =>
+										updateClip( selectedClip.id, {
+											name: value,
+										} )
+									}
+								/>
+								{ theme.timeline.mediaSlots.length > 1 && (
+									<SelectControl
+										__next40pxDefaultSize
+										label="Sequence spot"
+										value={ selectedSlot?.id || '' }
+										options={ theme.timeline.mediaSlots
+											.filter( ( slot ) =>
+												canMoveClipToSlot(
+													theme,
+													clips,
+													selectedClip.id,
+													slot.id
+												)
+											)
+											.map( ( slot ) => ( {
+												value: slot.id,
+												label: slot.label,
+											} ) ) }
+										onChange={ ( slotId ) =>
+											moveToSlot( selectedClip, slotId )
+										}
+									/>
+								) }
+								<div className="clipisode-studio-trim">
+									<div>
+										<span>Selected range</span>
+										<strong>
+											{ formatTime(
+												selectedClip.trimStart
+											) }{ ' ' }
+											–{ ' ' }
+											{ formatTime(
+												selectedClip.trimEnd
+											) }
+										</strong>
+									</div>
+									<Button
+										icon={ crop }
+										variant="secondary"
+										onClick={ () =>
+											setTrimmingClip( selectedClip )
+										}
+									>
+										Trim
+									</Button>
+								</div>
+								<div className="clipisode-composition-clip-actions">
+									<Button
+										icon={ arrowUp }
+										label="Move earlier"
+										size="compact"
+										disabled={ selectedSlotIndex <= 0 }
+										onClick={ () =>
+											moveSelectedInSlot( -1 )
+										}
+									/>
+									<Button
+										icon={ arrowDown }
+										label="Move later"
+										size="compact"
+										disabled={
+											selectedSlotIndex >=
+											selectedSlotClips.length - 1
+										}
+										onClick={ () =>
+											moveSelectedInSlot( 1 )
+										}
+									/>
+									<Button
+										icon={ copy }
+										label="Duplicate"
+										size="compact"
+										disabled={
+											selectedSlot?.maxClips !==
+												undefined &&
+											selectedSlotClips.length >=
+												selectedSlot.maxClips
+										}
+										onClick={ duplicateClip }
+									/>
+									<Button
+										icon={ trash }
+										label="Remove"
+										size="compact"
+										isDestructive
+										onClick={ () =>
+											removeClip( selectedClip.id )
+										}
+									/>
+								</div>
+								{ theme.tags.some(
+									( tag ) =>
+										! tag.roles ||
+										tag.roles.includes( selectedClip.role )
+								) && (
+									<fieldset className="clipisode-field-group">
+										<legend>Clip tags</legend>
+										{ theme.tags
+											.filter(
+												( tag ) =>
+													! tag.roles ||
+													tag.roles.includes(
+														selectedClip.role
+													)
+											)
+											.map( ( tag ) => {
+												const checked =
+													selectedClip.tags?.includes(
+														tag.id
+													) || false;
+												const atLimit =
+													! checked &&
+													tag.maxClips !==
+														undefined &&
+													clips.filter(
+														( clip ) =>
+															clip.tags?.includes(
+																tag.id
+															)
+													).length >= tag.maxClips;
+												return (
+													<CheckboxControl
+														key={ tag.id }
+														label={ tag.label }
+														checked={ checked }
+														disabled={ atLimit }
+														help={
+															atLimit
+																? `Limited to ${
+																		tag.maxClips
+																  } clip${
+																		tag.maxClips ===
+																		1
+																			? ''
+																			: 's'
+																  }. Remove this tag from another clip first.`
+																: tag.description
+														}
+														onChange={ ( next ) =>
+															toggleTag(
+																tag,
+																next
+															)
+														}
+													/>
+												);
+											} ) }
+									</fieldset>
+								) }
+								<ThemeFields
+									groups={ getVisibleGroups(
+										theme,
+										'clip',
+										settings,
+										selectedClip
+									) }
+									values={ selectedClip.values || {} }
+									clips={ clips }
+									idPrefix={ `clip-${ selectedClip.id }` }
+									onChange={ ( values ) =>
+										updateClip( selectedClip.id, {
+											values,
+										} )
+									}
+								/>
+							</>
+						) : (
+							<p className="clipisode-empty">
+								Select a clip from the sequence to edit its
+								details.
+							</p>
+						) }
+					</div>
+					<div
+						id="inspector-panel-export"
+						role="tabpanel"
+						aria-labelledby="inspector-tab-export"
+						hidden={ inspectorTab !== 'export' }
+						className="clipisode-studio-inspector-panel"
+					>
+						<CompositionExport
+							key={ savedId ?? 'unsaved' }
+							outputId={ savedId }
+							dirty={ dirty }
+							disabled={
+								saving || adding || validationErrors.length > 0
+							}
+							onRenderingChange={ setRendering }
+						/>
+					</div>
+					{ validationErrors.length > 0 && (
+						<Notice status="warning" isDismissible={ false }>
+							<p>Complete these fields before saving:</p>
+							<ul>
+								{ validationErrors.map( ( message, index ) => (
+									<li key={ index }>{ message }</li>
+								) ) }
+							</ul>
+						</Notice>
+					) }
+				</aside>
+			</div>
+			{ confirmLeave && (
+				<Modal
+					title="Unsaved preview changes"
+					className="clipisode-leave-modal"
+					onRequestClose={ cancelLeave }
+				>
+					<p>Save your preview changes before leaving?</p>
+					{ error && (
+						<Notice status="error" isDismissible={ false }>
+							{ error }
+						</Notice>
+					) }
+					<div className="clipisode-leave-modal-actions">
+						<Button variant="secondary" onClick={ cancelLeave }>
+							Keep editing
+						</Button>
+						<Button
+							variant="secondary"
+							isDestructive
+							onClick={ leave }
+						>
+							Leave without saving
+						</Button>
+						<Button
+							variant="primary"
+							disabled={ cannotSave }
+							onClick={ async () => {
+								if ( await save() ) {
+									leave();
+								}
+							} }
+						>
+							{ saving ? 'Saving…' : 'Save and leave' }
+						</Button>
+					</div>
+				</Modal>
 			) }
 
 			{ trimmingClip && (
@@ -787,96 +1012,31 @@ export default function CreateClipisode( {
 					duration={ trimmingClip.duration }
 					initialStart={ trimmingClip.trimStart }
 					initialEnd={ trimmingClip.trimEnd }
-					onDone={ handleTrimDone }
+					onDone={ ( trimStart, trimEnd ) => {
+						updateClip( trimmingClip.id, { trimStart, trimEnd } );
+						setTrimmingClip( null );
+					} }
 					onClose={ () => setTrimmingClip( null ) }
 				/>
 			) }
-
-			{ showAddMedia && (
+			{ activeAddSlot && (
 				<AddMediaModal
-					existingMediaIds={ clips.map( ( c ) => c.mediaId ) }
-					topicId={ topicId }
-					onAdd={ handleAddMedia }
-					onClose={ () => setShowAddMedia( false ) }
+					key={ activeAddSlot.id }
+					existingMediaIds={ clips.map( ( clip ) => clip.mediaId ) }
+					topicId={ currentTopicId ?? undefined }
+					introMediaId={ topic?.intro_media_id }
+					allowedRoles={ activeAddSlot.roles }
+					maxSelection={
+						activeAddSlot.maxClips === undefined
+							? undefined
+							: activeAddSlot.maxClips -
+							  clipsInSlot( theme, clips, activeAddSlot.id )
+									.length
+					}
+					onAdd={ ( media ) => addMedia( media, activeAddSlot.id ) }
+					onClose={ () => setAddingToSlot( null ) }
 				/>
 			) }
-
-			{ previewClip && (
-				<Modal
-					title={ previewClip.name }
-					onRequestClose={ () => setPreviewClip( null ) }
-					style={ { maxWidth: '90vw', maxHeight: '90vh' } }
-				>
-					<video
-						src={ previewClip.url }
-						controls
-						autoPlay
-						playsInline
-						style={ {
-							display: 'block',
-							maxWidth: '100%',
-							maxHeight: 'calc(90vh - 120px)',
-							borderRadius: 4,
-						} }
-					/>
-				</Modal>
-			) }
-
-			{ debugManifest && (
-				<Modal
-					title="Debug Manifest"
-					onRequestClose={ () => setDebugManifest( null ) }
-					style={ { maxWidth: '720px', maxHeight: '90vh' } }
-				>
-					<div
-						style={ {
-							display: 'flex',
-							justifyContent: 'flex-end',
-							gap: 8,
-							marginBottom: 12,
-						} }
-					>
-						<Button
-							variant="secondary"
-							onClick={ () => {
-								navigator.clipboard.writeText( debugManifest );
-							} }
-						>
-							Copy
-						</Button>
-						<Button
-							variant="secondary"
-							onClick={ () => {
-								const blob = new Blob( [ debugManifest ], {
-									type: 'application/json',
-								} );
-								const url = URL.createObjectURL( blob );
-								const a = document.createElement( 'a' );
-								a.href = url;
-								a.download = `clipisode-manifest-${ Date.now() }.json`;
-								document.body.appendChild( a );
-								a.click();
-								document.body.removeChild( a );
-								URL.revokeObjectURL( url );
-							} }
-						>
-							Download
-						</Button>
-					</div>
-					<pre
-						style={ {
-							whiteSpace: 'pre-wrap',
-							wordBreak: 'break-all',
-							fontSize: 12,
-							lineHeight: 1.5,
-							maxHeight: 'calc(90vh - 160px)',
-							overflow: 'auto',
-						} }
-					>
-						{ debugManifest }
-					</pre>
-				</Modal>
-			) }
-		</>
+		</div>
 	);
 }
