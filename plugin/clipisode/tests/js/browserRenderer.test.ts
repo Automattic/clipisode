@@ -97,6 +97,21 @@ it( 'rejects an empty timeline before loading the encoder', async () => {
 	expect( mockCanRender ).not.toHaveBeenCalled();
 } );
 
+it( 'rejects background-only input without cards before loading the encoder', async () => {
+	const props = composition();
+	props.settings = {
+		...createDefaultSettings(),
+		showTitle: false,
+		showEnding: false,
+	};
+	props.clips[ 0 ].tags = [ 'background' ];
+	await expect( getBrowserRenderSupport( props ) ).resolves.toEqual( {
+		supported: false,
+		message: 'Include a sequence clip or enable a title or ending card.',
+	} );
+	expect( mockCanRender ).not.toHaveBeenCalled();
+} );
+
 it( 'renders the saved trim duration with audio, progress, and cancellation', async () => {
 	const props = composition();
 	const blob = new Blob( [ 'encoded-video' ], { type: 'video/mp4' } );

@@ -166,7 +166,7 @@ function sanitize_title( string $value ): string {
 }
 
 function esc_url_raw( string $value, array $protocols = [ 'http', 'https' ] ): string {
-	return in_array( parse_url( $value, PHP_URL_SCHEME ), $protocols, true ) ? $value : '';
+	return in_array( strtolower( (string) parse_url( $value, PHP_URL_SCHEME ) ), $protocols, true ) ? $value : '';
 }
 
 function wp_parse_url( string $url, int $component = -1 ): mixed {

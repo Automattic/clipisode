@@ -1,0 +1,534 @@
+{
+	"themes": [
+		{
+			"id": "default",
+			"label": "Clipisode",
+			"description": "Bold color, animated shapes, and expressive speaker cards.",
+			"renderer": "branded",
+			"canvas": {
+				"backgroundField": "backgroundColor"
+			},
+			"timeline": {
+				"title": {
+					"enabledField": "showTitle",
+					"durationField": "titleDuration"
+				},
+				"ending": {
+					"enabledField": "showEnding",
+					"durationField": "endingDuration"
+				},
+				"backgroundTag": "background",
+				"backgroundField": "backgroundClip",
+				"endTag": "end"
+			},
+			"tags": [
+				{
+					"id": "background",
+					"label": "Background clip",
+					"description": "Available behind title and ending cards; omitted from the main sequence.",
+					"color": "#53788d",
+					"exclusiveGroup": "placement"
+				},
+				{
+					"id": "end",
+					"label": "End clip",
+					"description": "Plays after the other clips, before the ending card.",
+					"color": "#9a6634",
+					"exclusiveGroup": "placement"
+				}
+			],
+			"groups": [
+				{
+					"id": "framing",
+					"label": "Canvas",
+					"scope": "composition",
+					"fields": [
+						{
+							"id": "videoFit",
+							"label": "Video fit",
+							"type": "select",
+							"default": "cover",
+							"options": [
+								{
+									"value": "cover",
+									"label": "Fill frame (crop)"
+								},
+								{
+									"value": "contain",
+									"label": "Fit entire video"
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "palette",
+					"label": "Color & typography",
+					"scope": "composition",
+					"fields": [
+						{
+							"id": "accentColor",
+							"label": "Accent",
+							"type": "color",
+							"default": "#f45b43"
+						},
+						{
+							"id": "backgroundColor",
+							"label": "Background",
+							"type": "color",
+							"default": "#171b2a"
+						},
+						{
+							"id": "textColor",
+							"label": "Text",
+							"type": "color",
+							"default": "#ffffff"
+						},
+						{
+							"id": "fontFamily",
+							"label": "Typography",
+							"type": "select",
+							"default": "sans",
+							"options": [
+								{
+									"value": "sans",
+									"label": "Sans serif"
+								},
+								{
+									"value": "serif",
+									"label": "Serif"
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "branding",
+					"label": "Branding",
+					"scope": "composition",
+					"fields": [
+						{
+							"id": "logoUrl",
+							"label": "Logo",
+							"type": "image",
+							"default": "",
+							"help": "Choose an image URL from your media library."
+						},
+						{
+							"id": "showNames",
+							"label": "Show speaker names",
+							"type": "toggle",
+							"default": true
+						},
+						{
+							"id": "backgroundClip",
+							"label": "Card background",
+							"type": "clip",
+							"default": null,
+							"optional": true,
+							"source": {
+								"kind": "clips",
+								"filter": {
+									"tags": [
+										"background"
+									]
+								}
+							},
+							"help": "Tag a clip as Background clip to make it available here. It loops silently behind your cards."
+						}
+					]
+				},
+				{
+					"id": "title",
+					"label": "Opening card",
+					"scope": "composition",
+					"fields": [
+						{
+							"id": "showTitle",
+							"label": "Title card",
+							"type": "toggle",
+							"default": true
+						},
+						{
+							"id": "title",
+							"label": "Title",
+							"type": "text",
+							"default": "",
+							"when": {
+								"field": "showTitle",
+								"equals": true
+							}
+						},
+						{
+							"id": "subtitle",
+							"label": "Subtitle",
+							"type": "textarea",
+							"default": "",
+							"when": {
+								"field": "showTitle",
+								"equals": true
+							}
+						},
+						{
+							"id": "titleDuration",
+							"label": "Title duration (seconds)",
+							"type": "range",
+							"default": 3,
+							"min": 0.5,
+							"max": 10,
+							"step": 0.5,
+							"when": {
+								"field": "showTitle",
+								"equals": true
+							}
+						}
+					]
+				},
+				{
+					"id": "ending",
+					"label": "Ending card",
+					"scope": "composition",
+					"fields": [
+						{
+							"id": "showEnding",
+							"label": "Ending card",
+							"type": "toggle",
+							"default": true
+						},
+						{
+							"id": "endingText",
+							"label": "Ending text",
+							"type": "textarea",
+							"default": "Thanks for watching",
+							"when": {
+								"field": "showEnding",
+								"equals": true
+							}
+						},
+						{
+							"id": "endingDuration",
+							"label": "Ending duration (seconds)",
+							"type": "range",
+							"default": 3,
+							"min": 0.5,
+							"max": 10,
+							"step": 0.5,
+							"when": {
+								"field": "showEnding",
+								"equals": true
+							}
+						}
+					]
+				},
+				{
+					"id": "clip-caption",
+					"label": "Clip details",
+					"scope": "clip",
+					"fields": [
+						{
+							"id": "caption",
+							"label": "Caption",
+							"type": "textarea",
+							"default": null,
+							"optional": true,
+							"help": "An optional second line below the speaker name."
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "wpvip",
+			"label": "Editorial",
+			"description": "Refined typography, clean rules, and personal details for each reply.",
+			"renderer": "editorial",
+			"canvas": {
+				"backgroundField": "backgroundColor"
+			},
+			"timeline": {
+				"title": {
+					"enabledField": "showTitle",
+					"durationField": "titleDuration"
+				},
+				"ending": {
+					"enabledField": "showEnding",
+					"durationField": "endingDuration"
+				},
+				"backgroundTag": "background",
+				"backgroundField": "backgroundClip",
+				"endTag": "end"
+			},
+			"tags": [
+				{
+					"id": "background",
+					"label": "Background clip",
+					"description": "Available behind title and ending cards; omitted from the main sequence.",
+					"color": "#53788d",
+					"exclusiveGroup": "placement"
+				},
+				{
+					"id": "end",
+					"label": "End clip",
+					"description": "Plays after the other clips, before the ending card.",
+					"color": "#9a6634",
+					"exclusiveGroup": "placement"
+				}
+			],
+			"groups": [
+				{
+					"id": "framing",
+					"label": "Canvas",
+					"scope": "composition",
+					"fields": [
+						{
+							"id": "videoFit",
+							"label": "Video fit",
+							"type": "select",
+							"default": "cover",
+							"options": [
+								{
+									"value": "cover",
+									"label": "Fill frame (crop)"
+								},
+								{
+									"value": "contain",
+									"label": "Fit entire video"
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "palette",
+					"label": "Color & typography",
+					"scope": "composition",
+					"fields": [
+						{
+							"id": "accentColor",
+							"label": "Accent",
+							"type": "color",
+							"default": "#b79555"
+						},
+						{
+							"id": "backgroundColor",
+							"label": "Background",
+							"type": "color",
+							"default": "#f5f2ea"
+						},
+						{
+							"id": "textColor",
+							"label": "Text",
+							"type": "color",
+							"default": "#1e242b"
+						},
+						{
+							"id": "fontFamily",
+							"label": "Typography",
+							"type": "select",
+							"default": "serif",
+							"options": [
+								{
+									"value": "sans",
+									"label": "Sans serif"
+								},
+								{
+									"value": "serif",
+									"label": "Serif"
+								}
+							]
+						}
+					]
+				},
+				{
+					"id": "branding",
+					"label": "Branding",
+					"scope": "composition",
+					"fields": [
+						{
+							"id": "logoUrl",
+							"label": "Logo",
+							"type": "image",
+							"default": "",
+							"help": "Choose an image URL from your media library."
+						},
+						{
+							"id": "showNames",
+							"label": "Show speaker names",
+							"type": "toggle",
+							"default": true
+						},
+						{
+							"id": "backgroundClip",
+							"label": "Card background",
+							"type": "clip",
+							"default": null,
+							"optional": true,
+							"source": {
+								"kind": "clips",
+								"filter": {
+									"tags": [
+										"background"
+									]
+								}
+							},
+							"help": "Tag a clip as Background clip to make it available here. It loops silently behind your cards."
+						}
+					]
+				},
+				{
+					"id": "title",
+					"label": "Opening card",
+					"scope": "composition",
+					"fields": [
+						{
+							"id": "showTitle",
+							"label": "Title card",
+							"type": "toggle",
+							"default": true
+						},
+						{
+							"id": "title",
+							"label": "Title",
+							"type": "text",
+							"default": "",
+							"when": {
+								"field": "showTitle",
+								"equals": true
+							}
+						},
+						{
+							"id": "subtitle",
+							"label": "Subtitle",
+							"type": "textarea",
+							"default": "",
+							"when": {
+								"field": "showTitle",
+								"equals": true
+							}
+						},
+						{
+							"id": "titleDuration",
+							"label": "Title duration (seconds)",
+							"type": "range",
+							"default": 3,
+							"min": 0.5,
+							"max": 10,
+							"step": 0.5,
+							"when": {
+								"field": "showTitle",
+								"equals": true
+							}
+						}
+					]
+				},
+				{
+					"id": "ending",
+					"label": "Ending card",
+					"scope": "composition",
+					"fields": [
+						{
+							"id": "showEnding",
+							"label": "Ending card",
+							"type": "toggle",
+							"default": true
+						},
+						{
+							"id": "endingText",
+							"label": "Ending text",
+							"type": "textarea",
+							"default": "Thanks for watching",
+							"when": {
+								"field": "showEnding",
+								"equals": true
+							}
+						},
+						{
+							"id": "endingDuration",
+							"label": "Ending duration (seconds)",
+							"type": "range",
+							"default": 3,
+							"min": 0.5,
+							"max": 10,
+							"step": 0.5,
+							"when": {
+								"field": "showEnding",
+								"equals": true
+							}
+						}
+					]
+				},
+				{
+					"id": "clip-caption",
+					"label": "Clip details",
+					"scope": "clip",
+					"fields": [
+						{
+							"id": "caption",
+							"label": "Caption",
+							"type": "textarea",
+							"default": null,
+							"optional": true,
+							"help": "An optional second line below the speaker name."
+						}
+					]
+				},
+				{
+					"id": "reply-details",
+					"label": "About this reply",
+					"scope": "clip",
+					"fields": [
+						{
+							"id": "favoriteMovie",
+							"label": "Favorite movie",
+							"type": "text",
+							"default": null,
+							"optional": true,
+							"help": "Shown with this reply\u2019s speaker card."
+						}
+					],
+					"appliesTo": {
+						"roles": [
+							"reply"
+						]
+					}
+				}
+			]
+		},
+		{
+			"id": "none",
+			"label": "No theme",
+			"description": "Just the source video and original audio. No colors, cards, or branding controls.",
+			"renderer": "plain",
+			"canvas": {
+				"backgroundColor": "#000000"
+			},
+			"timeline": {},
+			"tags": [],
+			"groups": [
+				{
+					"id": "framing",
+					"label": "Canvas",
+					"scope": "composition",
+					"fields": [
+						{
+							"id": "videoFit",
+							"label": "Video fit",
+							"type": "select",
+							"default": "cover",
+							"options": [
+								{
+									"value": "cover",
+									"label": "Fill frame (crop)"
+								},
+								{
+									"value": "contain",
+									"label": "Fit entire video"
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	]
+}

@@ -68,12 +68,13 @@ add_filter( 'block_editor_settings_all', [ Clipisode_Post_Types::class, 'filter_
 add_filter( 'render_block', [ Clipisode_Post_Types::class, 'filter_flow_block_directives' ], 10, 2 );
 
 add_filter( 'clipisode_themes', function ( array $themes ): array {
-	$themes['default'] = [
-		'label' => 'Clipisode',
-	];
-	$themes['wpvip'] = [
-		'label' => 'Editorial',
-	];
+	$catalog = Clipisode_Composition::themes();
+	if ( is_wp_error( $catalog ) ) {
+		throw new RuntimeException( $catalog->get_error_message() );
+	}
+	foreach ( $catalog as $theme ) {
+		$themes[ $theme['id'] ] = [ 'label' => $theme['label'] ];
+	}
 	return $themes;
 } );
 

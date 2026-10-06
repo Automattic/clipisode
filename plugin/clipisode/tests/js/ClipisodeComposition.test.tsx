@@ -8,6 +8,7 @@ import type { ClipisodeCompositionProps } from '../../src/remotion/types';
 const mockBrowserVideo = jest.fn( () => null );
 const mockHtml5Video = jest.fn( () => null );
 const mockOffthreadVideo = jest.fn( () => null );
+const mockLoop = jest.fn( ( { children } ) => <>{ children }</> );
 let mockEnvironment = { isRendering: false, isClientSideRendering: false };
 
 jest.mock( '@remotion/media', () => ( {
@@ -17,6 +18,7 @@ jest.mock( '@remotion/media', () => ( {
 jest.mock( 'remotion', () => ( {
 	AbsoluteFill: ( { children } ) => <div>{ children }</div>,
 	Sequence: ( { children } ) => <>{ children }</>,
+	Loop: ( props ) => mockLoop( props ),
 	Html5Video: ( props ) => mockHtml5Video( props ),
 	OffthreadVideo: ( props ) => mockOffthreadVideo( props ),
 	useRemotionEnvironment: () => mockEnvironment,
@@ -131,5 +133,133 @@ describe( 'composition media across render environments', () => {
 		);
 		expect( console ).toHaveErrored();
 		expect( mockOffthreadVideo ).not.toHaveBeenCalled();
+	} );
+
+	it.each( [ 'player', 'browser', 'service' ] )(
+		'loops the selected trimmed background silently behind both cards in %s rendering',
+		( environment ) => {
+			mockEnvironment = {
+				isRendering: environment !== 'player',
+				isClientSideRendering: environment === 'browser',
+			};
+			const composition = input();
+			composition.settings = {
+				...createDefaultSettings(),
+				backgroundClip: 'background',
+			};
+			composition.clips.push( {
+				...composition.clips[ 0 ],
+				id: 'background',
+				name: 'Background',
+				url: 'https://example.com/background.mp4',
+				trimStart: 0.05,
+				trimEnd: 1.02,
+				tags: [ 'background' ],
+			} );
+			render( <ClipisodeComposition { ...composition } /> );
+			const video = {
+				browser: mockBrowserVideo,
+				service: mockOffthreadVideo,
+				player: mockHtml5Video,
+			}[ environment ];
+			const backgrounds = video.mock.calls
+				.map( ( [ props ] ) => props )
+				.filter(
+					( props ) =>
+						props.src === 'https://example.com/background.mp4'
+				);
+			expect( backgrounds ).toHaveLength( 2 );
+			for ( const props of backgrounds ) {
+				expect( props ).toMatchObject( {
+					trimBefore: 2,
+					trimAfter: 31,
+					muted: true,
+				} );
+				if ( environment === 'browser' ) {
+					expect( props.objectFit ).toBe( 'cover' );
+				} else {
+					expect( props.style.objectFit ).toBe( 'cover' );
+				}
+			}
+			expect( mockLoop ).toHaveBeenCalledTimes( 2 );
+			for ( const [ props ] of mockLoop.mock.calls ) {
+				expect( props.durationInFrames ).toBe( 29 );
+			}
+			expect(
+				video.mock.calls
+					.map( ( [ props ] ) => props )
+					.filter(
+						( props ) =>
+							props.src === 'https://example.com/avery.mp4'
+					)
+			).toEqual( [ expect.objectContaining( { muted: false } ) ] );
+		}
+	);
+
+	it( 'does not play or loop a tagged background when no card is enabled', () => {
+		const composition = input();
+		composition.settings = {
+			...createDefaultSettings(),
+			showTitle: false,
+			showEnding: false,
+			backgroundClip: 'background',
+		};
+		composition.clips.push( {
+			...composition.clips[ 0 ],
+			id: 'background',
+			tags: [ 'background' ],
+		} );
+		render( <ClipisodeComposition { ...composition } /> );
+		expect( mockHtml5Video ).toHaveBeenCalledTimes( 1 );
+		expect( mockLoop ).not.toHaveBeenCalled();
+	} );
+
+	it( 'renders saved clip captions and Editorial reply details while keeping reply-only details off intros', () => {
+		const composition = input();
+		composition.settings = {
+			...createDefaultSettings( 'wpvip' ),
+			showTitle: false,
+			showEnding: false,
+		};
+		composition.clips[ 0 ].values = {
+			caption: 'Film enthusiast',
+			favoriteMovie: 'Alien',
+		};
+		composition.clips.push( {
+			...composition.clips[ 0 ],
+			id: 'intro',
+			name: 'Host',
+			role: 'intro',
+			values: {
+				caption: 'Your host',
+				favoriteMovie: 'Hidden intro movie',
+			},
+		} );
+		render( <ClipisodeComposition { ...composition } /> );
+		expect( screen.getByText( /Film enthusiast/ ) ).toHaveTextContent(
+			'Favorite movie: Alien'
+		);
+		expect( screen.getByText( 'Your host' ) ).toBeInTheDocument();
+		expect(
+			screen.queryByText( /Hidden intro movie/ )
+		).not.toBeInTheDocument();
+	} );
+
+	it( 'keeps Editorial-only details out of the Clipisode renderer', () => {
+		const composition = input();
+		composition.settings = {
+			...createDefaultSettings(),
+			showTitle: false,
+			showEnding: false,
+		};
+		composition.clips[ 0 ].values = {
+			caption: 'Guest speaker',
+			favoriteMovie: 'Alien',
+		};
+		render( <ClipisodeComposition { ...composition } /> );
+		expect( screen.getByText( 'Guest speaker' ) ).toBeInTheDocument();
+		expect(
+			screen.queryByText( /Favorite movie/ )
+		).not.toBeInTheDocument();
 	} );
 } );

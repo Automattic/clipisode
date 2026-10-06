@@ -155,7 +155,7 @@ class CompositionTest extends TestCase {
 		$composition = self::composition();
 		$composition['clips'] = [];
 		$this->assertIsArray( Clipisode_Composition::sanitize( $composition ) );
-		$composition['settings']['themeId'] = 'none';
+		$composition['settings'] = [ 'themeId' => 'none', 'format' => 'portrait', 'videoFit' => 'cover' ];
 		$this->assertInstanceOf( WP_Error::class, Clipisode_Composition::sanitize( $composition ) );
 	}
 

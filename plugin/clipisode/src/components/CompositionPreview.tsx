@@ -5,7 +5,16 @@ import ClipisodeComposition from '../remotion/ClipisodeComposition';
 import { buildTimeline, FPS, getCompositionSize } from '../remotion/timeline';
 import type { ClipisodeCompositionProps } from '../remotion/types';
 
-export default function CompositionPreview( props: ClipisodeCompositionProps ) {
+interface Props extends ClipisodeCompositionProps {
+	selectedClipId?: string | null;
+	onSelectClip?: ( id: string ) => void;
+}
+
+export default function CompositionPreview( {
+	selectedClipId,
+	onSelectClip,
+	...props
+}: Props ) {
 	const player = useRef< PlayerRef >( null );
 	const [ revision, setRevision ] = useState( 0 );
 	const timeline = useMemo( () => {
@@ -41,6 +50,14 @@ export default function CompositionPreview( props: ClipisodeCompositionProps ) {
 			</div>
 		);
 	}
+	if ( timeline.durationInFrames === 0 ) {
+		return (
+			<div className="clipisode-empty">
+				Include a sequence clip or enable a title or ending card.
+			</div>
+		);
+	}
+
 	return (
 		<div className="clipisode-composition-preview">
 			<div className="clipisode-composition-stage">
@@ -59,7 +76,7 @@ export default function CompositionPreview( props: ClipisodeCompositionProps ) {
 					doubleClickToFullscreen
 					style={ {
 						width: '100%',
-						maxWidth: `calc(60vh * ${ size.width } / ${ size.height })`,
+						maxWidth: `calc(var(--clipisode-player-height, 60vh) * ${ size.width } / ${ size.height })`,
 						aspectRatio: `${ size.width } / ${ size.height }`,
 					} }
 					errorFallback={ ( { error } ) => (
@@ -79,25 +96,61 @@ export default function CompositionPreview( props: ClipisodeCompositionProps ) {
 				{ ( timeline.durationInFrames / FPS ).toFixed( 1 ) } seconds ·{ ' ' }
 				{ size.width } × { size.height } · { FPS } fps
 			</p>
+			<div className="clipisode-studio-sequence-heading">
+				<h2>Sequence</h2>
+				<span>Click to preview a moment</span>
+			</div>
 			<div
 				className="clipisode-composition-chapters"
 				aria-label="Preview chapters"
 			>
 				{ timeline.segments.map( ( segment, index ) => (
-					<Button
+					<button
 						key={ index }
-						variant="secondary"
-						size="compact"
-						onClick={ () =>
-							player.current?.seekTo( segment.start )
-						}
+						type="button"
+						aria-label={ `Preview ${
+							segment.type === 'clip'
+								? segment.clip.name
+								: { title: 'Title', ending: 'Ending' }[
+										segment.type
+								  ]
+						}` }
+						className={ `clipisode-sequence-item ${
+							segment.type === 'clip' ? 'is-clip' : 'is-card'
+						} ${
+							segment.type === 'clip' &&
+							selectedClipId === segment.clip.id
+								? 'is-selected'
+								: ''
+						}` }
+						style={ { flexGrow: segment.durationInFrames } }
+						onClick={ () => {
+							player.current?.seekTo( segment.start );
+							if ( segment.type === 'clip' ) {
+								onSelectClip?.( segment.clip.id );
+							}
+						} }
 					>
-						{ segment.type === 'clip'
-							? segment.clip.name
-							: { title: 'Title', ending: 'Ending' }[
-									segment.type
-							  ] }
-					</Button>
+						{ segment.type === 'clip' && (
+							<video
+								src={ segment.clip.url }
+								muted
+								playsInline
+								preload="metadata"
+								aria-hidden="true"
+							/>
+						) }
+						<strong>
+							{ segment.type === 'clip'
+								? segment.clip.name
+								: { title: 'Title', ending: 'Ending' }[
+										segment.type
+								  ] }
+						</strong>
+						<span>
+							{ ( segment.durationInFrames / FPS ).toFixed( 1 ) }s
+						</span>
+					</button>
 				) ) }
 			</div>
 		</div>

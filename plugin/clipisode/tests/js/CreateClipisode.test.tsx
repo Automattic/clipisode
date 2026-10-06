@@ -137,11 +137,14 @@ describe( 'Clipisode editor', () => {
 		fireEvent.change( screen.getByLabelText( 'Video fit' ), {
 			target: { value: 'contain' },
 		} );
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Select clip 2: Guest' } )
+		);
 		fireEvent.change( screen.getByLabelText( 'Speaker for clip 2' ), {
 			target: { value: 'Avery' },
 		} );
 		fireEvent.click(
-			screen.getAllByRole( 'button', { name: 'Move earlier' } )[ 1 ]
+			screen.getByRole( 'button', { name: 'Move earlier' } )
 		);
 		fireEvent.click( screen.getByLabelText( 'Include clip 2' ) );
 		expect( screen.getByText( 'Unsaved changes' ) ).toBeInTheDocument();
@@ -471,6 +474,7 @@ describe( 'Clipisode editor', () => {
 		);
 		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
 		await screen.findByDisplayValue( 'The original title' );
+		fireEvent.click( screen.getByRole( 'tab', { name: 'Export' } ) );
 		await waitFor( () =>
 			expect(
 				screen.getByRole( 'button', { name: 'Render in browser' } )
@@ -521,6 +525,7 @@ describe( 'Clipisode editor', () => {
 		} );
 		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
 		await screen.findByDisplayValue( 'The original title' );
+		fireEvent.click( screen.getByRole( 'tab', { name: 'Export' } ) );
 		await waitFor( () =>
 			expect(
 				screen.getByRole( 'button', { name: 'Save preview' } )
@@ -537,5 +542,191 @@ describe( 'Clipisode editor', () => {
 		expect(
 			screen.getByRole( 'button', { name: 'Render in browser' } )
 		).toBeDisabled();
+	} );
+	it( 'builds clip fields from the selected theme and keeps edits isolated to each clip', async () => {
+		mockEditorApi( async ( options ) =>
+			options.path === '/clipisode/v1/topics/7'
+				? ( { id: 7 } as never )
+				: ( savedOutput() as never )
+		);
+		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
+		await screen.findByDisplayValue( 'The original title' );
+		fireEvent.change( screen.getByLabelText( 'Video theme' ), {
+			target: { value: 'wpvip' },
+		} );
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Select clip 2: Guest' } )
+		);
+		expect( screen.getByRole( 'tab', { name: 'Clip' } ) ).toHaveAttribute(
+			'aria-selected',
+			'true'
+		);
+		fireEvent.click( screen.getByLabelText( 'Enable Favorite movie' ) );
+		fireEvent.change( screen.getByLabelText( 'Favorite movie' ), {
+			target: { value: 'Arrival' },
+		} );
+		fireEvent.click( screen.getByLabelText( 'Enable Caption' ) );
+		fireEvent.change( screen.getByLabelText( 'Caption' ), {
+			target: { value: 'A community voice' },
+		} );
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Select clip 1: Host' } )
+		);
+		expect(
+			screen.queryByLabelText( 'Enable Favorite movie' )
+		).not.toBeInTheDocument();
+		expect( screen.getByLabelText( 'Enable Caption' ) ).not.toBeChecked();
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Select clip 2: Guest' } )
+		);
+		expect( screen.getByLabelText( 'Favorite movie' ) ).toHaveValue(
+			'Arrival'
+		);
+		expect( screen.getByLabelText( 'Caption' ) ).toHaveValue(
+			'A community voice'
+		);
+		fireEvent.click( screen.getByRole( 'tab', { name: 'Theme' } ) );
+		fireEvent.change( screen.getByLabelText( 'Video theme' ), {
+			target: { value: 'none' },
+		} );
+		const preview =
+			mockPlayer.mock.calls[ mockPlayer.mock.calls.length - 1 ][ 0 ]
+				.inputProps;
+		expect( preview.settings ).toEqual( {
+			themeId: 'none',
+			format: 'portrait',
+			videoFit: 'cover',
+		} );
+		expect(
+			preview.clips.every(
+				( clip ) => Object.keys( clip.values ).length === 0
+			)
+		).toBe( true );
+	} );
+
+	it( 'retains an unavailable background reference and blocks saving until it is resolved', async () => {
+		mockEditorApi( async ( options ) =>
+			options.path === '/clipisode/v1/topics/7'
+				? ( { id: 7 } as never )
+				: ( savedOutput() as never )
+		);
+		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
+		await screen.findByDisplayValue( 'The original title' );
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Select clip 2: Guest' } )
+		);
+		fireEvent.click( screen.getByLabelText( 'Background clip' ) );
+		fireEvent.click( screen.getByRole( 'tab', { name: 'Theme' } ) );
+		fireEvent.click( screen.getByLabelText( 'Enable Card background' ) );
+		fireEvent.change( screen.getByLabelText( 'Card background' ), {
+			target: { value: 'reply' },
+		} );
+		expect(
+			screen.getByRole( 'button', { name: 'Save preview' } )
+		).toBeEnabled();
+		fireEvent.click( screen.getByRole( 'tab', { name: 'Clip' } ) );
+		fireEvent.click( screen.getByRole( 'button', { name: 'Remove' } ) );
+		fireEvent.click( screen.getByRole( 'tab', { name: 'Theme' } ) );
+		expect( screen.getByLabelText( 'Card background' ) ).toHaveValue(
+			'reply'
+		);
+		expect(
+			screen.getByRole( 'option', {
+				name: 'Unavailable selection (reply)',
+			} )
+		).toBeInTheDocument();
+		expect(
+			screen.getByText(
+				'Card background must reference an available selection.'
+			)
+		).toBeInTheDocument();
+		expect(
+			screen.getByRole( 'button', { name: 'Save preview' } )
+		).toBeDisabled();
+		fireEvent.click( screen.getByLabelText( 'Enable Card background' ) );
+		expect(
+			screen.getByRole( 'button', { name: 'Save preview' } )
+		).toBeEnabled();
+	} );
+
+	it( 'preserves duplicate, keyboard reorder, and remove actions in the clip inspector', async () => {
+		mockEditorApi( async ( options ) =>
+			options.path === '/clipisode/v1/topics/7'
+				? ( { id: 7 } as never )
+				: ( savedOutput() as never )
+		);
+		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
+		await screen.findByDisplayValue( 'The original title' );
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Select clip 2: Guest' } )
+		);
+		fireEvent.click( screen.getByRole( 'button', { name: 'Duplicate' } ) );
+		fireEvent.change( screen.getByLabelText( 'Speaker for clip 3' ), {
+			target: { value: 'Second take' },
+		} );
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Move earlier' } )
+		);
+		expect( screen.getByLabelText( 'Speaker for clip 2' ) ).toHaveValue(
+			'Second take'
+		);
+		let preview =
+			mockPlayer.mock.calls[ mockPlayer.mock.calls.length - 1 ][ 0 ]
+				.inputProps;
+		expect( preview.clips.map( ( clip ) => clip.name ) ).toEqual( [
+			'Host',
+			'Second take',
+			'Guest',
+		] );
+		expect( new Set( preview.clips.map( ( clip ) => clip.id ) ).size ).toBe(
+			3
+		);
+		fireEvent.click( screen.getByLabelText( 'Background clip' ) );
+		fireEvent.click( screen.getByLabelText( 'End clip' ) );
+		expect( screen.getByLabelText( 'Background clip' ) ).not.toBeChecked();
+		expect( screen.getByLabelText( 'End clip' ) ).toBeChecked();
+		fireEvent.click( screen.getByRole( 'button', { name: 'Remove' } ) );
+		preview =
+			mockPlayer.mock.calls[ mockPlayer.mock.calls.length - 1 ][ 0 ]
+				.inputProps;
+		expect( preview.clips.map( ( clip ) => clip.name ) ).toEqual( [
+			'Host',
+			'Guest',
+		] );
+	} );
+
+	it( 'does not preview or save an empty sequence made only of a background clip', async () => {
+		const output = savedOutput();
+		output.composition.settings.showTitle = false;
+		output.composition.settings.showEnding = false;
+		output.composition.clips = [
+			{ ...output.composition.clips[ 0 ], tags: [ 'background' ] },
+		];
+		mockEditorApi( async ( options ) =>
+			options.path === '/clipisode/v1/topics/7'
+				? ( { id: 7 } as never )
+				: ( output as never )
+		);
+		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
+		await screen.findByDisplayValue( 'Community stories' );
+		expect(
+			screen.getAllByText(
+				'Include a sequence clip or enable a title or ending card.'
+			).length
+		).toBeGreaterThan( 0 );
+		expect(
+			screen.queryByTestId( 'remotion-player' )
+		).not.toBeInTheDocument();
+		expect(
+			screen.getByRole( 'button', { name: 'Save preview' } )
+		).toBeDisabled();
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Select clip 1: Host' } )
+		);
+		fireEvent.click( screen.getByLabelText( 'Background clip' ) );
+		expect( screen.getByTestId( 'remotion-player' ) ).toBeInTheDocument();
+		expect(
+			screen.getByRole( 'button', { name: 'Save preview' } )
+		).toBeEnabled();
 	} );
 } );

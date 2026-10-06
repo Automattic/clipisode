@@ -20,6 +20,11 @@ function videoConfiguration( composition: ClipisodeCompositionProps ) {
 		composition.clips,
 		composition.settings
 	);
+	if ( durationInFrames < 1 ) {
+		throw new Error(
+			'Include a sequence clip or enable a title or ending card.'
+		);
+	}
 	return { ...size, durationInFrames, fps: FPS };
 }
 

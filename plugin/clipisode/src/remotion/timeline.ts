@@ -5,6 +5,7 @@ import type {
 	CompositionTimeline,
 	TimelineSegment,
 } from './types';
+import { getThemeDefinition } from './theme-schema';
 
 export const FPS = 30;
 
@@ -38,18 +39,33 @@ export function buildTimeline(
 ): CompositionTimeline {
 	const segments: TimelineSegment[] = [];
 	let cursor = 0;
-	const hasTheme = settings.themeId !== 'none';
+	const { timeline } = getThemeDefinition( settings.themeId );
 
-	if ( hasTheme && settings.showTitle ) {
+	if ( timeline.title && settings[ timeline.title.enabledField ] ) {
 		const durationInFrames = cardFrames(
-			settings.titleDuration,
+			settings[ timeline.title.durationField ] as number,
 			'The title card'
 		);
 		segments.push( { type: 'title', start: cursor, durationInFrames } );
 		cursor += durationInFrames;
 	}
 
-	for ( const clip of clips ) {
+	const sequenceClips = clips.filter(
+		( clip ) =>
+			! timeline.backgroundTag ||
+			! clip.tags?.includes( timeline.backgroundTag )
+	);
+	const orderedClips = timeline.endTag
+		? [
+				...sequenceClips.filter(
+					( clip ) => ! clip.tags?.includes( timeline.endTag )
+				),
+				...sequenceClips.filter(
+					( clip ) => clip.tags?.includes( timeline.endTag )
+				),
+		  ]
+		: sequenceClips;
+	for ( const clip of orderedClips ) {
 		if ( ! clip.included ) {
 			continue;
 		}
@@ -88,9 +104,9 @@ export function buildTimeline(
 		cursor += durationInFrames;
 	}
 
-	if ( hasTheme && settings.showEnding ) {
+	if ( timeline.ending && settings[ timeline.ending.enabledField ] ) {
 		const durationInFrames = cardFrames(
-			settings.endingDuration,
+			settings[ timeline.ending.durationField ] as number,
 			'The ending card'
 		);
 		segments.push( { type: 'ending', start: cursor, durationInFrames } );
@@ -98,4 +114,27 @@ export function buildTimeline(
 	}
 
 	return { durationInFrames: cursor, segments };
+}
+
+export function getCardBackgroundClip(
+	clips: CompositionClip[],
+	settings: CompositionSettings
+): CompositionClip | undefined {
+	const { timeline } = getThemeDefinition( settings.themeId );
+	const id = timeline.backgroundField
+		? settings[ timeline.backgroundField ]
+		: null;
+	if ( ! id ) {
+		return undefined;
+	}
+	const clip = clips.find(
+		( item ) =>
+			item.id === id &&
+			item.included &&
+			item.tags?.includes( timeline.backgroundTag )
+	);
+	if ( ! clip ) {
+		throw new Error( 'Select an included background clip for the cards.' );
+	}
+	return clip;
 }

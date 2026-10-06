@@ -6,7 +6,7 @@ The wp-admin composer uses `@remotion/player` to play a React composition direct
 
 1. Select approved replies on a topic and choose **Create Clipisode**, or select videos in the media library and create a clipisode from them.
 2. Arrange the clips, adjust their trims and names, and select which clips to include.
-3. Choose a theme and customize its format, colors, typography, logo, title, ending, and name cards. The player previews the current settings.
+3. Choose a theme and customize the fields it exposes. Theme controls are grouped, can appear conditionally, and can apply to the whole composition or an individual clip. The player previews the current settings.
 4. Save the preview. Reopen it using **Edit preview** in the Clipisodes list or the topic's Clipisodes section.
 5. Choose **Render in browser**, keep the tab open through rendering and upload, then choose **Download MP4**. A configured renderer also provides **Render with service**.
 
@@ -19,15 +19,17 @@ The preview loads source media through `Clipisode_Media` URLs and plays their or
 | File in `plugin/clipisode/` | Responsibility |
 | --- | --- |
 | `src/pages/CreateClipisode.tsx` | Composer controls, source selection, player, and save/load requests |
-| `src/components/CompositionControls.tsx` | Editable theme settings and preset selection |
+| `assets/composition-themes.json` | Shared theme, field, group, and clip-tag definitions |
+| `src/components/CompositionControls.tsx` | Schema-driven theme settings and preset selection |
 | `src/components/CompositionPreview.tsx` | Player controls, error state, and chapter navigation |
 | `src/components/CompositionExport.tsx` | Browser rendering, upload retry, service status polling, and MP4 download |
 | `src/lib/browser-renderer.ts` | Browser capability check and Remotion MP4 export |
 | `src/lib/video-metadata.ts` | Browser source duration loading |
 | `src/remotion/types.ts` | Composition clip and settings contracts |
+| `src/remotion/theme-schema.ts` | Theme defaults, field visibility, dynamic choices, theme changes, and validation |
 | `src/remotion/timeline.ts` | Frame calculation, clip trimming, card placement, and canvas sizes |
 | `src/remotion/ClipisodeComposition.tsx` | Remotion sequences, media playback, and theme layers |
-| `src/remotion/themes.tsx` | Theme presets, title/ending cards, and video overlays |
+| `src/remotion/themes.tsx` | Theme rendering, title/ending cards, and video overlays |
 | `includes/class-composition.php` | Saved-input validation and resolution of current media URLs |
 | `includes/class-rest-api.php` | Composition output endpoints |
 | `includes/class-database.php` | Output composition storage |
@@ -37,21 +39,21 @@ The preview loads source media through `Clipisode_Media` URLs and plays their or
 
 ## Composition contract
 
-`ClipisodeCompositionProps` contains `clips` and `settings`. Each clip has a unique instance `id`, a WordPress `mediaId`, a `role` (`intro` or `reply`), a display `name`, its source `duration`, `trimStart`, `trimEnd`, and an `included` flag. Source times and card durations are measured in seconds. The API supplies the current source `url` when loading a saved composition; source URLs are not persisted in the composition JSON.
+`ClipisodeCompositionProps` contains `clips` and `settings`. Each clip has a unique instance `id`, a WordPress `mediaId`, a `role` (`intro` or `reply`), a display `name`, its source `duration`, `trimStart`, `trimEnd`, and an `included` flag. A clip can also have theme-defined `tags` and a `values` object for its clip-scoped fields. Source times and card durations are measured in seconds. The API supplies the current source `url` when loading a saved composition; source URLs are not persisted in the composition JSON.
 
 The array order is the playback order. Duplicated source videos have separate clip instance IDs and can have different trims and names. Excluded clips remain saved so they can be included again later.
 
-The timeline runs at 30 frames per second. Trim start and end are rounded to integer source-frame boundaries, with the end boundary exclusive. The selected range must produce at least one frame. Included clips run consecutively between any enabled title and ending cards. Animations use the current sequence frame, so seeking and replaying show the same composition state.
+The timeline runs at 30 frames per second. Trim start and end are rounded to integer source-frame boundaries, with the end boundary exclusive. The selected range must produce at least one frame. Included clips run consecutively between any enabled title and ending cards. A theme can identify background and end clips by tag: background clips are omitted from the main sequence, and end clips follow the other clips before the ending card. The selected background clip loops without audio behind cards. Animations use the current sequence frame, so seeking and replaying show the same composition state.
 
-Canvas formats are portrait (1080 × 1920), square (1080 × 1080), and landscape (1920 × 1080). `videoFit` selects a crop that fills the canvas (`cover`) or displays the complete source within it (`contain`).
+Canvas formats are portrait (1080 × 1920), square (1080 × 1080), and landscape (1920 × 1080). These dimensions belong to the composition. Other settings belong to the selected theme's schema; for example, a theme can expose `videoFit` to select a crop that fills the canvas (`cover`) or displays the complete source within it (`contain`).
 
 The initial presets are:
 
 - **Clipisode** (`default`): colored shapes and bold name cards.
-- **Editorial** (`wpvip`): fine rules and serif typography.
+- **Editorial** (`wpvip`): fine rules and serif typography, plus reply-specific details such as a favorite movie.
 - **No theme** (`none`): source video and audio, without title/ending cards, logo, or name overlays.
 
-Settings include `themeId`, `format`, `title`, `subtitle`, `endingText`, three six-digit hex colors (`accentColor`, `backgroundColor`, `textColor`), `fontFamily` (`sans` or `serif`), `logoUrl`, `showNames`, `showTitle`, `showEnding`, `titleDuration`, `endingDuration`, and `videoFit`.
+`settings` is a flat object containing `themeId`, `format`, and the selected theme's composition-scoped field values. Themes do not share a compulsory set of colors, text, or branding controls. **No theme** exposes no color fields. The other presets declare their own groups and defaults. Changing themes retains compatible values with matching field IDs and removes values that the new theme does not declare.
 
 ## Saving and loading
 
@@ -76,15 +78,22 @@ Invalid settings or unavailable source media produce explicit errors. A saved pr
 
 ## Extending themes
 
-To add a preset:
+`assets/composition-themes.json` is the single schema consumed by the React controls and PHP validation. Its top-level `themes` array contains each theme's ID, label, description, renderer, groups, tags, timeline rules, and canvas settings. The inspector renders field types generically; it does not contain a field list or field switches for each theme. PHP reads the same definitions rather than maintaining a separate theme or settings allow-list.
 
-1. Add its ID to `ThemeId` in `src/remotion/types.ts`.
-2. Add an entry with a label, description, and complete defaults to `themePresets` in `src/remotion/themes.tsx`.
-3. Implement its card and overlay appearance in `ThemeCard` and `ThemeOverlay`. Keep animation state derived from `useCurrentFrame()` and sizing derived from `useVideoConfig()`.
-4. Add the ID to the `themeId` allow-list in `Clipisode_Composition::sanitize()`.
-5. Verify cards, names, logos, trimming, and seeking in all three canvas formats, then save and reopen the preview.
+Each group declares an `id`, `label`, a `scope` of `composition` or `clip`, and its `fields`. It can include a description. A clip group can use `appliesTo.roles` and `appliesTo.tags` to limit where it appears. Each field declares its `id`, label, type, and default, with optional help text and a placeholder. Supported types are `text`, `textarea`, `number`, `range`, `select`, `toggle`, `color`, `image`, `clip`, and `multiselect`. Numeric fields can set `min`, `max`, and `step`; optional fields use `optional`; fixed choices use `options` containing `{ label, value }` objects.
 
-For a new customizable setting, update `CompositionSettings`, each preset's defaults, `CompositionControls`, its theme consumer, and PHP validation together. A saved composition should contain everything required to reproduce its appearance.
+Fields can use `when: { field, equals, scope }` to show a control only when another value matches. The optional scope selects a composition or clip value. Hidden or inapplicable values remain stored and must retain their declared types, but are only required when their fields apply and are visible. An optional value can be `null`. A clip selector or multiselect can declare `source: { kind: "clips", filter: { roles, tags } }`; its choices are derived from the currently included clips, so adding, removing, naming, including, or tagging clips updates the choices. Clip references use instance IDs, allowing two uses of the same media file to be selected independently.
+
+Theme tags declare an ID and label, with optional descriptions and role restrictions. `exclusiveGroup` makes related tags mutually exclusive and `maxClips` limits how many clips can carry a tag. Tags can select clip controls and renderer behavior. Timeline declarations connect title and ending cards to the relevant enable and duration fields; `backgroundTag` and `endTag` identify clips assigned those timeline roles, and `backgroundField` names the field that selects a background clip. Canvas declarations select a background field or a fixed background color.
+
+To add a theme:
+
+1. Add its schema to `assets/composition-themes.json`, including defaults for its fields and any clip tags.
+2. Implement or select the React renderer that consumes those values. Keep animation state derived from `useCurrentFrame()` and sizing derived from `useVideoConfig()`.
+3. Verify the controls, conditional and clip-scoped fields, tag rules, dynamic clip choices, and saved values. Check the renderer in all supported canvas formats, then save and reopen the preview.
+4. Test browser and service exports using the same composition. Restrict browser-only features according to the rendering support described below.
+
+Adding a field to a theme requires a schema entry and a renderer consumer for its effect. It does not require editing the generic inspector or adding a matching PHP field switch. A genuinely new field type requires implementing that type's control and validation in both runtimes. Saved compositions contain their declared values and clip assignments so their appearance can be reproduced.
 
 Invitation page designs and public layouts remain separate WordPress block-based concerns. The React composition is the extension point for video appearance; browser previews and local MP4 rendering consume the same composition inputs.
 
@@ -135,6 +144,6 @@ The admin bundle requires WordPress 6.6 or later for its React JSX runtime. `rem
 
 From `plugin/clipisode/`, run `npm run build`, `npm run test:js -- --runInBand`, `npm run test:renderer`, and `composer test`. Timeline and editor/export tests are in `tests/js/`; composition persistence and renderer API tests are in `tests/phpunit/`.
 
-For a browser check, create a preview with multiple clips, play through the clip boundaries, seek into a trimmed clip, change the theme and canvas format, and save. Reload its Edit preview URL and confirm the saved order, trims, names, and settings.
+For a browser check, create a preview with multiple clips, play through the clip boundaries, seek into a trimmed clip, change the theme and canvas format, and save. Confirm that **No theme** has no color controls, that conditional controls follow their toggles, and that reply-only fields appear only for replies. Assign clip tags and check dynamic clip choices and timeline behavior. Reload its Edit preview URL and confirm the saved order, trims, names, settings, and clip values.
 
 For an export check, render that saved preview in the browser and with the configured service, then play each downloaded MP4. Check its dimensions, duration, source audio, trimmed clip boundaries, and customized cards against the browser preview.

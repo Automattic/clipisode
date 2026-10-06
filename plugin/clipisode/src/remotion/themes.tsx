@@ -1,79 +1,45 @@
 import { AbsoluteFill, Img, useCurrentFrame, useVideoConfig } from 'remotion';
 import { useState } from '@wordpress/element';
 import type { CSSProperties } from 'react';
-import type { CompositionSettings, ThemeId } from './types';
+import { getThemeDefinition, themeDefinitions } from './theme-schema';
+import type { CompositionClip, CompositionSettings } from './types';
 
-interface ThemePreset {
-	id: ThemeId;
-	label: string;
-	description: string;
-	defaults: CompositionSettings;
+export { createDefaultSettings } from './theme-schema';
+export const themePresets = themeDefinitions;
+
+interface BrandedSettings extends CompositionSettings {
+	title: string;
+	subtitle: string;
+	endingText: string;
+	accentColor: string;
+	backgroundColor: string;
+	textColor: string;
+	fontFamily: 'sans' | 'serif';
+	logoUrl: string;
+	showNames: boolean;
 }
 
-const defaults: CompositionSettings = {
-	themeId: 'default',
-	format: 'portrait',
-	title: '',
-	subtitle: '',
-	endingText: 'Thanks for watching',
-	accentColor: '#f45b43',
-	backgroundColor: '#171b2a',
-	textColor: '#ffffff',
-	fontFamily: 'sans',
-	logoUrl: '',
-	showNames: true,
-	showTitle: true,
-	showEnding: true,
-	titleDuration: 3,
-	endingDuration: 3,
-	videoFit: 'cover',
-};
-
-export const themePresets: ThemePreset[] = [
-	{
-		id: 'default',
-		label: 'Clipisode',
-		description: 'Bold color, animated shapes, and confident name cards.',
-		defaults,
-	},
-	{
-		id: 'wpvip',
-		label: 'Editorial',
-		description:
-			'Refined typography, clean rules, and understated name cards.',
-		defaults: {
-			...defaults,
-			themeId: 'wpvip',
-			accentColor: '#b79555',
-			backgroundColor: '#f5f2ea',
-			textColor: '#1e242b',
-			fontFamily: 'serif',
-		},
-	},
-	{
-		id: 'none',
-		label: 'No theme',
-		description:
-			'Video and original audio, without cards, names, or branding.',
-		defaults: {
-			...defaults,
-			themeId: 'none',
-			backgroundColor: '#000000',
-			showNames: false,
-			showTitle: false,
-			showEnding: false,
-		},
-	},
-];
-
-export function createDefaultSettings(
-	themeId: ThemeId = 'default'
-): CompositionSettings {
-	const preset = themePresets.find( ( theme ) => theme.id === themeId );
-	if ( ! preset ) {
-		throw new Error( `Unknown composition theme: ${ themeId }` );
+function rendererFor( settings: CompositionSettings ): string {
+	const renderer = getThemeDefinition( settings.themeId ).renderer;
+	if ( ! [ 'branded', 'editorial', 'plain' ].includes( renderer ) ) {
+		throw new Error(
+			`No composition renderer is registered for ${ renderer }.`
+		);
 	}
-	return { ...preset.defaults };
+	return renderer;
+}
+
+export function getCompositionBackground(
+	settings: CompositionSettings
+): string {
+	const { canvas } = getThemeDefinition( settings.themeId );
+	const color = canvas.backgroundField
+		? settings[ canvas.backgroundField ]
+		: canvas.backgroundColor;
+	if ( typeof color !== 'string' ) {
+		throw new Error( 'The theme must supply a canvas background color.' );
+	}
+	return color;
 }
 
 export function getFontFamily( settings: CompositionSettings ): string {
@@ -86,7 +52,7 @@ function Logo( {
 	settings,
 	size,
 }: {
-	settings: CompositionSettings;
+	settings: BrandedSettings;
 	size: number;
 } ) {
 	const [ error, setError ] = useState< Error | null >( null );
@@ -119,23 +85,27 @@ function entrance( frame: number, frames: number ): number {
 }
 
 export function ThemeCard( {
-	settings,
+	settings: inputSettings,
 	kind,
+	hasBackground = false,
 }: {
 	settings: CompositionSettings;
 	kind: 'title' | 'ending';
+	hasBackground?: boolean;
 } ) {
 	const frame = useCurrentFrame();
 	const { width, height, fps } = useVideoConfig();
-	if ( settings.themeId === 'none' ) {
+	const renderer = rendererFor( inputSettings );
+	if ( renderer === 'plain' ) {
 		return null;
 	}
+	const settings = inputSettings as BrandedSettings;
 	const unit = Math.min( width, height );
 	const inset = unit * 0.085;
 	const progress = entrance( frame, fps * 0.7 );
 	const text = kind === 'title' ? settings.title : settings.endingText;
 	const subtitle = kind === 'title' ? settings.subtitle : '';
-	const editorial = settings.themeId === 'wpvip';
+	const editorial = renderer === 'editorial';
 	const fontSize = Math.min(
 		unit * 0.11,
 		Math.max(
@@ -156,7 +126,9 @@ export function ThemeCard( {
 	return (
 		<AbsoluteFill
 			style={ {
-				backgroundColor: settings.backgroundColor,
+				backgroundColor: hasBackground
+					? `${ settings.backgroundColor }cc`
+					: settings.backgroundColor,
 				color: settings.textColor,
 				fontFamily: getFontFamily( settings ),
 				overflow: 'hidden',
@@ -275,21 +247,36 @@ export function ThemeCard( {
 }
 
 export function ThemeOverlay( {
-	settings,
+	settings: inputSettings,
 	name,
+	clip,
 }: {
 	settings: CompositionSettings;
 	name: string;
+	clip?: CompositionClip;
 } ) {
 	const frame = useCurrentFrame();
 	const { width, height, fps } = useVideoConfig();
-	if ( settings.themeId === 'none' ) {
+	const renderer = rendererFor( inputSettings );
+	if ( renderer === 'plain' ) {
 		return null;
 	}
+	const settings = inputSettings as BrandedSettings;
 	const unit = Math.min( width, height );
 	const inset = unit * 0.065;
 	const progress = entrance( frame, fps * 0.5 );
-	const editorial = settings.themeId === 'wpvip';
+	const editorial = renderer === 'editorial';
+	const caption =
+		typeof clip?.values?.caption === 'string' ? clip.values.caption : '';
+	const movie =
+		editorial &&
+		clip?.role === 'reply' &&
+		typeof clip.values?.favoriteMovie === 'string'
+			? clip.values.favoriteMovie
+			: '';
+	const detail = [ caption, movie ? `Favorite movie: ${ movie }` : '' ]
+		.filter( Boolean )
+		.join( '\n' );
 
 	return (
 		<AbsoluteFill
@@ -338,6 +325,19 @@ export function ThemeOverlay( {
 					} }
 				>
 					{ name }
+					{ detail && (
+						<div
+							style={ {
+								marginTop: unit * 0.012,
+								fontSize: unit * 0.025,
+								fontWeight: 400,
+								lineHeight: 1.4,
+								whiteSpace: 'pre-wrap',
+							} }
+						>
+							{ detail }
+						</div>
+					) }
 				</div>
 			) }
 		</AbsoluteFill>

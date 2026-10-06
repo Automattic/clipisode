@@ -58,9 +58,13 @@ describe( 'CompositionPreview', () => {
 				showVolumeControls: true,
 			} )
 		);
-		fireEvent.click( screen.getByRole( 'button', { name: 'Avery' } ) );
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Preview Avery' } )
+		);
 		expect( mockSeek ).toHaveBeenLastCalledWith( 90 );
-		fireEvent.click( screen.getByRole( 'button', { name: 'Ending' } ) );
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Preview Ending' } )
+		);
 		expect( mockSeek ).toHaveBeenLastCalledWith( 180 );
 	} );
 

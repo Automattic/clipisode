@@ -1,23 +1,82 @@
-export type ThemeId = 'default' | 'wpvip' | 'none';
+export type ThemeId = string;
 export type CompositionFormat = 'portrait' | 'square' | 'landscape';
+export type ThemeValue = string | number | boolean | string[] | null;
+export type ThemeValues = Record< string, ThemeValue >;
 
-export interface CompositionSettings {
+export interface ClipFilter {
+	roles?: string[];
+	tags?: string[];
+}
+
+export interface ThemeField {
+	id: string;
+	label: string;
+	type:
+		| 'text'
+		| 'textarea'
+		| 'number'
+		| 'range'
+		| 'select'
+		| 'toggle'
+		| 'color'
+		| 'image'
+		| 'clip'
+		| 'multiselect';
+	default: ThemeValue;
+	optional?: boolean;
+	help?: string;
+	placeholder?: string;
+	min?: number;
+	max?: number;
+	step?: number;
+	options?: { label: string; value: string }[];
+	source?: { kind: 'clips'; filter?: ClipFilter };
+	when?: {
+		field: string;
+		equals: ThemeValue;
+		scope?: 'composition' | 'clip';
+	};
+}
+
+export interface ThemeGroup {
+	id: string;
+	label: string;
+	scope: 'composition' | 'clip';
+	description?: string;
+	appliesTo?: ClipFilter;
+	fields: ThemeField[];
+}
+
+export interface ThemeTag {
+	id: string;
+	label: string;
+	description?: string;
+	color?: string;
+	roles?: string[];
+	exclusiveGroup?: string;
+	maxClips?: number;
+}
+
+export interface ThemeDefinition {
+	id: ThemeId;
+	label: string;
+	description: string;
+	renderer: string;
+	groups: ThemeGroup[];
+	tags: ThemeTag[];
+	canvas: { backgroundField?: string; backgroundColor?: string };
+	timeline: {
+		title?: { enabledField: string; durationField: string };
+		ending?: { enabledField: string; durationField: string };
+		backgroundTag?: string;
+		backgroundField?: string;
+		endTag?: string;
+	};
+}
+
+export interface CompositionSettings extends ThemeValues {
 	themeId: ThemeId;
 	format: CompositionFormat;
-	title: string;
-	subtitle: string;
-	endingText: string;
-	accentColor: string;
-	backgroundColor: string;
-	textColor: string;
-	fontFamily: 'sans' | 'serif';
-	logoUrl: string;
-	showNames: boolean;
-	showTitle: boolean;
-	showEnding: boolean;
-	titleDuration: number;
-	endingDuration: number;
-	videoFit: 'cover' | 'contain';
 }
 
 export interface CompositionClip {
@@ -30,6 +89,8 @@ export interface CompositionClip {
 	trimStart: number;
 	trimEnd: number;
 	included: boolean;
+	tags?: string[];
+	values?: ThemeValues;
 }
 
 export type ClipisodeCompositionProps = {

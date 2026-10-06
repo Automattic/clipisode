@@ -1,6 +1,7 @@
 import {
 	buildTimeline,
 	FPS,
+	getCardBackgroundClip,
 	getCompositionSize,
 } from '../../src/remotion/timeline';
 import { createDefaultSettings } from '../../src/remotion/themes';
@@ -109,6 +110,84 @@ describe( 'Remotion composition timeline', () => {
 			{ durationInFrames: 0, segments: [] }
 		);
 	} );
+
+	it( 'removes backgrounds from the main sequence and moves end clips after ordinary clips without changing their relative order', () => {
+		const timeline = buildTimeline(
+			[
+				clip( '1', { tags: [ 'end' ], trimEnd: 1 } ),
+				clip( '2', { trimEnd: 2 } ),
+				clip( '3', { tags: [ 'background' ], trimEnd: 9 } ),
+				clip( '4', { tags: [ 'end' ], trimEnd: 1 } ),
+				clip( '5', { trimEnd: 2 } ),
+				clip( '6', { tags: [ 'end' ], included: false } ),
+			],
+			{ ...createDefaultSettings(), titleDuration: 1, endingDuration: 1 }
+		);
+		expect(
+			timeline.segments.map( ( segment ) => ( {
+				id: segment.type === 'clip' ? segment.clip.id : segment.type,
+				start: segment.start,
+				duration: segment.durationInFrames,
+			} ) )
+		).toEqual( [
+			{ id: 'title', start: 0, duration: 30 },
+			{ id: '2', start: 30, duration: 60 },
+			{ id: '5', start: 90, duration: 60 },
+			{ id: '1', start: 150, duration: 30 },
+			{ id: '4', start: 180, duration: 30 },
+			{ id: 'ending', start: 210, duration: 30 },
+		] );
+		expect( timeline.durationInFrames ).toBe( 240 );
+	} );
+
+	it( 'does not create a playable sequence from background clips when both cards are disabled', () => {
+		expect(
+			buildTimeline( [ clip( '1', { tags: [ 'background' ] } ) ], {
+				...createDefaultSettings(),
+				backgroundClip: '1',
+				showTitle: false,
+				showEnding: false,
+			} )
+		).toEqual( { durationInFrames: 0, segments: [] } );
+	} );
+
+	it( 'selects a background by clip instance and preserves its trim for looping', () => {
+		const background = clip( '2', {
+			mediaId: 1,
+			tags: [ 'background' ],
+			trimStart: 1,
+			trimEnd: 3,
+		} );
+		const clips = [ clip( '1', { tags: [ 'background' ] } ), background ];
+		expect(
+			getCardBackgroundClip( clips, {
+				...createDefaultSettings(),
+				backgroundClip: '2',
+			} )
+		).toBe( background );
+		expect(
+			getCardBackgroundClip( clips, createDefaultSettings() )
+		).toBeUndefined();
+		expect(
+			getCardBackgroundClip( clips, createDefaultSettings( 'none' ) )
+		).toBeUndefined();
+	} );
+
+	it.each( [
+		{ clips: [] },
+		{ clips: [ clip( '1' ) ] },
+		{ clips: [ clip( '1', { tags: [ 'background' ], included: false } ) ] },
+	] )(
+		'rejects a missing, untagged, or excluded selected background',
+		( { clips } ) => {
+			expect( () =>
+				getCardBackgroundClip( clips, {
+					...createDefaultSettings(),
+					backgroundClip: '1',
+				} )
+			).toThrow( 'included background clip' );
+		}
+	);
 
 	it.each( [ 0, -1, NaN, Infinity ] )(
 		'rejects unavailable or invalid source duration %s',
