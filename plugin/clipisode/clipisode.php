@@ -100,4 +100,3 @@ add_action( 'init', [ $clipisode_preview, 'register_blocks' ] );
 add_action( 'init', [ $clipisode_preview, 'register_rewrite' ] );
 add_filter( 'query_vars', [ $clipisode_preview, 'add_query_vars' ] );
 add_filter( 'template_include', [ $clipisode_preview, 'template_include' ] );
-require_once CLIPISODE_PLUGIN_DIR . 'spike/spike.php';
