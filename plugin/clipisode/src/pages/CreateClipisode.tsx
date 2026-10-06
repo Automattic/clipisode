@@ -545,9 +545,9 @@ export default function CreateClipisode( {
 	};
 	const goBack = () => {
 		if ( currentTopicId ) {
-			navigate( currentTopicId );
+			window.location.href = `admin.php?page=clipisode#/${ currentTopicId }`;
 		} else {
-			window.location.href = 'admin.php?page=clipisode-clipisodes';
+			navigate( '' );
 		}
 	};
 	const requestLeave = () => {

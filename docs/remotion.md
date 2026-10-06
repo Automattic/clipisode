@@ -10,7 +10,7 @@ The wp-admin composer uses `@remotion/player` to play a React composition direct
 4. Save the preview. Reopen it using **Edit preview** in the Clipisodes list or the topic's Clipisodes section.
 5. Choose **Render in browser**, keep the tab open through rendering and upload, then choose **Download MP4**. A configured renderer also provides **Render with service**.
 
-Saved previews open at `admin.php?page=clipisode#/compose/{outputId}`. The Clipisodes list also displays existing rendered video files separately.
+Saved previews open at `admin.php?page=clipisode-clipisodes#/compose/{outputId}`. The Clipisodes list also displays existing rendered video files separately.
 
 The preview loads source media through `Clipisode_Media` URLs and plays their original audio. Video URLs must be playable by the browser. No desktop transcoder, WebSocket connection, or AVFoundation theme manifest is involved in the composition.
 

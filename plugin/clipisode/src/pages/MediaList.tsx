@@ -96,7 +96,7 @@ export default function MediaList() {
 		const mediaIds = items
 			.filter( ( i ) => selectedIds.has( i.id ) )
 			.map( ( i ) => i.id );
-		window.location.href = `admin.php?page=clipisode#/create-clipisode/${ mediaIds.join(
+		window.location.href = `admin.php?page=clipisode-clipisodes#/create-clipisode/${ mediaIds.join(
 			','
 		) }`;
 	};

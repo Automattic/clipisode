@@ -1,3 +1,4 @@
+import { useEffect } from '@wordpress/element';
 import TopicList from './pages/TopicList';
 import TopicDetail from './pages/TopicDetail';
 import TopicForm from './pages/TopicForm';
@@ -13,6 +14,24 @@ export default function App() {
 	const page = window.clipisodeAdmin?.page || 'clipisode';
 	const { route, navigate } = useHashRoute();
 	const compositionMatch = route.match( /^compose\/(\d+)$/ );
+	const createClipisodeWithTopicMatch = route.match(
+		/^create-clipisode\/(\d+)\/([\d,]+)$/
+	);
+	const createClipisodeMatch = route.match( /^create-clipisode\/([\d,]+)$/ );
+	const isComposerRoute =
+		!! compositionMatch ||
+		!! createClipisodeWithTopicMatch ||
+		!! createClipisodeMatch;
+	useEffect( () => {
+		if ( isComposerRoute && page !== 'clipisode-clipisodes' ) {
+			const url = new URL( window.location.href );
+			url.searchParams.set( 'page', 'clipisode-clipisodes' );
+			window.location.replace( url.toString() );
+		}
+	}, [ isComposerRoute, page, route ] );
+	if ( isComposerRoute && page !== 'clipisode-clipisodes' ) {
+		return null;
+	}
 	if ( compositionMatch ) {
 		return (
 			<CreateClipisode
@@ -21,6 +40,22 @@ export default function App() {
 				navigate={ navigate }
 			/>
 		);
+	}
+	if ( createClipisodeWithTopicMatch ) {
+		const mediaIds = createClipisodeWithTopicMatch[ 2 ]
+			.split( ',' )
+			.map( Number );
+		return (
+			<CreateClipisode
+				topicId={ Number( createClipisodeWithTopicMatch[ 1 ] ) }
+				mediaIds={ mediaIds }
+				navigate={ navigate }
+			/>
+		);
+	}
+	if ( createClipisodeMatch ) {
+		const mediaIds = createClipisodeMatch[ 1 ].split( ',' ).map( Number );
+		return <CreateClipisode mediaIds={ mediaIds } navigate={ navigate } />;
 	}
 
 	if ( page === 'clipisode-replies' ) {
@@ -53,27 +88,6 @@ export default function App() {
 	const editMatch = route.match( /^(\d+)\/edit$/ );
 	if ( editMatch ) {
 		return <TopicForm id={ editMatch[ 1 ] } navigate={ navigate } />;
-	}
-
-	const createClipisodeWithTopicMatch = route.match(
-		/^create-clipisode\/(\d+)\/([\d,]+)$/
-	);
-	const createClipisodeMatch = route.match( /^create-clipisode\/([\d,]+)$/ );
-	if ( createClipisodeWithTopicMatch ) {
-		const mediaIds = createClipisodeWithTopicMatch[ 2 ]
-			.split( ',' )
-			.map( Number );
-		return (
-			<CreateClipisode
-				topicId={ Number( createClipisodeWithTopicMatch[ 1 ] ) }
-				mediaIds={ mediaIds }
-				navigate={ navigate }
-			/>
-		);
-	}
-	if ( createClipisodeMatch ) {
-		const mediaIds = createClipisodeMatch[ 1 ].split( ',' ).map( Number );
-		return <CreateClipisode mediaIds={ mediaIds } navigate={ navigate } />;
 	}
 
 	const detailMatch = route.match( /^(\d+)$/ );

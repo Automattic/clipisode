@@ -135,7 +135,7 @@ export default function ClipisodeList() {
 								<td>
 									<Button
 										variant="link"
-										href={ `admin.php?page=clipisode#/compose/${ draft.id }` }
+										href={ `admin.php?page=clipisode-clipisodes#/compose/${ draft.id }` }
 									>
 										Edit preview
 									</Button>

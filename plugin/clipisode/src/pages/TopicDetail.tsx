@@ -668,11 +668,9 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 														topic.intro_media_id
 													);
 												}
-												navigate(
-													`create-clipisode/${ id }/${ mediaIds.join(
-														','
-													) }`
-												);
+												window.location.href = `admin.php?page=clipisode-clipisodes#/create-clipisode/${ id }/${ mediaIds.join(
+													','
+												) }`;
 											} }
 										>
 											Create Clipisode (
@@ -747,7 +745,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 													<Button
 														variant="tertiary"
 														size="compact"
-														href={ `admin.php?page=clipisode#/compose/${ o.id }` }
+														href={ `admin.php?page=clipisode-clipisodes#/compose/${ o.id }` }
 													>
 														Edit preview
 													</Button>
