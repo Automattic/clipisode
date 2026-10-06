@@ -81,34 +81,17 @@ class Clipisode_Admin {
 			$asset['version']
 		);
 
-		$registered = apply_filters( 'clipisode_themes', [] );
-		$themes     = [];
-		foreach ( $registered as $id => $theme ) {
-			$assets = [];
-			if ( ! empty( $theme['asset_dir'] ) && is_dir( $theme['asset_dir'] ) ) {
-				foreach ( glob( $theme['asset_dir'] . '*' ) as $file ) {
-					$filename             = basename( $file );
-					$assets[ $filename ] = [
-						'url'      => $theme['asset_url'] . $filename,
-						'filename' => $filename,
-					];
-				}
-			}
-			$themes[ $id ] = [
-				'label'  => $theme['label'],
-				'assets' => $assets,
-			];
-		}
-
-		wp_localize_script( 'clipisode-admin', 'clipisodeAdmin', [
-			'page'              => isset( $_GET['page'] ) ? sanitize_text_field( $_GET['page'] ) : 'clipisode',
-			'rest_root'         => esc_url_raw( rest_url() ),
-			'nonce'             => wp_create_nonce( 'wp_rest' ),
-			'invitation_prefix' => Clipisode_Invitation::get_prefix(),
-			'preview_prefix'    => Clipisode_Preview::get_prefix(),
-			'themes'            => $themes,
-			'debug_mode'        => (bool) get_option( 'clipisode_debug_mode', false ),
-		] );
+		$config = [
+			'page'                  => isset( $_GET['page'] ) ? sanitize_text_field( $_GET['page'] ) : 'clipisode',
+			'rest_root'             => esc_url_raw( rest_url() ),
+			'nonce'                 => wp_create_nonce( 'wp_rest' ),
+			'invitation_prefix'     => Clipisode_Invitation::get_prefix(),
+			'preview_prefix'        => Clipisode_Preview::get_prefix(),
+			'debug_mode'            => (bool) get_option( 'clipisode_debug_mode', false ),
+			'remotion_license_key'  => defined( 'CLIPISODE_REMOTION_LICENSE_KEY' ) ? (string) CLIPISODE_REMOTION_LICENSE_KEY : null,
+			'remotion_is_production' => 'production' === wp_get_environment_type(),
+		];
+		wp_add_inline_script( 'clipisode-admin', 'window.clipisodeAdmin = ' . wp_json_encode( $config ) . ';', 'before' );
 	}
 
 	public function render_page(): void {

@@ -12,6 +12,16 @@ import useHashRoute from './hooks/useHashRoute';
 export default function App() {
 	const page = window.clipisodeAdmin?.page || 'clipisode';
 	const { route, navigate } = useHashRoute();
+	const compositionMatch = route.match( /^compose\/(\d+)$/ );
+	if ( compositionMatch ) {
+		return (
+			<CreateClipisode
+				key={ route }
+				outputId={ Number( compositionMatch[ 1 ] ) }
+				navigate={ navigate }
+			/>
+		);
+	}
 
 	if ( page === 'clipisode-replies' ) {
 		const params = new URLSearchParams( window.location.search );

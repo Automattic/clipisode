@@ -153,32 +153,6 @@
 		margin-top: 4px;
 	}
 
-	// --- Create Clipisode action panel ---
-
-	.clipisode-create-actions {
-		margin-top: 24px;
-		background: #fff;
-		border: 1px solid #c3c4c7;
-		border-radius: 4px;
-		padding: 20px;
-
-		&__fields {
-			display: grid;
-			grid-template-columns: 1fr auto;
-			gap: 16px;
-			align-items: end;
-			max-width: 500px;
-		}
-
-		&__buttons {
-			display: flex;
-			gap: 12px;
-			margin-top: 20px;
-			padding-top: 16px;
-			border-top: 1px solid #f0f0f1;
-		}
-	}
-
 	// --- Sections ---
 
 	.clipisode-section {
@@ -666,80 +640,7 @@
 		font-style: italic;
 	}
 
-	.clipisode-output-status {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 8px;
-		padding: 16px;
-		background: #fff;
-		border: 1px solid #c3c4c7;
-		border-radius: 4px;
 
-		video {
-			width: 100%;
-			max-width: 480px;
-			border-radius: 4px;
-			background: #1d2327;
-			display: block;
-		}
-	}
-
-	.clipisode-output-phase {
-		font-weight: 700;
-		font-size: 14px;
-	}
-
-	.clipisode-output-message {
-		font-size: 13px;
-		color: #646970;
-	}
-
-	.clipisode-output-progress {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		width: 100%;
-		max-width: 400px;
-	}
-
-	.clipisode-output-progress-track {
-		flex: 1;
-		height: 8px;
-		background: #dcdcde;
-		border-radius: 4px;
-		overflow: hidden;
-	}
-
-	.clipisode-output-progress-bar {
-		height: 100%;
-		background: #2271b1;
-		border-radius: 4px;
-		transition: width 0.4s ease;
-	}
-
-	.clipisode-output-progress-label {
-		font-size: 12px;
-		font-weight: 700;
-		color: #1d2327;
-		white-space: nowrap;
-	}
-
-	.clipisode-output-done {
-		border-left: 4px solid #00a32a;
-
-		.clipisode-output-phase {
-			color: #00a32a;
-		}
-	}
-
-	.clipisode-output-error {
-		border-left: 4px solid #d63638;
-
-		.clipisode-output-phase {
-			color: #d63638;
-		}
-	}
 }
 
 // --- Reply modal (portaled outside #clipisode-root) ---
@@ -872,4 +773,98 @@
 	color: #d63638;
 	font-size: 12px;
 	width: 100%;
+}
+
+#clipisode-root {
+	.clipisode-composition-editor {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 320px;
+		gap: 24px;
+		align-items: start;
+		margin: 24px 0;
+	}
+
+	.clipisode-composition-monitor {
+		position: sticky;
+		top: 48px;
+		min-width: 0;
+	}
+
+	.clipisode-composition-stage {
+		display: flex;
+		justify-content: center;
+		padding: 24px;
+		background: #e4e6e9;
+		border-radius: 8px;
+	}
+
+	.clipisode-composition-sidebar {
+		background: #fff;
+		border: 1px solid #dcdcde;
+		border-radius: 8px;
+		padding: 20px;
+	}
+
+	.clipisode-composition-controls {
+		display: grid;
+		gap: 16px;
+	}
+
+	.clipisode-composition-sidebar > .components-base-control {
+		margin-bottom: 20px;
+	}
+
+	.clipisode-composition-colors {
+		display: flex;
+		gap: 16px;
+		margin-bottom: 20px;
+
+		label {
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+		}
+
+		input {
+			width: 64px;
+			height: 36px;
+			padding: 2px;
+		}
+	}
+
+	.clipisode-composition-caption {
+		text-align: center;
+		color: #646970;
+	}
+
+	.clipisode-composition-chapters,
+	.clipisode-composition-clip-actions {
+		display: flex;
+		gap: 6px;
+		flex-wrap: wrap;
+	}
+
+	.clipisode-composition-clips {
+		overflow-x: auto;
+
+		.components-base-control__field {
+			margin-bottom: 0;
+		}
+	}
+
+	.clipisode-player-error {
+		background: #fff;
+		padding: 24px;
+		color: #8a2424;
+	}
+
+	@media (max-width: 960px) {
+		.clipisode-composition-editor {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.clipisode-composition-monitor {
+			position: static;
+		}
+	}
 }

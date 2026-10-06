@@ -133,6 +133,17 @@ class Clipisode_Media {
 		return null;
 	}
 
+	public static function get_video_url( int $id ): ?string {
+		global $wpdb;
+		$media = $wpdb->get_row( $wpdb->prepare(
+			"SELECT type, mime_type FROM {$wpdb->prefix}clipisode_media WHERE id = %d", $id
+		) );
+		if ( ! $media || 'video' !== $media->type || ! in_array( $media->mime_type, self::ALLOWED_MIME_TYPES, true ) ) {
+			return null;
+		}
+		return self::get_url( $id );
+	}
+
 	public static function get_filename( int $id ): ?string {
 		global $wpdb;
 		$media = $wpdb->get_row( $wpdb->prepare(
@@ -150,14 +161,14 @@ class Clipisode_Media {
 		return $media->path ? basename( $media->path ) : null;
 	}
 
-	private static function insert_row( string $type, string $label, int $attachment_id ): array {
+	private static function insert_row( string $type, string $label, int $attachment_id ): array|WP_Error {
 		global $wpdb;
 
 		$path      = get_post_meta( $attachment_id, '_wp_attached_file', true );
 		$post      = get_post( $attachment_id );
 		$file_path = get_attached_file( $attachment_id );
 
-		$wpdb->insert( $wpdb->prefix . 'clipisode_media', [
+		$inserted = $wpdb->insert( $wpdb->prefix . 'clipisode_media', [
 			'type'          => $type,
 			'label'         => $label,
 			'storage'       => 'local',
@@ -166,6 +177,10 @@ class Clipisode_Media {
 			'mime_type'     => $post->post_mime_type,
 			'file_size'     => $file_path ? filesize( $file_path ) : null,
 		] );
+		if ( false === $inserted ) {
+			wp_delete_attachment( $attachment_id, true );
+			return new WP_Error( 'media_storage_failed', 'The uploaded media could not be saved.' );
+		}
 
 		return [
 			'id'  => (int) $wpdb->insert_id,

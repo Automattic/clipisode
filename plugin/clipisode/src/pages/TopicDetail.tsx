@@ -52,7 +52,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const deleteOutput = ( outputId: number, name: string ) => {
 		if (
 			! window.confirm(
-				`Delete "${ name }"? The video will be permanently removed.`
+				`Delete "${ name }"? The clipisode and any rendered video will be permanently removed.`
 			)
 		) {
 			return;
@@ -743,6 +743,15 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 												).toLocaleDateString() }
 											</td>
 											<td className="clipisode-link-actions">
+												{ o.has_composition && (
+													<Button
+														variant="tertiary"
+														size="compact"
+														href={ `admin.php?page=clipisode#/compose/${ o.id }` }
+													>
+														Edit preview
+													</Button>
+												) }
 												{ o.preview_url && (
 													<a
 														className="components-button is-tertiary is-compact"

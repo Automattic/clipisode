@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback } from '@wordpress/element';
-import { Modal, Spinner } from '@wordpress/components';
+import { Button, Modal, Notice, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
-import type { MediaItem } from '../types';
+import type { MediaItem, Output } from '../types';
+
+type PreviewDraft = Pick<
+	Output,
+	'id' | 'name' | 'topic_id' | 'created_at' | 'clips_count' | 'has_composition'
+>;
 
 function formatBytes( bytes: number | null ): string {
 	if ( ! bytes ) {
@@ -18,7 +23,9 @@ function formatBytes( bytes: number | null ): string {
 
 export default function ClipisodeList() {
 	const [ items, setItems ] = useState< MediaItem[] >( [] );
+	const [ drafts, setDrafts ] = useState< PreviewDraft[] >( [] );
 	const [ loading, setLoading ] = useState( true );
+	const [ error, setError ] = useState< string | null >( null );
 	const [ previewItem, setPreviewItem ] = useState< {
 		name: string;
 		url: string;
@@ -26,10 +33,20 @@ export default function ClipisodeList() {
 
 	const fetchClipisodes = useCallback( () => {
 		setLoading( true );
-		apiFetch< MediaItem[] >( {
-			path: '/clipisode/v1/media?label=clipisode',
-		} )
-			.then( setItems )
+		setError( null );
+		Promise.all( [
+			apiFetch< MediaItem[] >( {
+				path: '/clipisode/v1/media?label=clipisode',
+			} ),
+			apiFetch< PreviewDraft[] >( { path: '/clipisode/v1/outputs' } ),
+		] )
+			.then( ( [ media, outputs ] ) => {
+				setItems( media );
+				setDrafts( outputs );
+			} )
+			.catch( () =>
+				setError( 'Unable to load clipisodes. Please try again.' )
+			)
 			.finally( () => setLoading( false ) );
 	}, [] );
 
@@ -45,6 +62,17 @@ export default function ClipisodeList() {
 		);
 	}
 
+	if ( error ) {
+		return (
+			<Notice status="error" isDismissible={ false }>
+				<p>{ error }</p>
+				<Button variant="secondary" onClick={ fetchClipisodes }>
+					Try again
+				</Button>
+			</Notice>
+		);
+	}
+
 	return (
 		<>
 			<div className="clipisode-page-header">
@@ -56,13 +84,72 @@ export default function ClipisodeList() {
 						alignSelf: 'center',
 					} }
 				>
-					{ items.length } clipisode{ items.length !== 1 ? 's' : '' }
+					{ drafts.length } saved preview
+					{ drafts.length !== 1 ? 's' : '' }
+					{ ' · ' }
+					{ items.length } rendered video
+					{ items.length !== 1 ? 's' : '' }
 				</span>
 			</div>
 
+			<h2>Saved previews</h2>
+			{ drafts.length === 0 ? (
+				<div className="clipisode-empty-section">
+					<p>
+						No saved previews yet. Create a clipisode from a topic or
+						the media library.
+					</p>
+				</div>
+			) : (
+				<table className="clipisode-table">
+					<thead>
+						<tr>
+							<th>Name</th>
+							<th>Topic</th>
+							<th>Clips</th>
+							<th>Created</th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody>
+						{ drafts.map( ( draft ) => (
+							<tr key={ draft.id }>
+								<td>{ draft.name }</td>
+								<td>
+									{ draft.topic_id ? (
+										<a
+											href={ `admin.php?page=clipisode#${ draft.topic_id }` }
+										>
+											Topic #{ draft.topic_id }
+										</a>
+									) : (
+										'—'
+									) }
+								</td>
+								<td>{ draft.clips_count }</td>
+								<td>
+									{ new Date(
+										draft.created_at
+									).toLocaleDateString() }
+								</td>
+								<td>
+									<Button
+										variant="link"
+										href={ `admin.php?page=clipisode#/compose/${ draft.id }` }
+									>
+										Edit preview
+									</Button>
+								</td>
+							</tr>
+						) ) }
+					</tbody>
+				</table>
+			) }
+
+			<h2>Rendered videos</h2>
 			{ items.length === 0 ? (
 				<div className="clipisode-empty">
-					<p>No clipisodes yet.</p>
+					<p>No rendered videos yet.</p>
 				</div>
 			) : (
 				<table className="clipisode-table">

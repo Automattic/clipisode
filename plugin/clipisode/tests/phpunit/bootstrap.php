@@ -12,4 +12,7 @@ define( 'CLIPISODE_PLUGIN_URL', 'https://example.com/wp-content/plugins/clipisod
 define( 'CLIPISODE_VERSION', '0.1.0' );
 
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-post-types.php';
+require_once CLIPISODE_PLUGIN_DIR . 'includes/class-media.php';
+require_once CLIPISODE_PLUGIN_DIR . 'includes/class-composition.php';
+require_once CLIPISODE_PLUGIN_DIR . 'includes/class-renderer.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-rest-api.php';
