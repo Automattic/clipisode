@@ -110,6 +110,7 @@ export default function CreateClipisode( {
 		useState< CompositionClip | null >( null );
 	const [ showAddMedia, setShowAddMedia ] = useState( false );
 	const [ confirmLeave, setConfirmLeave ] = useState( false );
+	const [ pendingHref, setPendingHref ] = useState< string | null >( null );
 	const [ loadRevision, setLoadRevision ] = useState( 0 );
 	const [ selectedClipId, setSelectedClipId ] = useState< string | null >(
 		null
@@ -118,6 +119,7 @@ export default function CreateClipisode( {
 		'theme' | 'clip' | 'export'
 	>( 'theme' );
 	const dragIndex = useRef< number | null >( null );
+	const allowUnload = useRef( false );
 	const mediaKey = mediaIds?.join( ',' ) || '';
 	const snapshot = JSON.stringify( { name, clips, settings } );
 	const latestSnapshot = useRef( snapshot );
@@ -255,11 +257,46 @@ export default function CreateClipisode( {
 			return;
 		}
 		const warn = ( event: BeforeUnloadEvent ) => {
+			if ( allowUnload.current ) {
+				return;
+			}
 			event.preventDefault();
 			event.returnValue = '';
 		};
 		window.addEventListener( 'beforeunload', warn );
 		return () => window.removeEventListener( 'beforeunload', warn );
+	}, [ dirty ] );
+
+	useEffect( () => {
+		if ( ! dirty ) {
+			return;
+		}
+		const handleSidebarClick = ( event: MouseEvent ) => {
+			if (
+				event.defaultPrevented ||
+				event.button !== 0 ||
+				event.metaKey ||
+				event.ctrlKey ||
+				event.shiftKey ||
+				event.altKey ||
+				! ( event.target instanceof Element )
+			) {
+				return;
+			}
+			const link =
+				event.target.closest< HTMLAnchorElement >(
+					'#adminmenu a[href]'
+				);
+			if ( ! link || link.target === '_blank' ) {
+				return;
+			}
+			event.preventDefault();
+			setPendingHref( link.href );
+			setConfirmLeave( true );
+		};
+		document.addEventListener( 'click', handleSidebarClick );
+		return () =>
+			document.removeEventListener( 'click', handleSidebarClick );
 	}, [ dirty ] );
 
 	const updateClip = ( id: string, patch: Partial< CompositionClip > ) =>
@@ -372,9 +409,9 @@ export default function CreateClipisode( {
 				null
 		);
 	};
-	const save = async () => {
+	const save = async (): Promise< boolean > => {
 		if ( validationErrors.length ) {
-			return;
+			return false;
 		}
 		setSaving( true );
 		setError( '' );
@@ -404,8 +441,10 @@ export default function CreateClipisode( {
 			}
 			// Keep the editor mounted while giving the saved preview a reloadable URL.
 			window.history.replaceState( null, '', `#/compose/${ result.id }` );
+			return true;
 		} catch ( caught ) {
 			setError( ( caught as Error ).message );
+			return false;
 		} finally {
 			setSaving( false );
 		}
@@ -417,6 +456,29 @@ export default function CreateClipisode( {
 			window.location.href = 'admin.php?page=clipisode-clipisodes';
 		}
 	};
+	const requestLeave = () => {
+		setPendingHref( null );
+		setConfirmLeave( true );
+	};
+	const cancelLeave = () => {
+		setConfirmLeave( false );
+		setPendingHref( null );
+	};
+	const leave = () => {
+		allowUnload.current = true;
+		if ( pendingHref ) {
+			window.location.assign( pendingHref );
+		} else {
+			goBack();
+		}
+	};
+	const cannotSave =
+		saving ||
+		rendering ||
+		adding ||
+		! name.trim() ||
+		! clips.some( ( clip ) => clip.included ) ||
+		validationErrors.length > 0;
 	if ( loading ) {
 		return (
 			<div className="clipisode-spinner-wrap">
@@ -447,9 +509,7 @@ export default function CreateClipisode( {
 			<header className="clipisode-studio-header">
 				<Button
 					variant="tertiary"
-					onClick={ () =>
-						dirty ? setConfirmLeave( true ) : goBack()
-					}
+					onClick={ dirty ? requestLeave : goBack }
 				>
 					← { currentTopicId ? 'Back to topic' : 'Clipisodes' }
 				</Button>
@@ -473,14 +533,7 @@ export default function CreateClipisode( {
 						variant="primary"
 						onClick={ save }
 						isBusy={ saving }
-						disabled={
-							saving ||
-							rendering ||
-							adding ||
-							! name.trim() ||
-							! clips.some( ( clip ) => clip.included ) ||
-							validationErrors.length > 0
-						}
+						disabled={ cannotSave }
 					>
 						{ saving ? 'Saving…' : 'Save preview' }
 					</Button>
@@ -892,17 +945,30 @@ export default function CreateClipisode( {
 			{ confirmLeave && (
 				<Modal
 					title="Unsaved preview changes"
-					onRequestClose={ () => setConfirmLeave( false ) }
+					onRequestClose={ cancelLeave }
 				>
-					<p>Leave without saving your preview changes?</p>
-					<Button
-						variant="secondary"
-						onClick={ () => setConfirmLeave( false ) }
-					>
+					<p>Save your preview changes before leaving?</p>
+					{ error && (
+						<Notice status="error" isDismissible={ false }>
+							{ error }
+						</Notice>
+					) }
+					<Button variant="secondary" onClick={ cancelLeave }>
 						Keep editing
 					</Button>
-					<Button variant="primary" isDestructive onClick={ goBack }>
+					<Button variant="secondary" isDestructive onClick={ leave }>
 						Leave without saving
+					</Button>
+					<Button
+						variant="primary"
+						disabled={ cannotSave }
+						onClick={ async () => {
+							if ( await save() ) {
+								leave();
+							}
+						} }
+					>
+						{ saving ? 'Saving…' : 'Save and leave' }
 					</Button>
 				</Modal>
 			) }

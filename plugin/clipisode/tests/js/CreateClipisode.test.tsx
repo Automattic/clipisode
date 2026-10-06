@@ -729,4 +729,56 @@ describe( 'Clipisode editor', () => {
 			screen.getByRole( 'button', { name: 'Save preview' } )
 		).toBeEnabled();
 	} );
+
+	it( 'asks how to handle unsaved changes before following a sidebar link', async () => {
+		mockEditorApi( async ( options ) =>
+			options.path === '/clipisode/v1/topics/7'
+				? ( { id: 7 } as never )
+				: ( savedOutput() as never )
+		);
+		const menu = document.createElement( 'nav' );
+		menu.id = 'adminmenu';
+		menu.innerHTML = '<a href="#sidebar-destination">Replies</a>';
+		document.body.appendChild( menu );
+		try {
+			render(
+				<CreateClipisode outputId={ 42 } navigate={ jest.fn() } />
+			);
+			await screen.findByDisplayValue( 'Community stories' );
+			fireEvent.change( screen.getByLabelText( 'Clipisode name' ), {
+				target: { value: 'My edited clipisode' },
+			} );
+			const link = screen.getByRole( 'link', { name: 'Replies' } );
+			expect( fireEvent.click( link ) ).toBe( false );
+			expect(
+				screen.getByRole( 'dialog', {
+					name: 'Unsaved preview changes',
+				} )
+			).toBeInTheDocument();
+			fireEvent.click(
+				screen.getByRole( 'button', { name: 'Keep editing' } )
+			);
+			expect(
+				screen.getByDisplayValue( 'My edited clipisode' )
+			).toBeInTheDocument();
+			expect( window.location.hash ).toBe( '#/compose/42' );
+			fireEvent.click( link );
+			fireEvent.click(
+				screen.getByRole( 'button', { name: 'Save and leave' } )
+			);
+			await waitFor( () =>
+				expect( window.location.hash ).toBe( '#sidebar-destination' )
+			);
+			expect( mockApi ).toHaveBeenCalledWith(
+				expect.objectContaining( {
+					method: 'PUT',
+					data: expect.objectContaining( {
+						name: 'My edited clipisode',
+					} ),
+				} )
+			);
+		} finally {
+			menu.remove();
+		}
+	} );
 } );
