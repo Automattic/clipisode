@@ -2,6 +2,7 @@ import { AbsoluteFill, Img, useCurrentFrame, useVideoConfig } from 'remotion';
 import { useState } from '@wordpress/element';
 import type { CSSProperties } from 'react';
 import { getThemeDefinition, themeDefinitions } from './theme-schema';
+import { BaseballCard, BaseballOverlay } from './BaseballTheme';
 import type { CompositionClip, CompositionSettings } from './types';
 
 export { createDefaultSettings } from './theme-schema';
@@ -21,7 +22,9 @@ interface BrandedSettings extends CompositionSettings {
 
 function rendererFor( settings: CompositionSettings ): string {
 	const renderer = getThemeDefinition( settings.themeId ).renderer;
-	if ( ! [ 'branded', 'editorial', 'plain' ].includes( renderer ) ) {
+	if (
+		! [ 'branded', 'editorial', 'baseball', 'plain' ].includes( renderer )
+	) {
 		throw new Error(
 			`No composition renderer is registered for ${ renderer }.`
 		);
@@ -98,6 +101,15 @@ export function ThemeCard( {
 	const renderer = rendererFor( inputSettings );
 	if ( renderer === 'plain' ) {
 		return null;
+	}
+	if ( renderer === 'baseball' ) {
+		return (
+			<BaseballCard
+				settings={ inputSettings }
+				kind={ kind }
+				hasBackground={ hasBackground }
+			/>
+		);
 	}
 	const settings = inputSettings as BrandedSettings;
 	const unit = Math.min( width, height );
@@ -260,6 +272,9 @@ export function ThemeOverlay( {
 	const renderer = rendererFor( inputSettings );
 	if ( renderer === 'plain' ) {
 		return null;
+	}
+	if ( renderer === 'baseball' ) {
+		return <BaseballOverlay settings={ inputSettings } clip={ clip } />;
 	}
 	const settings = inputSettings as BrandedSettings;
 	const unit = Math.min( width, height );

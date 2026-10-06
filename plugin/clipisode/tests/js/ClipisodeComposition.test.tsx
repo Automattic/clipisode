@@ -21,6 +21,7 @@ jest.mock( 'remotion', () => ( {
 	Loop: ( props ) => mockLoop( props ),
 	Html5Video: ( props ) => mockHtml5Video( props ),
 	OffthreadVideo: ( props ) => mockOffthreadVideo( props ),
+	Img: ( props ) => <img alt="" { ...props } />,
 	useRemotionEnvironment: () => mockEnvironment,
 	useCurrentFrame: () => 0,
 	useVideoConfig: () => ( { width: 1080, height: 1920, fps: 30 } ),
@@ -261,5 +262,23 @@ describe( 'composition media across render environments', () => {
 		expect(
 			screen.queryByText( /Favorite movie/ )
 		).not.toBeInTheDocument();
+	} );
+
+	it( 'shows the selected MLB team logo on its clip only', () => {
+		const composition = input();
+		composition.settings = {
+			...createDefaultSettings( 'baseball' ),
+			showTitle: false,
+			showEnding: false,
+		};
+		composition.clips[ 0 ].values = { teamPick: '119' };
+		render( <ClipisodeComposition { ...composition } /> );
+		const logo = screen.getByAltText( 'Los Angeles Dodgers logo' );
+		expect( logo ).toHaveAttribute(
+			'src',
+			expect.stringContaining( 'svg' )
+		);
+		expect( screen.getByText( 'TEAM PICK' ) ).toBeInTheDocument();
+		expect( screen.getByText( 'Los Angeles Dodgers' ) ).toBeInTheDocument();
 	} );
 } );

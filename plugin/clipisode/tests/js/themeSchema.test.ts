@@ -18,6 +18,7 @@ import type {
 	ThemeField,
 } from '../../src/remotion/types';
 import { buildTimeline } from '../../src/remotion/timeline';
+import { mlbTeamLogos } from '../../src/remotion/mlb-team-logos';
 
 const clip = (
 	id: string,
@@ -158,6 +159,29 @@ const settings = (
 } );
 
 describe( 'theme schemas', () => {
+	it( 'provides a logo-backed choice for every MLB team', () => {
+		const baseball = getThemeDefinition( 'baseball' );
+		const field = baseball.groups
+			.flatMap( ( group ) => group.fields )
+			.find( ( item ) => item.id === 'teamPick' );
+		expect( field?.options ).toHaveLength( 30 );
+		expect(
+			field?.options?.map( ( option ) => option.value ).sort()
+		).toEqual( Object.keys( mlbTeamLogos ).sort() );
+		const baseballSettings = createDefaultSettings( 'baseball' );
+		expect(
+			validateThemeValues( baseball, baseballSettings, [
+				clip( 'fan', { values: { teamPick: '119' } } ),
+			] )
+		).toEqual( [] );
+		expect(
+			validateThemeValues( baseball, baseballSettings, [
+				clip( 'fan', { values: { teamPick: 'unknown' } } ),
+			] )
+		).toContain(
+			'Speaker fan: MLB team must reference an available selection.'
+		);
+	} );
 	it( 'uses theme-defined spots to order clips and enforce fixed capacities', () => {
 		const fixed: ThemeDefinition = {
 			...theme,

@@ -45,6 +45,18 @@ class CompositionSchemaTest extends TestCase {
 		$this->assertContains( 'none', array_column( Clipisode_Composition::themes(), 'id' ) );
 	}
 
+	public function test_baseball_team_pick_is_persisted_and_restricted_to_catalog_teams(): void {
+		$theme = $this->theme( 'baseball' );
+		$composition = CompositionTest::composition();
+		$composition['settings'] = $this->settings( $theme );
+		$composition['clips'][0]['values'] = [ 'teamPick' => '119' ];
+		$clean = Clipisode_Composition::sanitize( $composition );
+		$this->assertIsArray( $clean );
+		$this->assertSame( '119', $clean['clips'][0]['values']->teamPick );
+		$composition['clips'][0]['values']['teamPick'] = 'unknown';
+		$this->assertInstanceOf( WP_Error::class, Clipisode_Composition::sanitize( $composition ) );
+	}
+
 	public function test_theme_defined_sequence_spots_persist_and_enforce_capacity(): void {
 		$theme = $this->theme();
 		$theme['timeline']['mediaSlots'] = [

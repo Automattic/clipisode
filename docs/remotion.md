@@ -31,6 +31,7 @@ The preview loads source media through `Clipisode_Media` URLs and plays their or
 | `src/remotion/timeline.ts` | Frame calculation, clip trimming, card placement, and canvas sizes |
 | `src/remotion/ClipisodeComposition.tsx` | Remotion sequences, media playback, and theme layers |
 | `src/remotion/themes.tsx` | Theme rendering, title/ending cards, and video overlays |
+| `src/remotion/BaseballTheme.tsx` and `assets/mlb-team-logos/` | Baseball cards, per-clip team overlay, and bundled SVG logos |
 | `includes/class-composition.php` | Saved-input validation and resolution of current media URLs |
 | `includes/class-rest-api.php` | Composition output endpoints |
 | `includes/class-database.php` | Output composition storage |
@@ -52,6 +53,7 @@ The initial presets are:
 
 - **Clipisode** (`default`): colored shapes and bold name cards.
 - **Editorial** (`wpvip`): fine rules and serif typography, plus reply-specific details such as a favorite movie.
+- **Baseball** (`baseball`): ballpark-style cards and an optional MLB team pick on each clip. The selected team's bundled SVG logo appears while that clip plays.
 - **No theme** (`none`): source video and audio, without title/ending cards, logo, or name overlays.
 
 `settings` is a flat object containing `themeId`, `format`, and the selected theme's composition-scoped field values. Themes do not share a compulsory set of colors, text, or branding controls. **No theme** exposes no color fields. The other presets declare their own groups and defaults. Changing themes retains compatible values with matching field IDs and removes values that the new theme does not declare.

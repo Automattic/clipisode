@@ -537,6 +537,306 @@
 			]
 		},
 		{
+			"id": "baseball",
+			"label": "Baseball",
+			"description": "Ballpark-inspired cards and a team pick with its MLB logo on each clip.",
+			"renderer": "baseball",
+			"canvas": {
+				"backgroundField": "backgroundColor"
+			},
+			"timeline": {
+				"title": {
+					"label": "Opening card",
+					"enabledField": "showTitle",
+					"durationField": "titleDuration"
+				},
+				"ending": {
+					"label": "Ending card",
+					"enabledField": "showEnding",
+					"durationField": "endingDuration"
+				},
+				"mediaSlots": [
+					{
+						"id": "main",
+						"label": "Story clips",
+						"mode": "sequence"
+					}
+				]
+			},
+			"tags": [],
+			"groups": [
+				{
+					"id": "appearance",
+					"label": "Ballpark style",
+					"scope": "composition",
+					"fields": [
+						{
+							"id": "videoFit",
+							"label": "Video fit",
+							"type": "select",
+							"default": "cover",
+							"options": [
+								{
+									"value": "cover",
+									"label": "Fill frame (crop)"
+								},
+								{
+									"value": "contain",
+									"label": "Fit entire video"
+								}
+							]
+						},
+						{
+							"id": "backgroundColor",
+							"label": "Background",
+							"type": "color",
+							"default": "#071c32"
+						},
+						{
+							"id": "accentColor",
+							"label": "Accent",
+							"type": "color",
+							"default": "#d84035"
+						},
+						{
+							"id": "textColor",
+							"label": "Text",
+							"type": "color",
+							"default": "#ffffff"
+						},
+						{
+							"id": "showNames",
+							"label": "Show speaker names",
+							"type": "toggle",
+							"default": true
+						}
+					]
+				},
+				{
+					"id": "title",
+					"label": "Opening card",
+					"scope": "composition",
+					"card": "title",
+					"fields": [
+						{
+							"id": "showTitle",
+							"label": "Show opening card",
+							"type": "toggle",
+							"default": true
+						},
+						{
+							"id": "title",
+							"label": "Title",
+							"type": "text",
+							"default": "Who takes the pennant?",
+							"when": {
+								"field": "showTitle",
+								"equals": true
+							}
+						},
+						{
+							"id": "subtitle",
+							"label": "Subtitle",
+							"type": "textarea",
+							"default": "",
+							"when": {
+								"field": "showTitle",
+								"equals": true
+							}
+						},
+						{
+							"id": "titleDuration",
+							"label": "Opening card duration (seconds)",
+							"type": "range",
+							"default": 3,
+							"min": 0.5,
+							"max": 10,
+							"step": 0.5,
+							"when": {
+								"field": "showTitle",
+								"equals": true
+							}
+						}
+					]
+				},
+				{
+					"id": "ending",
+					"label": "Ending card",
+					"scope": "composition",
+					"card": "ending",
+					"fields": [
+						{
+							"id": "showEnding",
+							"label": "Show ending card",
+							"type": "toggle",
+							"default": true
+						},
+						{
+							"id": "endingText",
+							"label": "Ending text",
+							"type": "textarea",
+							"default": "See you at the ballpark",
+							"when": {
+								"field": "showEnding",
+								"equals": true
+							}
+						},
+						{
+							"id": "endingDuration",
+							"label": "Ending card duration (seconds)",
+							"type": "range",
+							"default": 3,
+							"min": 0.5,
+							"max": 10,
+							"step": 0.5,
+							"when": {
+								"field": "showEnding",
+								"equals": true
+							}
+						}
+					]
+				},
+				{
+					"id": "team-pick",
+					"label": "Team pick",
+					"scope": "clip",
+					"description": "Choose a favorite team or the team picked in this answer. Its logo appears during this clip.",
+					"fields": [
+						{
+							"id": "teamPick",
+							"label": "MLB team",
+							"type": "select",
+							"default": null,
+							"optional": true,
+							"options": [
+								{
+									"value": "109",
+									"label": "Arizona Diamondbacks"
+								},
+								{
+									"value": "133",
+									"label": "Athletics"
+								},
+								{
+									"value": "144",
+									"label": "Atlanta Braves"
+								},
+								{
+									"value": "110",
+									"label": "Baltimore Orioles"
+								},
+								{
+									"value": "111",
+									"label": "Boston Red Sox"
+								},
+								{
+									"value": "112",
+									"label": "Chicago Cubs"
+								},
+								{
+									"value": "145",
+									"label": "Chicago White Sox"
+								},
+								{
+									"value": "113",
+									"label": "Cincinnati Reds"
+								},
+								{
+									"value": "114",
+									"label": "Cleveland Guardians"
+								},
+								{
+									"value": "115",
+									"label": "Colorado Rockies"
+								},
+								{
+									"value": "116",
+									"label": "Detroit Tigers"
+								},
+								{
+									"value": "117",
+									"label": "Houston Astros"
+								},
+								{
+									"value": "118",
+									"label": "Kansas City Royals"
+								},
+								{
+									"value": "108",
+									"label": "Los Angeles Angels"
+								},
+								{
+									"value": "119",
+									"label": "Los Angeles Dodgers"
+								},
+								{
+									"value": "146",
+									"label": "Miami Marlins"
+								},
+								{
+									"value": "158",
+									"label": "Milwaukee Brewers"
+								},
+								{
+									"value": "142",
+									"label": "Minnesota Twins"
+								},
+								{
+									"value": "121",
+									"label": "New York Mets"
+								},
+								{
+									"value": "147",
+									"label": "New York Yankees"
+								},
+								{
+									"value": "143",
+									"label": "Philadelphia Phillies"
+								},
+								{
+									"value": "134",
+									"label": "Pittsburgh Pirates"
+								},
+								{
+									"value": "135",
+									"label": "San Diego Padres"
+								},
+								{
+									"value": "137",
+									"label": "San Francisco Giants"
+								},
+								{
+									"value": "136",
+									"label": "Seattle Mariners"
+								},
+								{
+									"value": "138",
+									"label": "St. Louis Cardinals"
+								},
+								{
+									"value": "139",
+									"label": "Tampa Bay Rays"
+								},
+								{
+									"value": "140",
+									"label": "Texas Rangers"
+								},
+								{
+									"value": "141",
+									"label": "Toronto Blue Jays"
+								},
+								{
+									"value": "120",
+									"label": "Washington Nationals"
+								}
+							],
+							"help": "The selected team logo appears while this clip plays."
+						}
+					]
+				}
+			]
+		},
+		{
 			"id": "none",
 			"label": "No theme",
 			"description": "Just the source video and original audio. No colors, cards, or branding controls.",
