@@ -25,6 +25,8 @@ import {
 	getThemeDefinition,
 	getMediaSlot,
 	clipsInSlot,
+	canMoveClipToSlot,
+	moveClipToSlot,
 	getVisibleGroups,
 	themeDefinitions,
 	validateThemeValues,
@@ -161,10 +163,11 @@ export default function CreateClipisode( {
 					}
 					setName( output.name );
 					setTopic( loadedTopic );
-					setClips( output.composition.clips );
-					setSelectedClipId(
-						output.composition.clips[ 0 ]?.id ?? null
+					const loadedClips = output.composition.clips.filter(
+						( clip ) => clip.included
 					);
+					setClips( loadedClips );
+					setSelectedClipId( loadedClips[ 0 ]?.id ?? null );
 					setSettings( output.composition.settings );
 					setSavedId( output.id );
 					setCurrentTopicId( output.topic_id );
@@ -316,13 +319,41 @@ export default function CreateClipisode( {
 				clip.id === id ? { ...clip, ...patch } : clip
 			)
 		);
-	const moveClip = ( from: number, to: number ) =>
-		setClips( ( previous ) => {
-			const next = [ ...previous ];
-			const [ item ] = next.splice( from, 1 );
-			next.splice( to, 0, item );
-			return next;
-		} );
+	const moveClip = (
+		clipId: string,
+		slotId: string,
+		targetClipId?: string,
+		after = false
+	) => {
+		const currentSettings = latestSettings.current;
+		const currentTheme = getThemeDefinition( currentSettings.themeId );
+		const next = moveClipToSlot(
+			currentTheme,
+			clips,
+			clipId,
+			slotId,
+			targetClipId,
+			after
+		);
+		if ( next === clips ) {
+			return;
+		}
+		setClips( next );
+		const backgroundField = currentTheme.timeline.backgroundField;
+		const backgroundClipId = backgroundField
+			? currentSettings[ backgroundField ]
+			: null;
+		if (
+			backgroundField &&
+			typeof backgroundClipId === 'string' &&
+			getMediaSlot(
+				currentTheme,
+				next.find( ( clip ) => clip.id === backgroundClipId )!
+			)?.mode !== 'background'
+		) {
+			setSettings( { ...currentSettings, [ backgroundField ]: null } );
+		}
+	};
 	const addMedia = async ( media: MediaItem[], slotId: string ) => {
 		setAddingToSlot( null );
 		setAdding( true );
@@ -386,10 +417,12 @@ export default function CreateClipisode( {
 	);
 	const moveSelectedInSlot = ( direction: number ) => {
 		const neighbor = selectedSlotClips[ selectedSlotIndex + direction ];
-		if ( neighbor ) {
+		if ( neighbor && selectedSlot ) {
 			moveClip(
-				selectedIndex,
-				clips.findIndex( ( clip ) => clip.id === neighbor.id )
+				selectedClip.id,
+				selectedSlot.id,
+				neighbor.id,
+				direction > 0
 			);
 		}
 	};
@@ -435,21 +468,7 @@ export default function CreateClipisode( {
 		} );
 	};
 	const moveToSlot = ( clip: CompositionClip, slotId: string ) => {
-		const slot = theme.timeline.mediaSlots.find(
-			( item ) => item.id === slotId
-		)!;
-		const slotTags = theme.timeline.mediaSlots
-			.map( ( item ) => item.tag )
-			.filter( Boolean );
-		updateClip( clip.id, {
-			slotId,
-			tags: [
-				...( clip.tags || [] ).filter(
-					( tag ) => ! slotTags.includes( tag )
-				),
-				...( slot.tag ? [ slot.tag ] : [] ),
-			],
-		} );
+		moveClip( clip.id, slotId );
 	};
 	const duplicateClip = () => {
 		if ( ! selectedClip ) {
@@ -552,7 +571,7 @@ export default function CreateClipisode( {
 		rendering ||
 		adding ||
 		! name.trim() ||
-		! clips.some( ( clip ) => clip.included ) ||
+		clips.length === 0 ||
 		validationErrors.length > 0;
 	if ( loading ) {
 		return (
@@ -626,10 +645,7 @@ export default function CreateClipisode( {
 				>
 					<div className="clipisode-studio-preview-heading">
 						<span>PREVIEW</span>
-						<span>
-							{ clips.filter( ( clip ) => clip.included ).length }{ ' ' }
-							clips included
-						</span>
+						<span>{ clips.length } clips</span>
 					</div>
 					<CompositionPreview
 						clips={ clips }
@@ -644,7 +660,6 @@ export default function CreateClipisode( {
 						adding={ adding }
 						onAddMedia={ setAddingToSlot }
 						onSelectClip={ selectClip }
-						onUpdateClip={ updateClip }
 						onRemoveClip={ removeClip }
 						onMoveClip={ moveClip }
 						onChangeSettings={ setSettings }
@@ -756,22 +771,13 @@ export default function CreateClipisode( {
 										label="Sequence spot"
 										value={ selectedSlot?.id || '' }
 										options={ theme.timeline.mediaSlots
-											.filter(
-												( slot ) =>
-													( ! slot.roles ||
-														slot.roles.includes(
-															selectedClip.role
-														) ) &&
-													( slot.id ===
-														selectedSlot?.id ||
-														slot.maxClips ===
-															undefined ||
-														clipsInSlot(
-															theme,
-															clips,
-															slot.id
-														).length <
-															slot.maxClips )
+											.filter( ( slot ) =>
+												canMoveClipToSlot(
+													theme,
+													clips,
+													selectedClip.id,
+													slot.id
+												)
 											)
 											.map( ( slot ) => ( {
 												value: slot.id,

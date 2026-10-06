@@ -5,7 +5,7 @@ The wp-admin composer uses `@remotion/player` to play a React composition direct
 ## Preview workflow
 
 1. Select approved replies on a topic and choose **Create Clipisode**, or select videos in the media library and create a clipisode from them.
-2. Arrange clips in the sequence below the preview. Add or remove media in the insertion areas supplied by the theme, and adjust trims, names, and inclusion from the sequence and clip inspector.
+2. Arrange clips in the sequence below the preview. Drag clips within or between theme-allowed insertion areas, add media, or remove unwanted clips from their tiles. Adjust trims and names in the clip inspector.
 3. Choose a theme and customize the fields it exposes. Select title or ending cards in the sequence to configure them. Other theme controls and per-clip controls are grouped in the inspector. The player previews the current settings.
 4. Save the preview. Reopen it using **Edit preview** in the Clipisodes list or the topic's Clipisodes section.
 5. Choose **Render in browser**, keep the tab open through rendering and upload, then choose **Download MP4**. A configured renderer also provides **Render with service**.
@@ -43,7 +43,7 @@ The preview loads source media through `Clipisode_Media` URLs and plays their or
 
 `ClipisodeCompositionProps` contains `clips` and `settings`. Each clip has a unique instance `id`, a WordPress `mediaId`, a `role` (`intro` or `reply`), a display `name`, its source `duration`, `trimStart`, `trimEnd`, and an `included` flag. A clip can also have a theme-defined `slotId`, `tags`, and a `values` object for its clip-scoped fields. Source times and card durations are measured in seconds. The API supplies the current source `url` when loading a saved composition; source URLs are not persisted in the composition JSON.
 
-The theme's sequence slots determine playback order; clips within each slot retain their array order. Duplicated source videos have separate clip instance IDs and can have different trims and names. Excluded clips remain saved so they can be included again later.
+The theme's sequence slots determine playback order; clips within each slot retain their array order. Duplicated source videos have separate clip instance IDs and can have different trims and names. The editor removes an unwanted clip rather than keeping it excluded; older saved compositions with excluded clips omit them when reopened for editing.
 
 The timeline runs at 30 frames per second. Trim start and end are rounded to integer source-frame boundaries, with the end boundary exclusive. The selected range must produce at least one frame. Sequence slots play in theme order between any enabled title and ending cards. Background slots are omitted from the main sequence. The selected background clip loops without audio behind cards. Animations use the current sequence frame, so seeking and replaying show the same composition state.
 

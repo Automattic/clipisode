@@ -1,9 +1,13 @@
 import { useRef, useState } from '@wordpress/element';
-import { Button, CheckboxControl } from '@wordpress/components';
+import { Button } from '@wordpress/components';
 import { trash } from '@wordpress/icons';
 import ThemeFields from './ThemeFields';
 import { buildTimeline } from '../remotion/timeline';
-import { clipsInSlot, getVisibleGroups } from '../remotion/theme-schema';
+import {
+	canMoveClipToSlot,
+	clipsInSlot,
+	getVisibleGroups,
+} from '../remotion/theme-schema';
 import type {
 	CompositionClip,
 	CompositionSettings,
@@ -20,9 +24,13 @@ interface Props {
 	adding: boolean;
 	onAddMedia: ( slotId: string ) => void;
 	onSelectClip: ( id: string ) => void;
-	onUpdateClip: ( id: string, patch: Partial< CompositionClip > ) => void;
 	onRemoveClip: ( id: string ) => void;
-	onMoveClip: ( from: number, to: number ) => void;
+	onMoveClip: (
+		clipId: string,
+		slotId: string,
+		targetClipId?: string,
+		after?: boolean
+	) => void;
 	onChangeSettings: ( settings: CompositionSettings ) => void;
 	onPreviewFrame: ( frame: number ) => void;
 }
@@ -39,7 +47,6 @@ export default function CompositionSequence( {
 	adding,
 	onAddMedia,
 	onSelectClip,
-	onUpdateClip,
 	onRemoveClip,
 	onMoveClip,
 	onChangeSettings,
@@ -49,6 +56,19 @@ export default function CompositionSequence( {
 		'title' | 'ending' | null
 	>( null );
 	const draggedClip = useRef< string | null >( null );
+	const [ draggingClipId, setDraggingClipId ] = useState< string | null >(
+		null
+	);
+	const [ dropTarget, setDropTarget ] = useState< {
+		slotId: string;
+		clipId?: string;
+		after?: boolean;
+	} | null >( null );
+	const clearDrag = () => {
+		draggedClip.current = null;
+		setDraggingClipId( null );
+		setDropTarget( null );
+	};
 	let segments: TimelineSegment[];
 	try {
 		segments = buildTimeline( clips, settings ).segments;
@@ -106,9 +126,38 @@ export default function CompositionSequence( {
 				: definition.maxClips - assigned.length;
 		return (
 			<section
-				className="clipisode-sequence-slot"
+				className={ `clipisode-sequence-slot ${
+					dropTarget?.slotId === definition.id && ! dropTarget.clipId
+						? 'is-drop-end'
+						: ''
+				}` }
 				key={ definition.id }
 				aria-label={ definition.label }
+				onDragOver={ ( event ) => {
+					if (
+						! draggedClip.current ||
+						! canMoveClipToSlot(
+							theme,
+							clips,
+							draggedClip.current,
+							definition.id
+						)
+					) {
+						return;
+					}
+					event.preventDefault();
+					event.dataTransfer.dropEffect = 'move';
+					setDropTarget( {
+						slotId: definition.id,
+					} );
+				} }
+				onDrop={ ( event ) => {
+					event.preventDefault();
+					if ( draggedClip.current ) {
+						onMoveClip( draggedClip.current, definition.id );
+					}
+					clearDrag();
+				} }
 			>
 				<div className="clipisode-sequence-slot-heading">
 					<strong>{ definition.label }</strong>
@@ -124,39 +173,74 @@ export default function CompositionSequence( {
 						const index = clips.findIndex(
 							( item ) => item.id === clip.id
 						);
+						let dropClass = '';
+						if (
+							dropTarget?.clipId === clip.id &&
+							dropTarget.slotId === definition.id
+						) {
+							dropClass = dropTarget.after
+								? 'is-drop-after'
+								: 'is-drop-before';
+						}
 						return (
 							<div
 								className={ `clipisode-sequence-clip ${
-									clip.included ? '' : 'is-excluded'
-								}` }
+									draggingClipId === clip.id
+										? 'is-dragging'
+										: ''
+								} ${ dropClass }` }
 								key={ clip.id }
 								draggable
-								onDragStart={ () => {
+								onDragStart={ ( event ) => {
 									draggedClip.current = clip.id;
-								} }
-								onDragOver={ ( event ) =>
-									event.preventDefault()
-								}
-								onDrop={ ( event ) => {
-									event.preventDefault();
-									const source = clips.findIndex(
-										( item ) =>
-											item.id === draggedClip.current
+									setDraggingClipId( clip.id );
+									event.dataTransfer.effectAllowed = 'move';
+									event.dataTransfer.setData(
+										'text/plain',
+										clip.id
 									);
+								} }
+								onDragOver={ ( event ) => {
+									event.stopPropagation();
 									if (
-										source >= 0 &&
-										assigned.some(
-											( item ) =>
-												item.id === draggedClip.current
+										! draggedClip.current ||
+										draggedClip.current === clip.id ||
+										! canMoveClipToSlot(
+											theme,
+											clips,
+											draggedClip.current,
+											definition.id,
+											clip.id
 										)
 									) {
-										onMoveClip( source, index );
+										return;
 									}
-									draggedClip.current = null;
+									event.preventDefault();
+									event.dataTransfer.dropEffect = 'move';
+									const bounds =
+										event.currentTarget.getBoundingClientRect();
+									setDropTarget( {
+										slotId: definition.id,
+										clipId: clip.id,
+										after:
+											event.clientX >=
+											bounds.left + bounds.width / 2,
+									} );
 								} }
-								onDragEnd={ () => {
-									draggedClip.current = null;
+								onDrop={ ( event ) => {
+									event.stopPropagation();
+									event.preventDefault();
+									if ( draggedClip.current ) {
+										onMoveClip(
+											draggedClip.current,
+											definition.id,
+											clip.id,
+											dropTarget?.after
+										);
+									}
+									clearDrag();
 								} }
+								onDragEnd={ clearDrag }
 							>
 								<button
 									type="button"
@@ -192,15 +276,6 @@ export default function CompositionSequence( {
 									</span>
 								</button>
 								<div className="clipisode-sequence-clip-actions">
-									<CheckboxControl
-										label={ `Include clip ${ index + 1 }` }
-										checked={ clip.included }
-										onChange={ ( included ) =>
-											onUpdateClip( clip.id, {
-												included,
-											} )
-										}
-									/>
 									<Button
 										icon={ trash }
 										label={ `Remove clip ${ index + 1 }: ${

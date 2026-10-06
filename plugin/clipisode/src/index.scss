@@ -1030,15 +1030,44 @@
 	.clipisode-sequence-slot-items {
 		align-items: flex-start;
 	}
+
+	.clipisode-sequence-slot.is-drop-end .clipisode-sequence-slot-items {
+		box-shadow: inset -4px 0 #3858e9;
+	}
 	.clipisode-sequence-clip {
 		flex: 0 0 112px;
 		width: 112px;
-		&.is-excluded .clipisode-sequence-clip-select {
-			opacity: 0.55;
+		position: relative;
+		cursor: grab;
+
+		&.is-dragging {
+			opacity: 0.5;
+			cursor: grabbing;
+		}
+
+		&.is-drop-before::before,
+		&.is-drop-after::after {
+			content: "";
+			position: absolute;
+			top: 0;
+			bottom: 0;
+			width: 4px;
+			border-radius: 2px;
+			background: #3858e9;
+			z-index: 3;
+		}
+
+		&.is-drop-before::before {
+			left: -7px;
+		}
+
+		&.is-drop-after::after {
+			right: -7px;
 		}
 	}
 	.clipisode-sequence-clip-select {
 		position: relative;
+		cursor: grab;
 		display: flex;
 		flex-direction: column;
 		justify-content: flex-end;
@@ -1078,18 +1107,34 @@
 		}
 	}
 	.clipisode-sequence-clip-actions {
-		justify-content: space-between;
-		margin-top: 4px;
-		.components-base-control,
-		.components-base-control__field {
-			margin: 0;
+		position: absolute;
+		top: 6px;
+		right: 6px;
+		z-index: 2;
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 120ms ease;
+
+		.components-button {
+			min-width: 28px;
+			height: 28px;
+			padding: 4px;
+			border-radius: 5px;
+			background: #fff;
+			box-shadow: 0 1px 5px #0004;
 		}
-		.components-checkbox-control__label {
-			position: absolute;
-			width: 1px;
-			height: 1px;
-			overflow: hidden;
-			clip-path: inset(50%);
+	}
+
+	.clipisode-sequence-clip:hover .clipisode-sequence-clip-actions,
+	.clipisode-sequence-clip:focus-within .clipisode-sequence-clip-actions {
+		opacity: 1;
+		pointer-events: auto;
+	}
+
+	@media (hover: none) {
+		.clipisode-sequence-clip-actions {
+			opacity: 1;
+			pointer-events: auto;
 		}
 	}
 	.clipisode-sequence-add {

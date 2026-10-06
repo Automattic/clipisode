@@ -6,9 +6,11 @@ import {
 	getFieldOptions,
 	getFieldValue,
 	clipsInSlot,
+	canMoveClipToSlot,
 	getThemeDefinition,
 	getVisibleGroups,
 	themeDefinitions,
+	moveClipToSlot,
 	validateThemeValues,
 } from '../../src/remotion/theme-schema';
 import type {
@@ -159,6 +161,132 @@ const settings = (
 } );
 
 describe( 'theme schemas', () => {
+	it( 'reorders clips within theme slots and rejects disallowed drops', () => {
+		const fixed: ThemeDefinition = {
+			...theme,
+			timeline: {
+				mediaSlots: [
+					{
+						id: 'replies',
+						label: 'Replies',
+						mode: 'sequence',
+						roles: [ 'reply' ],
+					},
+					{
+						id: 'intro',
+						label: 'Intro',
+						mode: 'sequence',
+						roles: [ 'intro' ],
+						maxClips: 1,
+					},
+				],
+			},
+		};
+		const initial = [
+			clip( 'a', { slotId: 'replies' } ),
+			clip( 'b', { slotId: 'replies' } ),
+			clip( 'intro', { role: 'intro', slotId: 'intro' } ),
+		];
+		expect(
+			moveClipToSlot( fixed, initial, 'a', 'replies', 'b', true ).map(
+				( item ) => item.id
+			)
+		).toEqual( [ 'b', 'a', 'intro' ] );
+		expect( canMoveClipToSlot( fixed, initial, 'a', 'intro' ) ).toBe(
+			false
+		);
+		expect( moveClipToSlot( fixed, initial, 'a', 'intro' ) ).toBe(
+			initial
+		);
+		const open = {
+			...fixed,
+			timeline: {
+				mediaSlots: [
+					fixed.timeline.mediaSlots[ 0 ],
+					{ ...fixed.timeline.mediaSlots[ 1 ], maxClips: 2 },
+				],
+			},
+		};
+		expect( canMoveClipToSlot( open, initial, 'a', 'intro' ) ).toBe(
+			false
+		);
+		const allowed = {
+			...open,
+			timeline: {
+				mediaSlots: [
+					open.timeline.mediaSlots[ 0 ],
+					{ ...open.timeline.mediaSlots[ 1 ], roles: undefined },
+				],
+			},
+		};
+		const moved = moveClipToSlot( allowed, initial, 'a', 'intro' );
+		expect(
+			clipsInSlot( allowed, moved, 'intro' ).map( ( item ) => item.id )
+		).toEqual( [ 'intro', 'a' ] );
+		expect( moved.find( ( item ) => item.id === 'a' )?.slotId ).toBe(
+			'intro'
+		);
+		const required = {
+			...allowed,
+			timeline: {
+				mediaSlots: [
+					{ ...allowed.timeline.mediaSlots[ 0 ], minClips: 2 },
+					allowed.timeline.mediaSlots[ 1 ],
+				],
+			},
+		};
+		expect( canMoveClipToSlot( required, initial, 'a', 'intro' ) ).toBe(
+			false
+		);
+		const branded = getThemeDefinition( 'default' );
+		const retagged = moveClipToSlot(
+			branded,
+			[ clip( 'a', { slotId: 'background', tags: [ 'background' ] } ) ],
+			'a',
+			'end'
+		);
+		expect( retagged[ 0 ] ).toMatchObject( {
+			slotId: 'end',
+			tags: [ 'end' ],
+		} );
+		const twoSpots: ThemeDefinition = {
+			...theme,
+			timeline: {
+				mediaSlots: [
+					{
+						id: 'first',
+						label: 'First',
+						mode: 'sequence',
+						maxClips: 1,
+					},
+					{
+						id: 'second',
+						label: 'Second',
+						mode: 'sequence',
+						maxClips: 1,
+					},
+				],
+			},
+		};
+		const filled = [
+			clip( 'first', { slotId: 'first' } ),
+			clip( 'second', { slotId: 'second' } ),
+		];
+		expect( canMoveClipToSlot( twoSpots, filled, 'first', 'second' ) ).toBe(
+			false
+		);
+		expect(
+			canMoveClipToSlot( twoSpots, filled, 'first', 'second', 'second' )
+		).toBe( true );
+		expect(
+			moveClipToSlot( twoSpots, filled, 'first', 'second', 'second' ).map(
+				( item ) => [ item.id, item.slotId ]
+			)
+		).toEqual( [
+			[ 'second', 'first' ],
+			[ 'first', 'second' ],
+		] );
+	} );
 	it( 'provides a logo-backed choice for every MLB team', () => {
 		const baseball = getThemeDefinition( 'baseball' );
 		const field = baseball.groups

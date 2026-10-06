@@ -102,6 +102,61 @@ describe( 'Clipisode editor', () => {
 		window.history.replaceState( null, '', '#/compose/42' );
 	} );
 
+	it( 'drags a clip to another theme-allowed sequence slot', async () => {
+		mockEditorApi( async ( options ) =>
+			options.path === '/clipisode/v1/topics/7'
+				? ( { id: 7, intro_media_id: 1, hosted_by: 'Host' } as never )
+				: ( savedOutput() as never )
+		);
+		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
+		const source = (
+			await screen.findByRole( 'button', {
+				name: 'Select clip 2: Guest',
+			} )
+		).closest( '.clipisode-sequence-clip' )!;
+		const destination = screen.getByRole( 'region', {
+			name: 'End clips',
+		} );
+		const dataTransfer = {
+			effectAllowed: '',
+			dropEffect: '',
+			setData: jest.fn(),
+		};
+		fireEvent.dragStart( source, { dataTransfer } );
+		fireEvent.dragOver( destination, { dataTransfer } );
+		fireEvent.drop( destination, { dataTransfer } );
+		const preview =
+			mockPlayer.mock.calls[ mockPlayer.mock.calls.length - 1 ][ 0 ];
+		expect( preview.inputProps.clips[ 1 ] ).toMatchObject( {
+			id: 'reply',
+			slotId: 'end',
+			tags: [ 'end' ],
+		} );
+		expect( destination ).toHaveTextContent( 'Guest' );
+		expect( dataTransfer.setData ).toHaveBeenCalledWith(
+			'text/plain',
+			'reply'
+		);
+	} );
+
+	it( 'removes previously excluded clips when reopening a preview', async () => {
+		const saved = savedOutput();
+		saved.composition.clips[ 1 ].included = false;
+		mockEditorApi( async ( options ) =>
+			options.path === '/clipisode/v1/topics/7'
+				? ( { id: 7, intro_media_id: 1, hosted_by: 'Host' } as never )
+				: ( saved as never )
+		);
+		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
+		await screen.findByRole( 'button', {
+			name: 'Select clip 1: Host',
+		} );
+		expect(
+			screen.queryByRole( 'button', { name: 'Select clip 2: Guest' } )
+		).not.toBeInTheDocument();
+		expect( screen.getByText( 'Unsaved changes' ) ).toBeInTheDocument();
+	} );
+
 	it( 'restores a saved composition, previews edits, saves them, and reopens the same customized result without a transcoder', async () => {
 		let stored = savedOutput();
 		mockEditorApi( async ( options ) => {
@@ -153,7 +208,9 @@ describe( 'Clipisode editor', () => {
 		fireEvent.click(
 			screen.getByRole( 'button', { name: 'Move earlier' } )
 		);
-		fireEvent.click( screen.getByLabelText( 'Include clip 2' ) );
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Remove clip 2: Host' } )
+		);
 		expect( screen.getByText( 'Unsaved changes' ) ).toBeInTheDocument();
 		const preview =
 			mockPlayer.mock.calls[ mockPlayer.mock.calls.length - 1 ][ 0 ];
@@ -166,7 +223,6 @@ describe( 'Clipisode editor', () => {
 		} );
 		expect( preview.inputProps.clips ).toMatchObject( [
 			{ id: 'reply', name: 'Avery', trimEnd: 6, included: true },
-			{ id: 'intro', included: false },
 		] );
 		fireEvent.click(
 			screen.getByRole( 'button', { name: 'Save preview' } )
@@ -200,7 +256,9 @@ describe( 'Clipisode editor', () => {
 		expect( screen.getByLabelText( 'Speaker for clip 1' ) ).toHaveValue(
 			'Avery'
 		);
-		expect( screen.getByLabelText( 'Include clip 2' ) ).not.toBeChecked();
+		expect(
+			screen.queryByLabelText( 'Include clip 1' )
+		).not.toBeInTheDocument();
 		expect( getVideoDuration ).not.toHaveBeenCalled();
 		websocket.mockRestore();
 	} );
@@ -383,7 +441,7 @@ describe( 'Clipisode editor', () => {
 		expect( mockPlayer ).not.toHaveBeenCalled();
 	} );
 
-	it( 'disables saving when no clip is included', async () => {
+	it( 'disables saving when every clip is removed', async () => {
 		mockEditorApi( async ( options ) =>
 			options.path === '/clipisode/v1/topics/7'
 				? ( { id: 7, intro_media_id: 1, hosted_by: 'Host' } as never )
@@ -392,8 +450,12 @@ describe( 'Clipisode editor', () => {
 		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
 		await openTitleCard();
 		await screen.findByDisplayValue( 'The original title' );
-		fireEvent.click( screen.getByLabelText( 'Include clip 1' ) );
-		fireEvent.click( screen.getByLabelText( 'Include clip 2' ) );
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Remove clip 1: Host' } )
+		);
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Remove clip 1: Guest' } )
+		);
 		expect(
 			screen.getByRole( 'button', { name: 'Save preview' } )
 		).toBeDisabled();

@@ -78,6 +78,195 @@ export function clipsInSlot(
 	);
 }
 
+export function canMoveClipToSlot(
+	theme: ThemeDefinition,
+	clips: CompositionClip[],
+	clipId: string,
+	slotId: string,
+	targetClipId?: string
+): boolean {
+	const clip = clips.find( ( item ) => item.id === clipId );
+	const slot = theme.timeline.mediaSlots.find(
+		( item ) => item.id === slotId
+	);
+	if ( ! clip || ! slot ) {
+		return false;
+	}
+	if (
+		targetClipId &&
+		! clips.some(
+			( item ) =>
+				item.id === targetClipId &&
+				getMediaSlot( theme, item )?.id === slotId
+		)
+	) {
+		return false;
+	}
+	const sourceSlot = getMediaSlot( theme, clip );
+	if ( sourceSlot?.id === slotId ) {
+		return true;
+	}
+	const target = targetClipId
+		? clips.find( ( item ) => item.id === targetClipId )
+		: undefined;
+	const sourceHasMinimum =
+		sourceSlot?.minClips !== undefined &&
+		clipsInSlot( theme, clips, sourceSlot.id ).filter(
+			( item ) => item.included
+		).length <= sourceSlot.minClips;
+	if (
+		! sourceHasMinimum &&
+		canPlaceClipInSlot( theme, clips, clip, slot, [] )
+	) {
+		return true;
+	}
+	return (
+		!! sourceSlot &&
+		!! target &&
+		canPlaceClipInSlot( theme, clips, clip, slot, [ target.id ] ) &&
+		canPlaceClipInSlot( theme, clips, target, sourceSlot, [ clip.id ] )
+	);
+}
+
+function canPlaceClipInSlot(
+	theme: ThemeDefinition,
+	clips: CompositionClip[],
+	clip: CompositionClip,
+	slot: ThemeMediaSlot,
+	departing: string[]
+): boolean {
+	if ( slot.roles && ! slot.roles.includes( clip.role ) ) {
+		return false;
+	}
+	if (
+		slot.maxClips !== undefined &&
+		clipsInSlot( theme, clips, slot.id ).filter(
+			( item ) => item.id !== clip.id && ! departing.includes( item.id )
+		).length >= slot.maxClips
+	) {
+		return false;
+	}
+	const tag = theme.tags.find( ( item ) => item.id === slot.tag );
+	return (
+		! tag ||
+		( ( ! tag.roles || tag.roles.includes( clip.role ) ) &&
+			( tag.maxClips === undefined ||
+				clips.filter(
+					( item ) =>
+						item.id !== clip.id &&
+						! departing.includes( item.id ) &&
+						item.tags?.includes( tag.id )
+				).length < tag.maxClips ) )
+	);
+}
+
+function withSlot(
+	theme: ThemeDefinition,
+	clip: CompositionClip,
+	slot: ThemeMediaSlot
+): CompositionClip {
+	const slotTags = theme.timeline.mediaSlots
+		.map( ( item ) => item.tag )
+		.filter( ( tag ): tag is string => Boolean( tag ) );
+	const targetTag = theme.tags.find( ( item ) => item.id === slot.tag );
+	return {
+		...clip,
+		slotId: slot.id,
+		tags: [
+			...( clip.tags || [] ).filter(
+				( tag ) =>
+					! slotTags.includes( tag ) &&
+					( ! targetTag?.exclusiveGroup ||
+						theme.tags.find( ( item ) => item.id === tag )
+							?.exclusiveGroup !== targetTag.exclusiveGroup )
+			),
+			...( slot.tag ? [ slot.tag ] : [] ),
+		],
+	};
+}
+
+function orderClipsBySlot(
+	theme: ThemeDefinition,
+	clips: CompositionClip[]
+): CompositionClip[] {
+	const slotOrder = new Map(
+		theme.timeline.mediaSlots.map( ( item, index ) => [ item.id, index ] )
+	);
+	return clips.sort(
+		( first, second ) =>
+			( slotOrder.get( getMediaSlot( theme, first )?.id || '' ) ?? 0 ) -
+			( slotOrder.get( getMediaSlot( theme, second )?.id || '' ) ?? 0 )
+	);
+}
+
+export function moveClipToSlot(
+	theme: ThemeDefinition,
+	clips: CompositionClip[],
+	clipId: string,
+	slotId: string,
+	targetClipId?: string,
+	after = false
+): CompositionClip[] {
+	if ( ! canMoveClipToSlot( theme, clips, clipId, slotId, targetClipId ) ) {
+		return clips;
+	}
+	const slot = theme.timeline.mediaSlots.find(
+		( item ) => item.id === slotId
+	)!;
+	if (
+		targetClipId === clipId ||
+		( targetClipId &&
+			! clipsInSlot( theme, clips, slotId ).some(
+				( item ) => item.id === targetClipId
+			) )
+	) {
+		return clips;
+	}
+	const source = clips.find( ( item ) => item.id === clipId )!;
+	const sourceSlot = getMediaSlot( theme, source );
+	const target = targetClipId
+		? clips.find( ( item ) => item.id === targetClipId )
+		: undefined;
+	const sourceHasMinimum =
+		sourceSlot?.minClips !== undefined &&
+		clipsInSlot( theme, clips, sourceSlot.id ).filter(
+			( item ) => item.included
+		).length <= sourceSlot.minClips;
+	const swapping =
+		sourceSlot?.id !== slotId &&
+		( sourceHasMinimum ||
+			! canPlaceClipInSlot( theme, clips, source, slot, [] ) );
+	const moved = withSlot( theme, source, slot );
+	if ( swapping && target && sourceSlot ) {
+		const exchanged = withSlot( theme, target, sourceSlot );
+		const next = clips.map( ( item ) => {
+			if ( item.id === source.id ) {
+				return exchanged;
+			}
+			if ( item.id === target.id ) {
+				return moved;
+			}
+			return item;
+		} );
+		return orderClipsBySlot( theme, next );
+	}
+	const next = clips.filter( ( item ) => item.id !== clipId );
+	if ( targetClipId ) {
+		const targetIndex = next.findIndex(
+			( item ) => item.id === targetClipId
+		);
+		next.splice( targetIndex + ( after ? 1 : 0 ), 0, moved );
+	} else {
+		const assigned = clipsInSlot( theme, next, slotId );
+		const last = assigned[ assigned.length - 1 ];
+		const index = last
+			? next.findIndex( ( item ) => item.id === last.id ) + 1
+			: next.length;
+		next.splice( index, 0, moved );
+	}
+	return orderClipsBySlot( theme, next );
+}
+
 export function assignClipsToSlots(
 	theme: ThemeDefinition,
 	clips: CompositionClip[]
