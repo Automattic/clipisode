@@ -49,6 +49,7 @@ class AdminTest extends TestCase {
 		$config = json_decode( substr( $inline['script'], strlen( 'window.clipisodeAdmin = ' ), -1 ), true, 512, JSON_THROW_ON_ERROR );
 		$this->assertSame( [
 			'page' => 'clipisode-media',
+			'home_url' => 'https://example.com/site/',
 			'rest_root' => 'https://example.com/wp-json/',
 			'nonce' => 'test-rest-nonce',
 			'invitation_prefix' => 'join',

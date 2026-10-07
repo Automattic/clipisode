@@ -208,6 +208,9 @@ function wp_generate_password( int $length = 12, bool $special = true ): string 
 function rest_url( string $path = '' ): string {
 	return 'https://example.com/wp-json/' . $path;
 }
+function home_url( string $path = '' ): string {
+	return 'https://example.com/site/' . ltrim( $path, '/' );
+}
 function add_query_arg( string $key, string $value, string $url ): string {
 	return $url . '?' . http_build_query( [ $key => $value ] );
 }
