@@ -22,6 +22,11 @@ interface TopicDetailProps {
 	navigate: ( path: string | number ) => void;
 }
 
+function invitationUrl( link: InvitationLink ): string {
+	const { home_url, invitation_prefix } = window.clipisodeAdmin!;
+	return new URL( `${ invitation_prefix }/${ link.slug }/`, home_url ).href;
+}
+
 export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const [ topic, setTopic ] = useState< Topic | null >( null );
 	const [ links, setLinks ] = useState< InvitationLink[] >( [] );
@@ -169,9 +174,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	};
 
 	const copyLinkUrl = ( link: InvitationLink ) => {
-		const prefix = window.clipisodeAdmin?.invitation_prefix || 'invitation';
-		const url = `${ window.location.origin }/${ prefix }/${ link.slug }`;
-		navigator.clipboard.writeText( url );
+		navigator.clipboard.writeText( invitationUrl( link ) );
 		setCopiedId( link.id );
 		setTimeout(
 			() => setCopiedId( ( prev ) => ( prev === link.id ? null : prev ) ),
@@ -497,17 +500,18 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 													onClick={ () =>
 														copyLinkUrl( link )
 													}
-													title={ `${
-														window.location.origin
-													}/${
-														window.clipisodeAdmin
-															?.invitation_prefix ||
-														'invitation'
-													}/${ link.slug }` }
+													title={ invitationUrl( link ) }
 												>
 													{ copiedId === link.id
 														? 'Copied!'
 														: 'Copy URL' }
+												</Button>
+												<Button
+													variant="tertiary"
+													size="compact"
+													href={ invitationUrl( link ) }
+												>
+													Open
 												</Button>
 												<Button
 													variant="tertiary"

@@ -145,6 +145,7 @@ function fireUpload( file ) {
 
 	const xhr = new XMLHttpRequest();
 	xhr.open( 'POST', ( state.restUrl || '' ) + 'invitation/upload' );
+	xhr.setRequestHeader( 'X-WP-Nonce', state.restNonce );
 	xhr.upload.onprogress = ( e ) => {
 		if ( e.lengthComputable && e.total > 0 ) {
 			state.uploadPercent = Math.round( ( e.loaded / e.total ) * 100 );
@@ -243,7 +244,10 @@ function fireSubmit() {
 
 	fetch( ( state.restUrl || '' ) + 'invitation/submit', {
 		method: 'POST',
-		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+		headers: {
+			'Content-Type': 'application/x-www-form-urlencoded',
+			'X-WP-Nonce': state.restNonce,
+		},
 		body,
 	} )
 		.then( ( r ) => {

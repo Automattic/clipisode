@@ -180,6 +180,7 @@ declare global {
 	interface Window {
 		clipisodeAdmin?: {
 			page: string;
+			home_url: string;
 			rest_root: string;
 			nonce: string;
 			invitation_prefix: string;

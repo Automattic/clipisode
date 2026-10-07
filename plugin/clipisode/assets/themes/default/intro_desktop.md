@@ -9,7 +9,7 @@ For shared theme conventions (lock model, placeholder tokens, slot injection, re
 Two-column white card centered on a light gray viewport:
 
 - **Left column** — portrait video (the topic's intro video).
-- **Right column** — vertical stack: logo → topic title → instructions → live invitation URL → QR helper text → QR code.
+- **Right column** — vertical stack: logo → topic title → instructions → on-device reply button → live invitation URL → QR helper text → QR code.
 
 ### Equal-width columns
 
@@ -34,6 +34,7 @@ The shared lock-model categories (author-controlled / structural / PHP-injected)
 | Logo (`core/image`) | Author-controlled, no lock | Replace with any Media Library image, resize, link, move, delete. Default is the imported `icon.png`. |
 | Topic title (`core/heading`) | Author-controlled, `lock: {move, remove}` | Edit text, change heading level (H1→H2→H3…), pick from the S/M/L/XL/XXL size scale, change color, etc. |
 | Instructions paragraph | Author-controlled, `lock: {move, remove}` | Edit text and styling. |
+| On-device reply button | Author-controlled | Opens the mobile reply flow on the current device, including desktop browsers. |
 | QR helper paragraph | Author-controlled, `lock: {move, remove}` | Edit text and styling. |
 | QR placeholder (`core/image`) | Author-controlled, `lock: {remove}` only | Resize, pad, border, change alignment, **and reorder** (move above the logo, etc.). Lock prevents removal so the public renderer always finds a `clipisode-introd-qr-image` figure to swap for the live QR mount at request time. |
 | Root group | Structural, `lock: {move, remove}` | Reorder/replace children, change padding/background. |
