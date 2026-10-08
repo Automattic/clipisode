@@ -184,6 +184,11 @@ export interface Host {
 
 declare global {
 	interface Window {
+		ClipisodeThemeAPI?: {
+			React: typeof import('react');
+			Remotion: typeof import('remotion');
+			registerRenderer: ( id: string, renderer: import('./remotion/theme-renderers').ThemeRenderer ) => void;
+		};
 		clipisodeAdmin?: {
 			page: string;
 			home_url: string;
@@ -194,6 +199,7 @@ declare global {
 			debug_mode: boolean;
 			remotion_license_key?: string | null;
 			remotion_is_production?: boolean;
+			composition_themes?: import('./remotion/types').ThemeDefinition[];
 		};
 	}
 }

@@ -3,6 +3,7 @@ import { useState } from '@wordpress/element';
 import type { CSSProperties } from 'react';
 import { getThemeDefinition, themeDefinitions } from './theme-schema';
 import { BaseballCard, BaseballOverlay } from './BaseballTheme';
+import { getThemeRenderer, isBuiltInRenderer } from './theme-renderers';
 import type { CompositionClip, CompositionSettings } from './types';
 
 export { createDefaultSettings } from './theme-schema';
@@ -22,9 +23,7 @@ interface BrandedSettings extends CompositionSettings {
 
 function rendererFor( settings: CompositionSettings ): string {
 	const renderer = getThemeDefinition( settings.themeId ).renderer;
-	if (
-		! [ 'branded', 'editorial', 'baseball', 'plain' ].includes( renderer )
-	) {
+	if ( ! isBuiltInRenderer( renderer ) && ! getThemeRenderer( renderer ) ) {
 		throw new Error(
 			`No composition renderer is registered for ${ renderer }.`
 		);
@@ -101,6 +100,10 @@ export function ThemeCard( {
 	const renderer = rendererFor( inputSettings );
 	if ( renderer === 'plain' ) {
 		return null;
+	}
+	if ( ! isBuiltInRenderer( renderer ) ) {
+		const Card = getThemeRenderer( renderer )!.Card;
+		return <Card settings={ inputSettings } kind={ kind } hasBackground={ hasBackground } />;
 	}
 	if ( renderer === 'baseball' ) {
 		return (
@@ -272,6 +275,10 @@ export function ThemeOverlay( {
 	const renderer = rendererFor( inputSettings );
 	if ( renderer === 'plain' ) {
 		return null;
+	}
+	if ( ! isBuiltInRenderer( renderer ) ) {
+		const Overlay = getThemeRenderer( renderer )!.Overlay;
+		return <Overlay settings={ inputSettings } name={ name } clip={ clip } />;
 	}
 	if ( renderer === 'baseball' ) {
 		return <BaseballOverlay settings={ inputSettings } clip={ clip } />;

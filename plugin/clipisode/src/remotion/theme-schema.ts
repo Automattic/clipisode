@@ -11,7 +11,24 @@ import type {
 	ThemeValues,
 } from './types';
 
-export const themeDefinitions = catalog.themes as ThemeDefinition[];
+if ( window.clipisodeAdmin && ! window.clipisodeAdmin.composition_themes ) {
+	throw new Error( 'The composition theme catalog is missing from Clipisode admin.' );
+}
+
+export const themeDefinitions: ThemeDefinition[] = window.clipisodeAdmin
+	? window.clipisodeAdmin.composition_themes!
+	: ( catalog.themes as ThemeDefinition[] );
+
+export function registerThemeDefinition( theme: ThemeDefinition ): void {
+	const existing = themeDefinitions.find( ( item ) => item.id === theme.id );
+	if ( existing ) {
+		if ( JSON.stringify( existing ) !== JSON.stringify( theme ) ) {
+			throw new Error( `Conflicting composition theme: ${ theme.id }` );
+		}
+		return;
+	}
+	themeDefinitions.push( theme );
+}
 
 export function getThemeDefinition( id: string ): ThemeDefinition {
 	const theme = themeDefinitions.find( ( item ) => item.id === id );
@@ -44,10 +61,12 @@ function defaultsFor(
 export function createDefaultSettings(
 	themeId = 'default'
 ): CompositionSettings {
+	const theme = getThemeDefinition( themeId );
 	return {
 		themeId,
+		...( theme.version ? { themeVersion: theme.version } : {} ),
 		format: 'portrait',
-		...defaultsFor( getThemeDefinition( themeId ), 'composition' ),
+		...defaultsFor( theme, 'composition' ),
 	};
 }
 
@@ -481,6 +500,9 @@ export function validateThemeValues(
 	if ( settings.themeId !== theme.id ) {
 		errors.push( 'The composition does not match its theme.' );
 	}
+	if ( theme.version && settings.themeVersion !== theme.version ) {
+		errors.push( 'The composition requires another version of its video theme.' );
+	}
 	if ( ! [ 'portrait', 'square', 'landscape' ].includes( settings.format ) ) {
 		errors.push( 'Choose a valid canvas format.' );
 	}
@@ -638,6 +660,7 @@ export function changeTheme(
 	return {
 		settings: {
 			themeId: nextThemeId,
+			...( next.version ? { themeVersion: next.version } : {} ),
 			format: settings.format,
 			...transfer( 'composition', settings, slottedClips ),
 		},

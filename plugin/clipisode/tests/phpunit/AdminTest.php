@@ -57,6 +57,7 @@ class AdminTest extends TestCase {
 			'debug_mode' => true,
 			'remotion_license_key' => $license,
 			'remotion_is_production' => $production,
+			'composition_themes' => Clipisode_Composition::themes(),
 		], $config );
 	}
 

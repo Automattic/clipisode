@@ -23,7 +23,30 @@ class Clipisode_Composition {
 		if ( ! is_array( $schema ) || ! isset( $schema['themes'] ) || ! is_array( $schema['themes'] ) ) {
 			return self::invalid( 'The composition theme schema is invalid.' );
 		}
-		return $schema['themes'];
+		$themes = apply_filters( 'clipisode_composition_themes', $schema['themes'] );
+		if ( ! is_array( $themes ) || ! array_is_list( $themes ) ) {
+			return self::invalid( 'The composition theme catalog must be a list.' );
+		}
+		$ids = [];
+		$renderers = [];
+		$built_in_ids = array_column( $schema['themes'], 'id' );
+		foreach ( $themes as $theme ) {
+			if ( ! is_array( $theme ) || ! isset( $theme['id'], $theme['label'], $theme['renderer'], $theme['canvas'], $theme['timeline'], $theme['tags'], $theme['groups'] ) || ! is_string( $theme['id'] ) || ! preg_match( '/^[a-z0-9][a-z0-9_-]*$/', $theme['id'] ) || isset( $ids[ $theme['id'] ] ) || ! is_string( $theme['renderer'] ) || ! preg_match( '/^[a-z0-9][a-z0-9_-]*$/', $theme['renderer'] ) || ! is_array( $theme['canvas'] ) || ! is_array( $theme['timeline'] ) || ! is_array( $theme['tags'] ) || ! is_array( $theme['groups'] ) ) {
+				return self::invalid( 'A registered composition theme is invalid or duplicates another theme ID.' );
+			}
+			if ( ! in_array( $theme['renderer'], [ 'branded', 'editorial', 'baseball', 'plain' ], true ) && ( empty( $theme['rendererUrl'] ) || ! filter_var( $theme['rendererUrl'], FILTER_VALIDATE_URL ) || ! in_array( wp_parse_url( $theme['rendererUrl'], PHP_URL_SCHEME ), [ 'http', 'https' ], true ) ) ) {
+				return self::invalid( 'A custom composition renderer requires an HTTP or HTTPS script URL.' );
+			}
+			if ( ! in_array( $theme['renderer'], [ 'branded', 'editorial', 'baseball', 'plain' ], true ) && isset( $renderers[ $theme['renderer'] ] ) ) {
+				return self::invalid( 'Custom composition renderer IDs must be unique.' );
+			}
+			if ( ! in_array( $theme['id'], $built_in_ids, true ) && ( empty( $theme['version'] ) || ! is_string( $theme['version'] ) ) ) {
+				return self::invalid( 'Plugin composition themes require a version.' );
+			}
+			$ids[ $theme['id'] ] = true;
+			$renderers[ $theme['renderer'] ] = true;
+		}
+		return $themes;
 	}
 
 	private static function theme( mixed $id ): array|WP_Error {
@@ -41,6 +64,9 @@ class Clipisode_Composition {
 
 	private static function sanitize_theme( array $value, array $theme ): array|WP_Error {
 		$settings = $value['settings'];
+		if ( isset( $theme['version'] ) && ( $settings['themeVersion'] ?? null ) !== $theme['version'] ) {
+			return self::invalid( 'The composition was created with a different theme version.' );
+		}
 		if ( ! isset( $settings['format'] ) || ! in_array( $settings['format'], [ 'portrait', 'square', 'landscape' ], true ) ) {
 			return self::invalid( 'Invalid composition format.' );
 		}
@@ -168,12 +194,12 @@ class Clipisode_Composition {
 
 		$fields = self::fields( $theme, 'composition' );
 		$values = $settings;
-		unset( $values['themeId'], $values['format'] );
+		unset( $values['themeId'], $values['themeVersion'], $values['format'] );
 		$clean = self::sanitize_fields( $values, $fields, 'composition', $settings, $clips );
 		if ( is_wp_error( $clean ) ) {
 			return $clean;
 		}
-		$clean = array_merge( [ 'themeId' => $theme['id'], 'format' => $settings['format'] ], $clean );
+		$clean = array_merge( [ 'themeId' => $theme['id'], 'format' => $settings['format'] ], isset( $theme['version'] ) ? [ 'themeVersion' => $theme['version'] ] : [], $clean );
 		$effective_settings = array_replace( self::defaults( $fields ), $clean );
 		$clip_fields = self::fields( $theme, 'clip' );
 		foreach ( $clips as &$clip ) {
@@ -345,8 +371,11 @@ class Clipisode_Composition {
 		if ( is_wp_error( $theme ) ) {
 			return $theme;
 		}
+		if ( isset( $theme['version'] ) && ( $composition['settings']['themeVersion'] ?? null ) !== $theme['version'] ) {
+			return self::invalid( 'The saved composition requires another version of its video theme.' );
+		}
 		$fields = self::fields( $theme, 'composition' );
-		$composition['settings'] = array_intersect_key( $composition['settings'], array_merge( [ 'themeId' => true, 'format' => true ], $fields ) );
+		$composition['settings'] = array_intersect_key( $composition['settings'], array_merge( [ 'themeId' => true, 'themeVersion' => true, 'format' => true ], $fields ) );
 		$composition['settings'] = self::optional_defaults( $composition['settings'], $fields );
 		$clip_fields = self::fields( $theme, 'clip' );
 		foreach ( $composition['clips'] as &$clip ) {

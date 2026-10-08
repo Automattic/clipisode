@@ -65,7 +65,7 @@ export default function CompositionPreview( {
 		<div className="clipisode-composition-preview">
 			<div className="clipisode-composition-stage">
 				<Player
-					key={ revision }
+					key={ `${ revision }-${ props.settings.themeId }` }
 					ref={ player }
 					component={ ClipisodeComposition }
 					inputProps={ props }

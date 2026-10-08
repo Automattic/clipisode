@@ -36,7 +36,29 @@ if ( ! function_exists( 'register_rest_route' ) ) {
 
 if ( ! function_exists( 'add_filter' ) ) {
 	function add_filter( string $hook, callable $callback, int $priority = 10, int $args = 1 ): bool {
+		global $test_filters;
+		$test_filters[ $hook ][ $priority ][] = $callback;
 		return true;
+	}
+}
+
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( string $hook, mixed $value ): mixed {
+		global $test_filters;
+		$callbacks = $test_filters[ $hook ] ?? [];
+		ksort( $callbacks );
+		foreach ( $callbacks as $group ) {
+			foreach ( $group as $callback ) {
+				$value = $callback( $value );
+			}
+		}
+		return $value;
+	}
+}
+
+if ( ! function_exists( 'plugins_url' ) ) {
+	function plugins_url( string $path, string $plugin ): string {
+		return 'https://example.com/wp-content/plugins/' . basename( dirname( $plugin ) ) . '/' . $path;
 	}
 }
 

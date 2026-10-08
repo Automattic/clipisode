@@ -42,10 +42,20 @@ jobs:
         working-directory: plugin/clipisode
         run: npm ci && npm run plugin
 
+      - name: Package video theme plugins
+        if: steps.version_check.outputs.new_version
+        working-directory: plugin
+        run: |
+          zip -q -r clipisode-community-theme.zip clipisode-community-theme
+          zip -q -r clipisode-studio-theme.zip clipisode-studio-theme
+
       - name: Create Release
         if: steps.version_check.outputs.new_version
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: v${{ steps.version_check.outputs.new_version }}
-          files: plugin/clipisode/clipisode.zip
+          files: |
+            plugin/clipisode/clipisode.zip
+            plugin/clipisode-community-theme.zip
+            plugin/clipisode-studio-theme.zip
           generate_release_notes: true
