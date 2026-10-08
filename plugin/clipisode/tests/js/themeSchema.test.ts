@@ -9,6 +9,7 @@ import {
 	canMoveClipToSlot,
 	getThemeDefinition,
 	getVisibleGroups,
+	registerThemeDefinition,
 	themeDefinitions,
 	moveClipToSlot,
 	validateThemeValues,
@@ -21,6 +22,7 @@ import type {
 } from '../../src/remotion/types';
 import { buildTimeline } from '../../src/remotion/timeline';
 import { mlbTeamLogos } from '../../src/remotion/mlb-team-logos';
+import studioTheme from '../../../clipisode-studio-theme/theme.json';
 
 const clip = (
 	id: string,
@@ -573,6 +575,29 @@ describe( 'theme schemas', () => {
 		expect( createClipValues( 'default' ) ).not.toHaveProperty(
 			'customProperty'
 		);
+	} );
+
+	it( 'accepts the Studio theme version as composition metadata', () => {
+		const studio = studioTheme as ThemeDefinition;
+		registerThemeDefinition( studio );
+		const studioSettings = createDefaultSettings( studio.id );
+		expect( validateThemeValues( studio, studioSettings, [] ) ).toEqual( [] );
+		expect(
+			validateThemeValues(
+				studio,
+				{ ...studioSettings, themeVersion: '0.9.0' },
+				[]
+			)
+		).toContain(
+			'The composition requires another version of its video theme.'
+		);
+		expect(
+			validateThemeValues(
+				studio,
+				{ ...studioSettings, unknown: 'value' },
+				[]
+			)
+		).toContain( 'Unknown composition field: unknown.' );
 	} );
 
 	it( 'accepts optional nulls and requires a value only when its field is visible and applicable', () => {

@@ -558,7 +558,7 @@ export function validateThemeValues(
 				! allowed.includes( key ) &&
 				! (
 					scope === 'composition' &&
-					[ 'themeId', 'format' ].includes( key )
+					[ 'themeId', 'themeVersion', 'format' ].includes( key )
 				)
 			) {
 				errors.push( `Unknown ${ scope } field: ${ key }.` );
