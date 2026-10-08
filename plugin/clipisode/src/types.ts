@@ -85,7 +85,9 @@ export interface InvitationLink {
 	social_image_media_id: number | null;
 	social_image_url: string | null;
 	topic_social_image_url: string | null;
+	effective_social_image_media_id: number | null;
 	effective_social_image_url: string | null;
+	share_url: string;
 	clicks: number;
 	replies_count: number;
 	created_at: string;

@@ -24,6 +24,9 @@ interface TopicDetailProps {
 }
 
 function invitationUrl( link: InvitationLink ): string {
+	if ( link.share_url ) {
+		return link.share_url;
+	}
 	const { home_url, invitation_prefix } = window.clipisodeAdmin!;
 	return new URL( `${ invitation_prefix }/${ link.slug }/`, home_url ).href;
 }

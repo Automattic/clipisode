@@ -1163,6 +1163,13 @@ class Clipisode_REST_API {
 			? Clipisode_Media::get_url( $topic_social_image_id )
 			: null;
 		$link->effective_social_image_url = $link->social_image_url ?: $link->topic_social_image_url;
+		$link->effective_social_image_media_id = $link->social_image_url
+			? $link->social_image_media_id
+			: ( $link->topic_social_image_url ? $topic_social_image_id : null );
+		$link->share_url = Clipisode_Invitation::get_share_url(
+			$link->slug,
+			(int) $link->effective_social_image_media_id
+		);
 		unset( $link->topic_social_image_media_id );
 		return $link;
 	}

@@ -17,8 +17,10 @@ class Clipisode_Invitation {
 	/**
 	 * Resolve the image used by social crawlers for an invitation URL.
 	 * A link-level override wins; otherwise the topic's image is inherited.
+	 *
+	 * @return array{id: int, url: string}|null
 	 */
-	public static function get_social_image_url( object $link, object $topic ): string {
+	public static function get_social_image( object $link, object $topic ): ?array {
 		$media_ids = array_unique( array_filter( [
 			(int) ( $link->social_image_media_id ?? 0 ),
 			(int) ( $topic->social_image_media_id ?? 0 ),
@@ -26,11 +28,19 @@ class Clipisode_Invitation {
 		foreach ( $media_ids as $media_id ) {
 			$url = Clipisode_Media::get_url( $media_id );
 			if ( is_string( $url ) && $url !== '' ) {
-				return $url;
+				return [
+					'id'  => $media_id,
+					'url' => $url,
+				];
 			}
 		}
 
-		return '';
+		return null;
+	}
+
+	public static function get_social_image_url( object $link, object $topic ): string {
+		$image = self::get_social_image( $link, $topic );
+		return $image['url'] ?? '';
 	}
 
 	public static function get_social_description( object $topic ): string {
@@ -39,6 +49,13 @@ class Clipisode_Invitation {
 			return sprintf( 'Share a video reply with %s.', $host );
 		}
 		return 'Share a video reply.';
+	}
+
+	public static function get_share_url( string $slug, int $social_image_media_id = 0 ): string {
+		$url = home_url( self::get_prefix() . '/' . rawurlencode( $slug ) . '/' );
+		return $social_image_media_id > 0
+			? add_query_arg( 'v', (string) $social_image_media_id, $url )
+			: $url;
 	}
 
 	/**

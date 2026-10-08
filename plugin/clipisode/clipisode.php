@@ -20,6 +20,7 @@ require_once CLIPISODE_PLUGIN_DIR . 'includes/class-post-types.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-media.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-composition.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-renderer.php';
+require_once CLIPISODE_PLUGIN_DIR . 'includes/class-social-meta.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-admin.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-rest-api.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-invitation.php';
