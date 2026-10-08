@@ -390,6 +390,41 @@
 		border-radius: 3px;
 	}
 
+	.clipisode-social-image-variants {
+		display: flex;
+		align-items: flex-end;
+		gap: 10px;
+		margin-bottom: 10px;
+
+		figure {
+			margin: 0;
+		}
+
+		img {
+			display: block;
+			width: auto;
+			max-width: 180px;
+			height: 110px;
+			object-fit: contain;
+			background: #111827;
+			border: 1px solid #dcdcde;
+			border-radius: 4px;
+		}
+
+		figcaption {
+			margin-top: 3px;
+			color: #646970;
+			font-size: 11px;
+			text-transform: capitalize;
+		}
+	}
+
+	.clipisode-social-image-format-tabs {
+		display: flex;
+		justify-content: center;
+		margin-bottom: 12px;
+	}
+
 	// --- Host Suggestions ---
 
 	.clipisode-host-suggestions {

@@ -6,6 +6,7 @@ export interface Topic {
 	intro_video_filename: string | null;
 	social_image_media_id: number | null;
 	social_image_url: string | null;
+	social_image_variants: SocialImageVariants;
 	hosted_by: string;
 	brand_terms_id: number;
 	brand_terms_title: string | null;
@@ -76,6 +77,24 @@ export interface VideoValue {
 	reused?: boolean;
 }
 
+export interface SocialImageVariant {
+	id: number;
+	url: string;
+	width: number;
+	height: number;
+	type: string;
+}
+
+export type SocialImageVariants = Partial<
+	Record< 'wide' | 'square' | 'portrait', SocialImageVariant >
+>;
+
+export interface SocialImageValue {
+	id: number;
+	url: string;
+	variants?: SocialImageVariants;
+}
+
 export interface InvitationLink {
 	id: number;
 	topic_id: number;
@@ -84,9 +103,12 @@ export interface InvitationLink {
 	status: string;
 	social_image_media_id: number | null;
 	social_image_url: string | null;
+	social_image_variants: SocialImageVariants;
 	topic_social_image_url: string | null;
+	topic_social_image_variants: SocialImageVariants;
 	effective_social_image_media_id: number | null;
 	effective_social_image_url: string | null;
+	effective_social_image_variants: SocialImageVariants;
 	share_url: string;
 	clicks: number;
 	replies_count: number;

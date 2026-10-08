@@ -113,13 +113,21 @@ Clipisode_Post_Types::set_flow_intro_video_url( $intro_video_url );
 //
 // Looked up once per request and threaded through the render_block filter.
 $invitation_url = home_url( trailingslashit( Clipisode_Invitation::get_prefix() . '/' . $slug ) );
-$social_image = Clipisode_Invitation::get_social_image( $link, $topic );
+$social_images = Clipisode_Invitation::get_social_images( $link, $topic );
+$social_image_variants = $social_images['variants'] ?? [];
+$ordered_social_images = Clipisode_Social_Meta::ordered_images(
+	$social_image_variants,
+	Clipisode_Social_Meta::request_user_agent()
+);
+$social_image = $social_image_variants['wide'] ?? ( $ordered_social_images[0] ?? null );
 $social_image_url = $social_image['url'] ?? '';
+$twitter_image = $social_image_variants['wide'] ?? $social_image;
 $invitation_share_url = Clipisode_Invitation::get_share_url(
 	$slug,
-	(int) ( $social_image['id'] ?? 0 )
+	(int) ( $social_images['id'] ?? 0 )
 );
 $social_description = Clipisode_Invitation::get_social_description( $topic );
+Clipisode_Social_Meta::send_crawler_headers();
 $theme_asset_url = plugins_url(
 	'assets/themes/default',
 	CLIPISODE_PLUGIN_DIR . 'clipisode.php'
@@ -657,11 +665,20 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 	<meta property="og:title" content="<?php echo esc_attr( $topic->title ); ?>">
 	<meta property="og:description" content="<?php echo esc_attr( $social_description ); ?>">
 	<meta property="og:url" content="<?php echo esc_url( $invitation_share_url ); ?>">
-	<?php if ( $social_image_url !== '' ) : ?>
-		<meta property="og:image" content="<?php echo esc_url( $social_image_url ); ?>">
-		<meta property="og:image:alt" content="<?php echo esc_attr( sprintf( 'Social preview for %s', $topic->title ) ); ?>">
+	<?php if ( ! empty( $ordered_social_images ) ) : ?>
+		<?php foreach ( $ordered_social_images as $social_meta_image ) : ?>
+			<meta property="og:image" content="<?php echo esc_url( $social_meta_image['url'] ); ?>">
+			<meta property="og:image:secure_url" content="<?php echo esc_url( $social_meta_image['url'] ); ?>">
+			<meta property="og:image:type" content="<?php echo esc_attr( $social_meta_image['type'] ); ?>">
+			<meta property="og:image:width" content="<?php echo esc_attr( (string) $social_meta_image['width'] ); ?>">
+			<meta property="og:image:height" content="<?php echo esc_attr( (string) $social_meta_image['height'] ); ?>">
+			<meta property="og:image:alt" content="<?php echo esc_attr( sprintf( 'Social preview for %s', $topic->title ) ); ?>">
+		<?php endforeach; ?>
+		<link rel="image_src" href="<?php echo esc_url( $ordered_social_images[0]['url'] ); ?>">
+		<meta itemprop="image" content="<?php echo esc_url( $ordered_social_images[0]['url'] ); ?>">
 		<meta name="twitter:card" content="summary_large_image">
-		<meta name="twitter:image" content="<?php echo esc_url( $social_image_url ); ?>">
+		<meta name="twitter:image" content="<?php echo esc_url( $twitter_image['url'] ); ?>">
+		<meta name="twitter:image:alt" content="<?php echo esc_attr( sprintf( 'Social preview for %s', $topic->title ) ); ?>">
 	<?php else : ?>
 		<meta name="twitter:card" content="summary">
 	<?php endif; ?>

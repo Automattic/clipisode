@@ -157,6 +157,16 @@ function sanitize_text_field( mixed $value ): string {
 	return trim( preg_replace( '/[\r\n\t ]+/', ' ', strip_tags( (string) $value ) ) );
 }
 
+function sanitize_key( string $value ): string {
+	return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( $value ) );
+}
+
+function wp_unslash( string $value ): string {
+	return stripslashes( $value );
+}
+
+function nocache_headers(): void {}
+
 function sanitize_textarea_field( string $value ): string {
 	return trim( strip_tags( $value ) );
 }

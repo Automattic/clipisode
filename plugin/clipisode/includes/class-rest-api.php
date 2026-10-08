@@ -503,9 +503,10 @@ class Clipisode_REST_API {
 			? Clipisode_Media::get_filename( (int) $topic->intro_media_id )
 			: null;
 
-		$topic->social_image_url = ! empty( $topic->social_image_media_id )
-			? Clipisode_Media::get_url( (int) $topic->social_image_media_id )
-			: null;
+		$topic->social_image_variants = ! empty( $topic->social_image_media_id )
+			? Clipisode_Media::get_social_image_variants( (int) $topic->social_image_media_id )
+			: [];
+		$topic->social_image_url = $topic->social_image_variants['wide']['url'] ?? null;
 
 		if ( ! empty( $topic->invitation_id ) ) {
 			$inv_post = get_post( (int) $topic->invitation_id );
@@ -1153,16 +1154,21 @@ class Clipisode_REST_API {
 		$link->social_image_media_id = ! empty( $link->social_image_media_id )
 			? (int) $link->social_image_media_id
 			: null;
-		$link->social_image_url = $link->social_image_media_id
-			? Clipisode_Media::get_url( $link->social_image_media_id )
-			: null;
+		$link->social_image_variants = $link->social_image_media_id
+			? Clipisode_Media::get_social_image_variants( $link->social_image_media_id )
+			: [];
+		$link->social_image_url = $link->social_image_variants['wide']['url'] ?? null;
 		$topic_social_image_id = ! empty( $link->topic_social_image_media_id )
 			? (int) $link->topic_social_image_media_id
 			: null;
-		$link->topic_social_image_url = $topic_social_image_id
-			? Clipisode_Media::get_url( $topic_social_image_id )
-			: null;
+		$link->topic_social_image_variants = $topic_social_image_id
+			? Clipisode_Media::get_social_image_variants( $topic_social_image_id )
+			: [];
+		$link->topic_social_image_url = $link->topic_social_image_variants['wide']['url'] ?? null;
 		$link->effective_social_image_url = $link->social_image_url ?: $link->topic_social_image_url;
+		$link->effective_social_image_variants = $link->social_image_url
+			? $link->social_image_variants
+			: $link->topic_social_image_variants;
 		$link->effective_social_image_media_id = $link->social_image_url
 			? $link->social_image_media_id
 			: ( $link->topic_social_image_url ? $topic_social_image_id : null );
@@ -1565,6 +1571,7 @@ class Clipisode_REST_API {
 	}
 
 	public function upload_media_asset( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
 		$files = $request->get_file_params();
 		if ( empty( $files['file'] ) ) {
 			return new WP_REST_Response( [ 'message' => 'No file provided.' ], 400 );
@@ -1590,7 +1597,31 @@ class Clipisode_REST_API {
 			return new WP_REST_Response( [ 'message' => 'Unsupported file type.' ], 400 );
 		}
 
-		$result = Clipisode_Media::create( $type, 'asset', 'file' );
+		$label = sanitize_key( (string) $request->get_param( 'label' ) );
+		$label = $label ?: 'asset';
+		$allowed_labels = [ 'asset', 'social-wide', 'social-square', 'social-portrait' ];
+		if ( ! in_array( $label, $allowed_labels, true ) ) {
+			return new WP_REST_Response( [ 'message' => 'Unsupported media label.' ], 400 );
+		}
+		if ( 'photo' !== $type && 'asset' !== $label ) {
+			return new WP_REST_Response( [ 'message' => 'Social preview variants must be images.' ], 400 );
+		}
+
+		$parent_id = (int) $request->get_param( 'parent_id' );
+		$is_child  = in_array( $label, [ 'social-square', 'social-portrait' ], true );
+		if ( $is_child ) {
+			$parent = $wpdb->get_var( $wpdb->prepare(
+				"SELECT id FROM {$wpdb->prefix}clipisode_media WHERE id = %d AND type = 'photo' AND label = 'social-wide' AND parent_id IS NULL",
+				$parent_id
+			) );
+			if ( ! $parent ) {
+				return new WP_REST_Response( [ 'message' => 'A valid social-image root is required.' ], 400 );
+			}
+		} elseif ( $parent_id ) {
+			return new WP_REST_Response( [ 'message' => 'Only social-image variants can have a parent.' ], 400 );
+		}
+
+		$result = Clipisode_Media::create( $type, $label, 'file', $parent_id ?: null );
 		if ( is_wp_error( $result ) ) {
 			return new WP_REST_Response( [ 'message' => $result->get_error_message() ], 400 );
 		}
@@ -1611,8 +1642,8 @@ class Clipisode_REST_API {
 			return new WP_REST_Response( [ 'message' => 'Media not found.' ], 404 );
 		}
 
-		if ( $media->label !== 'asset' ) {
-			return new WP_REST_Response( [ 'message' => 'Only manually uploaded assets can be deleted from this page.' ], 403 );
+		if ( ! in_array( $media->label, [ 'asset', 'social-wide' ], true ) ) {
+			return new WP_REST_Response( [ 'message' => 'Only standalone assets and social-image sets can be deleted directly.' ], 403 );
 		}
 
 		Clipisode_Media::delete( $id );

@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from '@wordpress/element';
-import { Button, Modal, Notice, Spinner } from '@wordpress/components';
+import {
+	Button,
+	ButtonGroup,
+	Modal,
+	Notice,
+	Spinner,
+} from '@wordpress/components';
 import { Player } from '@remotion/player';
 import ThemeFields from './ThemeFields';
 import InvitationSocialImage from '../remotion/InvitationSocialImage';
@@ -8,7 +14,13 @@ import {
 	getThemeDefinition,
 	getVisibleGroups,
 } from '../remotion/theme-schema';
-import { renderInvitationSocialImage } from '../lib/social-image-renderer';
+import { renderInvitationSocialImages } from '../lib/social-image-renderer';
+import {
+	SOCIAL_IMAGE_FORMAT_ORDER,
+	SOCIAL_IMAGE_FORMATS,
+	type SocialImageBlobSet,
+	type SocialImageFormat,
+} from '../lib/social-image-formats';
 import type { CompositionSettings, ThemeGroup } from '../remotion/types';
 
 interface SocialImageComposerProps {
@@ -16,7 +28,7 @@ interface SocialImageComposerProps {
 	title: string;
 	hostedBy: string;
 	disabled?: boolean;
-	onCreate: ( blob: Blob ) => Promise< void >;
+	onCreate: ( images: SocialImageBlobSet ) => Promise< void >;
 }
 
 const EXCLUDED_FIELDS = new Set( [
@@ -69,6 +81,8 @@ export default function SocialImageComposer( {
 	const [ open, setOpen ] = useState( false );
 	const [ rendering, setRendering ] = useState( false );
 	const [ error, setError ] = useState< string | null >( null );
+	const [ previewFormat, setPreviewFormat ] =
+		useState< SocialImageFormat >( 'wide' );
 	const [ settings, setSettings ] = useState< CompositionSettings >( () =>
 		initialSettings( themeId, title, hostedBy )
 	);
@@ -86,13 +100,18 @@ export default function SocialImageComposer( {
 	);
 	const groups = useMemo( () => socialImageGroups( settings ), [ settings ] );
 	const canGenerate = theme.renderer !== 'plain';
+	const previewDefinition = SOCIAL_IMAGE_FORMATS[ previewFormat ];
+	const previewSettings = {
+		...settings,
+		format: previewDefinition.compositionFormat,
+	};
 
 	const create = async () => {
 		setRendering( true );
 		setError( null );
 		try {
-			const blob = await renderInvitationSocialImage( settings );
-			await onCreate( blob );
+			const images = await renderInvitationSocialImages( settings );
+			await onCreate( images );
 			setOpen( false );
 		} catch ( err ) {
 			setError(
@@ -127,24 +146,47 @@ export default function SocialImageComposer( {
 					onRequestClose={ () => ! rendering && setOpen( false ) }
 				>
 					<p className="clipisode-social-image-intro">
-						This 1200 × 630 image uses the { theme.label } Remotion
-						theme. Customize it, then generate and save it to
-						WordPress.
+						This uses the { theme.label } Remotion theme to generate
+						wide, square, and portrait images. Customize once, then
+						save the complete set to WordPress.
 					</p>
 					<div className="clipisode-social-image-layout">
 						<div className="clipisode-social-image-preview">
+							<ButtonGroup
+								className="clipisode-social-image-format-tabs"
+								aria-label="Preview format"
+							>
+								{ SOCIAL_IMAGE_FORMAT_ORDER.map( ( format ) => (
+									<Button
+										key={ format }
+										variant={
+											previewFormat === format
+												? 'primary'
+												: 'secondary'
+										}
+										size="compact"
+										onClick={ () =>
+											setPreviewFormat( format )
+										}
+									>
+										{ SOCIAL_IMAGE_FORMATS[ format ].label }
+									</Button>
+								) ) }
+							</ButtonGroup>
 							<Player
 								component={ InvitationSocialImage }
-								inputProps={ { settings } }
+								inputProps={ { settings: previewSettings } }
 								durationInFrames={ 31 }
-								compositionWidth={ 1200 }
-								compositionHeight={ 630 }
+								compositionWidth={ previewDefinition.width }
+								compositionHeight={ previewDefinition.height }
 								fps={ 30 }
 								initialFrame={ 30 }
 								controls={ false }
 								style={ {
 									width: '100%',
-									aspectRatio: '1200 / 630',
+									aspectRatio: `${ previewDefinition.width } / ${ previewDefinition.height }`,
+									maxHeight: 520,
+									margin: '0 auto',
 								} }
 							/>
 						</div>
