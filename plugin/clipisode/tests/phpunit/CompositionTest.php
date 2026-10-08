@@ -238,6 +238,14 @@ class CompositionTestDatabase {
 				}
 			}
 		}
+		if ( str_contains( $sql, 'clipisode_contents WHERE media_id' ) ) {
+			preg_match( '/clipisode_contents WHERE media_id = (\d+)/', $sql, $matches );
+			foreach ( $this->contents as $row ) {
+				if ( $row['media_id'] === (int) ( $matches[1] ?? 0 ) ) {
+					return $row['output_id'];
+				}
+			}
+		}
 		if ( str_contains( $sql, 'clipisode_outputs WHERE id' ) ) {
 			preg_match( '/WHERE id = (\d+)/', $sql, $matches );
 			return isset( $this->outputs[ (int) $matches[1] ] ) ? (int) $matches[1] : null;

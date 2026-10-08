@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from '@wordpress/element';
+import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
 import { Button, Modal, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import ReplyModal from '../components/ReplyModal';
+import SocialImagePicker from '../components/SocialImagePicker';
 import type { Topic, InvitationLink, Reply } from '../types';
 
 function formatBytes( bytes: number | null ): string {
@@ -46,6 +47,9 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const [ selectedReply, setSelectedReply ] = useState< Reply | null >(
 		null
 	);
+	const [ socialImageLink, setSocialImageLink ] =
+		useState< InvitationLink | null >( null );
+	const socialImageVideoRef = useRef< HTMLVideoElement >( null );
 	const [ selectedReplyIds, setSelectedReplyIds ] = useState< Set< number > >(
 		new Set()
 	);
@@ -129,6 +133,21 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 				prev.map( ( l ) => ( l.id === updated.id ? updated : l ) )
 			);
 		} );
+	};
+
+	const updateLinkSocialImage = async (
+		link: InvitationLink,
+		image: { id: number; url: string } | null
+	) => {
+		const updated = await apiFetch< InvitationLink >( {
+			path: `/clipisode/v1/invitation-links/${ link.id }`,
+			method: 'PUT',
+			data: { social_image_media_id: image?.id || null },
+		} );
+		setLinks( ( prev ) =>
+			prev.map( ( item ) => ( item.id === updated.id ? updated : item ) )
+		);
+		setSocialImageLink( updated );
 	};
 
 	const saveSlug = async ( link: InvitationLink ) => {
@@ -312,6 +331,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 									<tr>
 										<th>Slug</th>
 										<th>Status</th>
+										<th>Preview</th>
 										<th>Clicks</th>
 										<th>Replies</th>
 										<th>Created</th>
@@ -479,6 +499,19 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 												</span>
 											</td>
 											<td>
+												{ link.effective_social_image_url ? (
+													<img
+														className="clipisode-social-image-thumb"
+														src={
+															link.effective_social_image_url
+														}
+														alt=""
+													/>
+												) : (
+													'—'
+												) }
+											</td>
+											<td>
 												{ Number(
 													link.clicks
 												).toLocaleString() }
@@ -498,9 +531,22 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 													variant="tertiary"
 													size="compact"
 													onClick={ () =>
+														setSocialImageLink(
+															link
+														)
+													}
+												>
+													Social Image
+												</Button>
+												<Button
+													variant="tertiary"
+													size="compact"
+													onClick={ () =>
 														copyLinkUrl( link )
 													}
-													title={ invitationUrl( link ) }
+													title={ invitationUrl(
+														link
+													) }
 												>
 													{ copiedId === link.id
 														? 'Copied!'
@@ -509,7 +555,9 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 												<Button
 													variant="tertiary"
 													size="compact"
-													href={ invitationUrl( link ) }
+													href={ invitationUrl(
+														link
+													) }
 												>
 													Open
 												</Button>
@@ -884,6 +932,41 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 					onClose={ () => setSelectedReply( null ) }
 					onUpdated={ onReplyUpdated }
 				/>
+			) }
+			{ socialImageLink && (
+				<Modal
+					title={ `Social image · ${ socialImageLink.slug }` }
+					className="clipisode-social-image-override-modal"
+					onRequestClose={ () => setSocialImageLink( null ) }
+				>
+					<SocialImagePicker
+						value={
+							socialImageLink.social_image_media_id &&
+							socialImageLink.social_image_url
+								? {
+										id: socialImageLink.social_image_media_id,
+										url: socialImageLink.social_image_url,
+								  }
+								: null
+						}
+						inheritedValue={
+							socialImageLink.topic_social_image_url
+								? {
+										url: socialImageLink.topic_social_image_url,
+								  }
+								: null
+						}
+						videoRef={ socialImageVideoRef }
+						hasVideo={ false }
+						label="Invitation Override"
+						themeId={ topic.invitation_renderer_theme || 'default' }
+						title={ topic.title }
+						hostedBy={ topic.hosted_by }
+						onChange={ ( image ) =>
+							updateLinkSocialImage( socialImageLink, image )
+						}
+					/>
+				</Modal>
 			) }
 
 			{ previewOutput && (
