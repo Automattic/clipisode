@@ -15,6 +15,33 @@ class Clipisode_Invitation {
 	}
 
 	/**
+	 * Resolve the image used by social crawlers for an invitation URL.
+	 * A link-level override wins; otherwise the topic's image is inherited.
+	 */
+	public static function get_social_image_url( object $link, object $topic ): string {
+		$media_ids = array_unique( array_filter( [
+			(int) ( $link->social_image_media_id ?? 0 ),
+			(int) ( $topic->social_image_media_id ?? 0 ),
+		] ) );
+		foreach ( $media_ids as $media_id ) {
+			$url = Clipisode_Media::get_url( $media_id );
+			if ( is_string( $url ) && $url !== '' ) {
+				return $url;
+			}
+		}
+
+		return '';
+	}
+
+	public static function get_social_description( object $topic ): string {
+		$host = trim( (string) ( $topic->hosted_by ?? '' ) );
+		if ( $host !== '' ) {
+			return sprintf( 'Share a video reply with %s.', $host );
+		}
+		return 'Share a video reply.';
+	}
+
+	/**
 	 * Returns the configured short-URL base for invitation links, or
 	 * an empty string if the short-URL feature isn't configured on
 	 * this site.

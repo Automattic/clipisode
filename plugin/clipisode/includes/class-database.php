@@ -4,7 +4,7 @@ defined( 'ABSPATH' ) || exit;
 
 class Clipisode_Database {
 
-	private const VERSION = '2';
+	private const VERSION = '3';
 
 	public static function maybe_upgrade(): void {
 		if ( self::VERSION !== get_option( 'clipisode_database_version' ) ) {
@@ -86,6 +86,7 @@ topic_id BIGINT UNSIGNED NOT NULL,
 slug VARCHAR(20) NOT NULL,
 type VARCHAR(20) NOT NULL,
 status VARCHAR(20) NOT NULL DEFAULT 'open',
+social_image_media_id BIGINT UNSIGNED DEFAULT NULL,
 clicks BIGINT UNSIGNED NOT NULL DEFAULT 0,
 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 PRIMARY KEY  (id),

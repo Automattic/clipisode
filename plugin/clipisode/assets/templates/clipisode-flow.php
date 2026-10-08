@@ -113,6 +113,8 @@ Clipisode_Post_Types::set_flow_intro_video_url( $intro_video_url );
 //
 // Looked up once per request and threaded through the render_block filter.
 $invitation_url = home_url( trailingslashit( Clipisode_Invitation::get_prefix() . '/' . $slug ) );
+$social_image_url = Clipisode_Invitation::get_social_image_url( $link, $topic );
+$social_description = Clipisode_Invitation::get_social_description( $topic );
 $theme_asset_url = plugins_url(
 	'assets/themes/default',
 	CLIPISODE_PLUGIN_DIR . 'clipisode.php'
@@ -645,6 +647,20 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 	<meta name="robots" content="noindex, nofollow">
 	<title><?php echo esc_html( $topic->title ); ?> — <?php bloginfo( 'name' ); ?></title>
+	<meta name="description" content="<?php echo esc_attr( $social_description ); ?>">
+	<meta property="og:type" content="website">
+	<meta property="og:title" content="<?php echo esc_attr( $topic->title ); ?>">
+	<meta property="og:description" content="<?php echo esc_attr( $social_description ); ?>">
+	<meta property="og:url" content="<?php echo esc_url( $invitation_url ); ?>">
+	<?php if ( $social_image_url !== '' ) : ?>
+		<meta property="og:image" content="<?php echo esc_url( $social_image_url ); ?>">
+		<meta name="twitter:card" content="summary_large_image">
+		<meta name="twitter:image" content="<?php echo esc_url( $social_image_url ); ?>">
+	<?php else : ?>
+		<meta name="twitter:card" content="summary">
+	<?php endif; ?>
+	<meta name="twitter:title" content="<?php echo esc_attr( $topic->title ); ?>">
+	<meta name="twitter:description" content="<?php echo esc_attr( $social_description ); ?>">
 	<style>
 		/*
 		 * App-shell lock. We want the flow to feel like a native app:

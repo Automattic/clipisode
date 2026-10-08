@@ -1,12 +1,20 @@
 import { useState, useRef, useCallback } from '@wordpress/element';
 import { Button, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
+import SocialImageComposer from './SocialImageComposer';
 
 interface SocialImagePickerProps {
 	value: { id: number; url: string } | null;
 	videoRef: React.RefObject< HTMLVideoElement >;
 	hasVideo: boolean;
-	onChange: ( value: { id: number; url: string } | null ) => void;
+	onChange: (
+		value: { id: number; url: string } | null
+	) => void | Promise< void >;
+	themeId?: string;
+	title?: string;
+	hostedBy?: string;
+	inheritedValue?: { url: string } | null;
+	label?: string;
 }
 
 const ALLOWED_ACCEPT = 'image/jpeg,image/png,image/webp';
@@ -66,6 +74,11 @@ export default function SocialImagePicker( {
 	videoRef,
 	hasVideo,
 	onChange,
+	themeId,
+	title = '',
+	hostedBy = '',
+	inheritedValue = null,
+	label = 'Social Image',
 }: SocialImagePickerProps ) {
 	const [ uploading, setUploading ] = useState( false );
 	const [ progress, setProgress ] = useState( 0 );
@@ -74,7 +87,7 @@ export default function SocialImagePicker( {
 	const abortRef = useRef< ( () => void ) | null >( null );
 
 	const doUpload = useCallback(
-		async ( blob: Blob, filename: string ) => {
+		async ( blob: Blob, filename: string, throwOnError = false ) => {
 			setUploading( true );
 			setProgress( 0 );
 			setError( null );
@@ -84,16 +97,27 @@ export default function SocialImagePicker( {
 
 			try {
 				const result = await upload.promise;
-				if ( value ) {
+				try {
+					await onChange( result );
+				} catch ( err ) {
+					apiFetch( {
+						path: `/clipisode/v1/media/${ result.id }`,
+						method: 'DELETE',
+					} ).catch( () => {} );
+					throw err;
+				}
+				if ( value && value.id !== result.id ) {
 					apiFetch( {
 						path: `/clipisode/v1/media/${ value.id }`,
 						method: 'DELETE',
 					} ).catch( () => {} );
 				}
-				onChange( result );
 			} catch ( err: any ) {
 				if ( err.message !== 'Upload cancelled.' ) {
 					setError( err.message || 'Upload failed.' );
+				}
+				if ( throwOnError ) {
+					throw err;
 				}
 			} finally {
 				abortRef.current = null;
@@ -108,7 +132,7 @@ export default function SocialImagePicker( {
 		( e: React.ChangeEvent< HTMLInputElement > ) => {
 			const file = e.target.files?.[ 0 ];
 			if ( file ) {
-				doUpload( file, file.name );
+				doUpload( file, file.name ).catch( () => {} );
 			}
 			if ( fileInputRef.current ) {
 				fileInputRef.current.value = '';
@@ -142,28 +166,37 @@ export default function SocialImagePicker( {
 					setError( 'Failed to capture frame.' );
 					return;
 				}
-				doUpload( blob, 'social-image.jpg' );
+				doUpload( blob, 'social-image.jpg' ).catch( () => {} );
 			},
 			'image/jpeg',
 			0.9
 		);
 	}, [ videoRef, doUpload ] );
 
-	const handleRemove = useCallback( () => {
-		if ( value ) {
-			apiFetch( {
-				path: `/clipisode/v1/media/${ value.id }`,
-				method: 'DELETE',
-			} ).catch( () => {} );
+	const handleRemove = useCallback( async () => {
+		setError( null );
+		try {
+			await onChange( null );
+			if ( value ) {
+				apiFetch( {
+					path: `/clipisode/v1/media/${ value.id }`,
+					method: 'DELETE',
+				} ).catch( () => {} );
+			}
+		} catch ( err ) {
+			setError(
+				err instanceof Error
+					? err.message
+					: 'The image could not be removed.'
+			);
 		}
-		onChange( null );
 	}, [ onChange, value ] );
+
+	const displayedImage = value || inheritedValue;
 
 	return (
 		<div>
-			<label className="components-base-control__label">
-				Social Image
-			</label>
+			<span className="components-base-control__label">{ label }</span>
 			<p
 				style={ {
 					fontSize: 12,
@@ -171,16 +204,20 @@ export default function SocialImagePicker( {
 					margin: '4px 0 8px',
 				} }
 			>
-				Used for link previews on Facebook, Twitter, LinkedIn, etc.
+				Used for link previews on Facebook, X, LinkedIn, and messaging
+				apps.
+				{ ! value && inheritedValue
+					? ' This invitation currently inherits the topic image.'
+					: '' }
 				{ hasVideo
 					? ' Pause the intro video on the frame you want, then capture it.'
 					: '' }
 			</p>
 
-			{ value && (
+			{ displayedImage && (
 				<div style={ { marginBottom: 8 } }>
 					<img
-						src={ value.url }
+						src={ displayedImage.url }
 						alt="Social preview"
 						style={ {
 							maxWidth: 300,
@@ -222,13 +259,30 @@ export default function SocialImagePicker( {
 			) }
 
 			<div style={ { display: 'flex', gap: 8, flexWrap: 'wrap' } }>
+				{ themeId && (
+					<SocialImageComposer
+						themeId={ themeId }
+						title={ title }
+						hostedBy={ hostedBy }
+						disabled={ uploading }
+						onCreate={ ( blob ) =>
+							doUpload(
+								blob,
+								'clipisode-social-preview.png',
+								true
+							)
+						}
+					/>
+				) }
 				<Button
 					variant="secondary"
 					onClick={ () => fileInputRef.current?.click() }
 					disabled={ uploading }
 					size="compact"
 				>
-					{ value ? 'Replace Image' : 'Upload Image' }
+					{ value || inheritedValue
+						? 'Upload Override'
+						: 'Upload Image' }
 				</Button>
 				{ hasVideo && (
 					<Button

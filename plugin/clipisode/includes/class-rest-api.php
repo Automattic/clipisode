@@ -651,6 +651,8 @@ class Clipisode_REST_API {
 		global $wpdb;
 		$table = $wpdb->prefix . 'clipisode_topics';
 		$id    = (int) $request['id'];
+		$old_intro_media_id = 0;
+		$old_social_image_id = 0;
 
 		$fields = [];
 		foreach ( [ 'title', 'hosted_by', 'status' ] as $field ) {
@@ -663,14 +665,10 @@ class Clipisode_REST_API {
 			$new_media_id = $request->get_param( 'intro_media_id' );
 			$new_media_id = $new_media_id ? (int) $new_media_id : null;
 
-			$old_media_id = (int) $wpdb->get_var( $wpdb->prepare(
+			$old_intro_media_id = (int) $wpdb->get_var( $wpdb->prepare(
 				"SELECT intro_media_id FROM $table WHERE id = %d",
 				$id
 			) );
-
-			if ( $old_media_id && $old_media_id !== $new_media_id ) {
-				Clipisode_Media::delete( $old_media_id );
-			}
 
 			$fields['intro_media_id'] = $new_media_id;
 		}
@@ -678,14 +676,10 @@ class Clipisode_REST_API {
 			$new_si_id = $request->get_param( 'social_image_media_id' );
 			$new_si_id = $new_si_id ? (int) $new_si_id : null;
 
-			$old_si_id = (int) $wpdb->get_var( $wpdb->prepare(
+			$old_social_image_id = (int) $wpdb->get_var( $wpdb->prepare(
 				"SELECT social_image_media_id FROM $table WHERE id = %d",
 				$id
 			) );
-
-			if ( $old_si_id && $old_si_id !== $new_si_id ) {
-				Clipisode_Media::delete( $old_si_id );
-			}
 
 			$fields['social_image_media_id'] = $new_si_id;
 		}
@@ -698,7 +692,15 @@ class Clipisode_REST_API {
 			$fields['invitation_id'] = $invitation_id ? (int) $invitation_id : null;
 		}
 
-		$wpdb->update( $table, $fields, [ 'id' => $id ] );
+		$updated = $wpdb->update( $table, $fields, [ 'id' => $id ] );
+		if ( false === $updated ) {
+			return new WP_REST_Response( [ 'message' => 'The topic could not be updated.' ], 500 );
+		}
+		foreach ( [ $old_intro_media_id, $old_social_image_id ] as $old_media_id ) {
+			if ( $old_media_id && ! $this->media_is_referenced( $old_media_id ) ) {
+				Clipisode_Media::delete( $old_media_id );
+			}
+		}
 
 		if ( ! empty( $fields['hosted_by'] ) ) {
 			$this->ensure_host( $fields['hosted_by'] );
@@ -740,10 +742,11 @@ class Clipisode_REST_API {
 			AND c.media_id IN (
 				SELECT intro_media_id FROM {$wpdb->prefix}clipisode_topics WHERE id = %d
 				UNION SELECT social_image_media_id FROM {$wpdb->prefix}clipisode_topics WHERE id = %d
+				UNION SELECT social_image_media_id FROM {$wpdb->prefix}clipisode_invitation_links WHERE topic_id = %d
 				UNION SELECT media_id FROM {$wpdb->prefix}clipisode_replies WHERE topic_id = %d
 				UNION SELECT media_id FROM {$wpdb->prefix}clipisode_outputs WHERE topic_id = %d
 			) LIMIT 1",
-			$id, $id, $id, $id, $id
+			$id, $id, $id, $id, $id, $id
 		) );
 		if ( $referenced ) {
 			$wpdb->query( 'ROLLBACK' );
@@ -755,6 +758,11 @@ class Clipisode_REST_API {
 			$id
 		) );
 		$topic_media_ids = $topic_row ? [ $topic_row->intro_media_id, $topic_row->social_image_media_id ] : [];
+
+		$invitation_media_ids = $wpdb->get_col( $wpdb->prepare(
+			"SELECT social_image_media_id FROM {$wpdb->prefix}clipisode_invitation_links WHERE topic_id = %d AND social_image_media_id IS NOT NULL",
+			$id
+		) );
 
 		$output_media_ids = $wpdb->get_col( $wpdb->prepare(
 			"SELECT media_id FROM {$wpdb->prefix}clipisode_outputs WHERE topic_id = %d AND media_id IS NOT NULL",
@@ -782,7 +790,7 @@ class Clipisode_REST_API {
 		foreach ( $output_ids as $output_id ) {
 			Clipisode_Renderer::forget( (int) $output_id );
 		}
-		$media_ids = array_unique( array_filter( array_merge( $topic_media_ids, $output_media_ids, $reply_media_ids ) ) );
+		$media_ids = array_unique( array_filter( array_merge( $topic_media_ids, $invitation_media_ids, $output_media_ids, $reply_media_ids ) ) );
 		foreach ( $media_ids as $media_id ) {
 			if ( ! $this->media_is_referenced( (int) $media_id ) ) {
 				Clipisode_Media::delete( (int) $media_id );
@@ -1089,8 +1097,9 @@ class Clipisode_REST_API {
 			"SELECT id FROM {$wpdb->prefix}clipisode_outputs WHERE media_id = %d
 			UNION SELECT id FROM {$wpdb->prefix}clipisode_contents WHERE media_id = %d
 			UNION SELECT id FROM {$wpdb->prefix}clipisode_replies WHERE media_id = %d
-			UNION SELECT id FROM {$wpdb->prefix}clipisode_topics WHERE intro_media_id = %d OR social_image_media_id = %d LIMIT 1",
-			$media_id, $media_id, $media_id, $media_id, $media_id
+			UNION SELECT id FROM {$wpdb->prefix}clipisode_topics WHERE intro_media_id = %d OR social_image_media_id = %d
+			UNION SELECT id FROM {$wpdb->prefix}clipisode_invitation_links WHERE social_image_media_id = %d LIMIT 1",
+			$media_id, $media_id, $media_id, $media_id, $media_id, $media_id
 		) );
 	}
 
@@ -1140,21 +1149,42 @@ class Clipisode_REST_API {
 
 	// --- Invitation Links ---
 
+	private function enrich_invitation_link( object $link ): object {
+		$link->social_image_media_id = ! empty( $link->social_image_media_id )
+			? (int) $link->social_image_media_id
+			: null;
+		$link->social_image_url = $link->social_image_media_id
+			? Clipisode_Media::get_url( $link->social_image_media_id )
+			: null;
+		$topic_social_image_id = ! empty( $link->topic_social_image_media_id )
+			? (int) $link->topic_social_image_media_id
+			: null;
+		$link->topic_social_image_url = $topic_social_image_id
+			? Clipisode_Media::get_url( $topic_social_image_id )
+			: null;
+		$link->effective_social_image_url = $link->social_image_url ?: $link->topic_social_image_url;
+		unset( $link->topic_social_image_media_id );
+		return $link;
+	}
+
 	public function list_invitation_links( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
-		$table     = $wpdb->prefix . 'clipisode_invitation_links';
+		$table       = $wpdb->prefix . 'clipisode_invitation_links';
 		$replies_tbl = $wpdb->prefix . 'clipisode_replies';
-		$topic_id  = (int) $request['topic_id'];
+		$topics_tbl  = $wpdb->prefix . 'clipisode_topics';
+		$topic_id    = (int) $request['topic_id'];
 
 		$links = $wpdb->get_results( $wpdb->prepare( "
-			SELECT l.*, COALESCE(cl.replies_count, 0) AS replies_count
+			SELECT l.*, t.social_image_media_id AS topic_social_image_media_id,
+				COALESCE(cl.replies_count, 0) AS replies_count
 			FROM $table l
+			INNER JOIN $topics_tbl t ON t.id = l.topic_id
 			LEFT JOIN (SELECT invitation_link_id, COUNT(*) AS replies_count FROM $replies_tbl GROUP BY invitation_link_id) cl ON cl.invitation_link_id = l.id
 			WHERE l.topic_id = %d
 			ORDER BY l.created_at DESC
 		", $topic_id ) );
 
-		return new WP_REST_Response( $links );
+		return new WP_REST_Response( array_map( [ $this, 'enrich_invitation_link' ], $links ) );
 	}
 
 	public function create_invitation_link( WP_REST_Request $request ): WP_REST_Response {
@@ -1181,15 +1211,23 @@ class Clipisode_REST_API {
 			return new WP_REST_Response( [ 'message' => 'Failed to generate a unique slug.' ], 500 );
 		}
 
-		$link = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $wpdb->insert_id ) );
+		$link = $wpdb->get_row( $wpdb->prepare(
+			"SELECT l.*, t.social_image_media_id AS topic_social_image_media_id
+			 FROM $table l
+			 INNER JOIN {$wpdb->prefix}clipisode_topics t ON t.id = l.topic_id
+			 WHERE l.id = %d",
+			$wpdb->insert_id
+		) );
 		$link->replies_count = 0;
-		return new WP_REST_Response( $link, 201 );
+		return new WP_REST_Response( $this->enrich_invitation_link( $link ), 201 );
 	}
 
 	public function update_invitation_link( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
 		$table = $wpdb->prefix . 'clipisode_invitation_links';
 		$id    = (int) $request['id'];
+		$old_social_image_id = 0;
+		$new_social_image_id = 0;
 
 		$fields = [];
 		if ( $request->get_param( 'status' ) !== null ) {
@@ -1210,24 +1248,63 @@ class Clipisode_REST_API {
 			$fields['slug'] = $new_slug;
 		}
 
+		if ( $request->has_param( 'social_image_media_id' ) ) {
+			$new_social_image_id = (int) $request->get_param( 'social_image_media_id' );
+			if ( $new_social_image_id ) {
+				$is_image = $wpdb->get_var( $wpdb->prepare(
+					"SELECT id FROM {$wpdb->prefix}clipisode_media WHERE id = %d AND type = 'photo'",
+					$new_social_image_id
+				) );
+				if ( ! $is_image ) {
+					return new WP_REST_Response( [ 'message' => 'The social image must be a Clipisode-managed image.' ], 400 );
+				}
+			}
+			$old_social_image_id = (int) $wpdb->get_var( $wpdb->prepare(
+				"SELECT social_image_media_id FROM $table WHERE id = %d",
+				$id
+			) );
+			$fields['social_image_media_id'] = $new_social_image_id ?: null;
+		}
+
 		if ( ! empty( $fields ) ) {
-			$wpdb->update( $table, $fields, [ 'id' => $id ] );
+			$updated = $wpdb->update( $table, $fields, [ 'id' => $id ] );
+			if ( false === $updated ) {
+				return new WP_REST_Response( [ 'message' => 'The invitation link could not be updated.' ], 500 );
+			}
+		}
+		if ( $old_social_image_id && $old_social_image_id !== $new_social_image_id && ! $this->media_is_referenced( $old_social_image_id ) ) {
+			Clipisode_Media::delete( $old_social_image_id );
 		}
 
 		$replies_tbl = $wpdb->prefix . 'clipisode_replies';
 		$link = $wpdb->get_row( $wpdb->prepare(
-			"SELECT l.*, COALESCE(cl.replies_count, 0) AS replies_count
+			"SELECT l.*, t.social_image_media_id AS topic_social_image_media_id,
+				COALESCE(cl.replies_count, 0) AS replies_count
 			 FROM $table l
+			 INNER JOIN {$wpdb->prefix}clipisode_topics t ON t.id = l.topic_id
 			 LEFT JOIN (SELECT invitation_link_id, COUNT(*) AS replies_count FROM $replies_tbl GROUP BY invitation_link_id) cl ON cl.invitation_link_id = l.id
 			 WHERE l.id = %d", $id
 		) );
-		return new WP_REST_Response( $link );
+		if ( ! $link ) {
+			return new WP_REST_Response( [ 'message' => 'Invitation link not found.' ], 404 );
+		}
+		return new WP_REST_Response( $this->enrich_invitation_link( $link ) );
 	}
 
 	public function delete_invitation_link( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
 		$id = (int) $request['id'];
-		$wpdb->delete( $wpdb->prefix . 'clipisode_invitation_links', [ 'id' => $id ] );
+		$social_image_id = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT social_image_media_id FROM {$wpdb->prefix}clipisode_invitation_links WHERE id = %d",
+			$id
+		) );
+		$deleted = $wpdb->delete( $wpdb->prefix . 'clipisode_invitation_links', [ 'id' => $id ] );
+		if ( false === $deleted ) {
+			return new WP_REST_Response( [ 'message' => 'The invitation link could not be deleted.' ], 500 );
+		}
+		if ( $social_image_id && ! $this->media_is_referenced( $social_image_id ) ) {
+			Clipisode_Media::delete( $social_image_id );
+		}
 		return new WP_REST_Response( null, 204 );
 	}
 
@@ -1518,8 +1595,8 @@ class Clipisode_REST_API {
 		global $wpdb;
 		$id    = (int) $request['id'];
 		$table = $wpdb->prefix . 'clipisode_media';
-		if ( $this->composition_uses_media( $id ) ) {
-			return new WP_REST_Response( [ 'message' => 'This video is used by a saved composition. Remove it from the composition before deleting it.' ], 409 );
+		if ( $this->media_is_referenced( $id ) ) {
+			return new WP_REST_Response( [ 'message' => 'This media is in use. Remove it from the topic, invitation, reply, or composition before deleting it.' ], 409 );
 		}
 
 		$media = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $id ) );
@@ -1557,6 +1634,24 @@ class Clipisode_REST_API {
 				'id'    => (int) $topic->id,
 				'label' => $topic->title,
 				'page'  => 'clipisode',
+			];
+		}
+
+		$invitation = $wpdb->get_row( $wpdb->prepare(
+			"SELECT l.id, l.slug, l.topic_id, t.title AS topic_title
+			 FROM {$wpdb->prefix}clipisode_invitation_links l
+			 LEFT JOIN {$wpdb->prefix}clipisode_topics t ON t.id = l.topic_id
+			 WHERE l.social_image_media_id = %d",
+			$media_id
+		) );
+		if ( $invitation ) {
+			return [
+				'type'        => 'invitation',
+				'id'          => (int) $invitation->id,
+				'label'       => $invitation->slug,
+				'topic_id'    => (int) $invitation->topic_id,
+				'topic_title' => $invitation->topic_title,
+				'page'        => 'clipisode',
 			];
 		}
 

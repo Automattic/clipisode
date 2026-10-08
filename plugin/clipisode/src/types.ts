@@ -82,6 +82,10 @@ export interface InvitationLink {
 	slug: string;
 	type: string;
 	status: string;
+	social_image_media_id: number | null;
+	social_image_url: string | null;
+	topic_social_image_url: string | null;
+	effective_social_image_url: string | null;
 	clicks: number;
 	replies_count: number;
 	created_at: string;
@@ -122,7 +126,7 @@ export interface Reply {
 }
 
 export interface MediaUsage {
-	type: 'topic' | 'output' | 'reply';
+	type: 'topic' | 'invitation' | 'output' | 'reply';
 	id: number;
 	label: string;
 	preview_url?: string | null;

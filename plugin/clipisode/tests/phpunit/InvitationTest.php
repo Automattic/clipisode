@@ -39,4 +39,48 @@ class InvitationTest extends TestCase {
 		$this->assertSame( 1, preg_match( '#' . $test_rewrite_rules[0][0] . '#', 'clipisode/my-invitation/ABC123/' ) );
 		$this->assertSame( 0, preg_match( '#' . $test_rewrite_rules[0][0] . '#', 'invitation/ABC123/' ) );
 	}
+
+	public function test_invitation_social_image_overrides_topic_image(): void {
+		global $wpdb, $test_attachment_urls;
+		$test_attachment_urls = [
+			11 => 'https://example.com/topic.png',
+			22 => 'https://example.com/invitation.png',
+		];
+		$wpdb = new class() {
+			public string $prefix = 'wp_';
+			public function prepare( string $query, int $id ): array {
+				return [ $query, $id ];
+			}
+			public function get_row( array $prepared ): object {
+				return (object) [
+					'storage'       => 'local',
+					'attachment_id' => $prepared[1],
+				];
+			}
+		};
+
+		$topic = (object) [ 'social_image_media_id' => 11 ];
+		$this->assertSame(
+			'https://example.com/topic.png',
+			Clipisode_Invitation::get_social_image_url( (object) [], $topic )
+		);
+		$this->assertSame(
+			'https://example.com/invitation.png',
+			Clipisode_Invitation::get_social_image_url(
+				(object) [ 'social_image_media_id' => 22 ],
+				$topic
+			)
+		);
+	}
+
+	public function test_social_description_names_the_host_when_available(): void {
+		$this->assertSame(
+			'Share a video reply with Max.',
+			Clipisode_Invitation::get_social_description( (object) [ 'hosted_by' => 'Max' ] )
+		);
+		$this->assertSame(
+			'Share a video reply.',
+			Clipisode_Invitation::get_social_description( (object) [] )
+		);
+	}
 }

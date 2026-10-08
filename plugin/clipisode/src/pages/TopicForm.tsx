@@ -256,6 +256,9 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 						videoRef={ introVideoRef }
 						hasVideo={ Boolean( video ) }
 						onChange={ setSocialImage }
+						themeId={ selectedTheme?.renderer_theme || 'default' }
+						title={ form.title }
+						hostedBy={ form.hosted_by }
 					/>
 				</div>
 				<div style={ { marginTop: 16 } }>
