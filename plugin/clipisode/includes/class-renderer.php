@@ -52,6 +52,17 @@ class Clipisode_Renderer {
 			$wpdb->query( 'ROLLBACK' );
 			return self::error( $composition->get_error_message(), 409 );
 		}
+		$themes = Clipisode_Composition::themes();
+		if ( is_wp_error( $themes ) ) {
+			$wpdb->query( 'ROLLBACK' );
+			return self::error( $themes->get_error_message(), 409 );
+		}
+		foreach ( $themes as $theme ) {
+			if ( $theme['id'] === $composition['settings']['themeId'] ) {
+				$composition['themeDefinition'] = $theme;
+				break;
+			}
+		}
 		$token = wp_generate_password( 48, false );
 		if ( false === $wpdb->update( $wpdb->prefix . 'clipisode_outputs', [ 'upload_token' => $token ], [ 'id' => $output_id ] ) ) {
 			$wpdb->query( 'ROLLBACK' );

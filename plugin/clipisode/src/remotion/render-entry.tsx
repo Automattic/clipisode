@@ -6,6 +6,7 @@ import {
 } from 'remotion';
 import ClipisodeComposition from './ClipisodeComposition';
 import { buildTimeline, FPS, getCompositionSize } from './timeline';
+import { registerThemeDefinition } from './theme-schema';
 import type { ClipisodeCompositionProps } from './types';
 
 export const calculateCompositionMetadata: CalculateMetadataFunction<
@@ -16,6 +17,9 @@ export const calculateCompositionMetadata: CalculateMetadataFunction<
 	}
 	if ( ! props.clips.some( ( clip ) => clip.included ) ) {
 		throw new Error( 'Include at least one video clip before rendering.' );
+	}
+	if ( props.themeDefinition ) {
+		registerThemeDefinition( props.themeDefinition );
 	}
 	const size = getCompositionSize( props.settings.format );
 	if ( ! size ) {

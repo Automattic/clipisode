@@ -1,14 +1,18 @@
 import {
 	AbsoluteFill,
+	continueRender,
+	delayRender,
 	Html5Video,
 	Loop,
 	OffthreadVideo,
 	Sequence,
 	useRemotionEnvironment,
 } from 'remotion';
-import { useState } from '@wordpress/element';
+import { useEffect, useState } from '@wordpress/element';
 import { Video as BrowserVideo } from '@remotion/media';
 import { buildTimeline, FPS, getCardBackgroundClip } from './timeline';
+import { getThemeDefinition, registerThemeDefinition } from './theme-schema';
+import { isBuiltInRenderer, loadThemeRenderer, getThemeRenderer } from './theme-renderers';
 import { getCompositionBackground, ThemeCard, ThemeOverlay } from './themes';
 import type { ClipisodeCompositionProps, CompositionClip } from './types';
 
@@ -60,12 +64,41 @@ function SourceVideo( {
 export default function ClipisodeComposition( {
 	clips,
 	settings,
+	themeDefinition,
 }: ClipisodeCompositionProps ) {
+	if ( themeDefinition ) {
+		registerThemeDefinition( themeDefinition );
+	}
+	const theme = getThemeDefinition( settings.themeId );
+	const [ rendererReady, setRendererReady ] = useState( () =>
+		isBuiltInRenderer( theme.renderer ) || Boolean( getThemeRenderer( theme.renderer ) )
+	);
+	const [ renderHandle ] = useState( () =>
+		isBuiltInRenderer( theme.renderer ) || getThemeRenderer( theme.renderer )
+			? null
+			: delayRender( `Loading theme ${ theme.id }` )
+	);
+	useEffect( () => {
+		if ( rendererReady ) {
+			return;
+		}
+		loadThemeRenderer( theme )
+			.then( () => setRendererReady( true ) )
+			.catch( ( error: Error ) => setPlaybackError( error ) )
+			.finally( () => {
+				if ( renderHandle !== null ) {
+					continueRender( renderHandle );
+				}
+			} );
+	}, [ theme, rendererReady, renderHandle ] );
 	const [ playbackError, setPlaybackError ] = useState< Error | null >(
 		null
 	);
 	if ( playbackError ) {
 		throw playbackError;
+	}
+	if ( ! rendererReady ) {
+		return null;
 	}
 	const { segments } = buildTimeline( clips, settings );
 	const background = getCardBackgroundClip( clips, settings );

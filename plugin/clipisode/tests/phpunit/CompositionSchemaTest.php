@@ -29,6 +29,9 @@ class CompositionSchemaTest extends TestCase {
 
 	private function settings( array $theme ): array {
 		$settings = [ 'themeId' => $theme['id'], 'format' => 'portrait' ];
+		if ( isset( $theme['version'] ) ) {
+			$settings['themeVersion'] = $theme['version'];
+		}
 		foreach ( $theme['groups'] as $group ) {
 			if ( 'composition' === $group['scope'] ) {
 				foreach ( $group['fields'] as $field ) {
@@ -43,6 +46,63 @@ class CompositionSchemaTest extends TestCase {
 		$schema = json_decode( file_get_contents( CLIPISODE_PLUGIN_DIR . 'assets/composition-themes.json' ), true );
 		$this->assertSame( $schema['themes'], Clipisode_Composition::themes() );
 		$this->assertContains( 'none', array_column( Clipisode_Composition::themes(), 'id' ) );
+	}
+
+	public function test_plugin_theme_is_registered_and_validated(): void {
+		global $test_filters;
+		$existing_filters = $test_filters ?? [];
+		try {
+			require dirname( __DIR__, 3 ) . '/clipisode-community-theme/clipisode-community-theme.php';
+			$themes = Clipisode_Composition::themes();
+			$this->assertIsArray( $themes );
+			$this->assertContains( 'community', array_column( $themes, 'id' ) );
+			$theme = current( array_filter( $themes, fn( $item ) => 'community' === $item['id'] ) );
+			$composition = CompositionTest::composition();
+			$composition['settings'] = $this->settings( $theme );
+			$this->assertIsArray( Clipisode_Composition::sanitize( $composition ) );
+		} finally {
+			$test_filters = $existing_filters;
+		}
+	}
+
+	public function test_duplicate_plugin_theme_id_is_rejected(): void {
+		global $test_filters;
+		$existing_filters = $test_filters ?? [];
+		try {
+			add_filter( 'clipisode_composition_themes', function ( array $themes ): array {
+				$themes[] = $themes[0];
+				return $themes;
+			} );
+			$this->assertInstanceOf( WP_Error::class, Clipisode_Composition::themes() );
+		} finally {
+			$test_filters = $existing_filters;
+		}
+	}
+
+	public function test_plugin_can_register_a_custom_renderer_script(): void {
+		global $test_filters;
+		$existing_filters = $test_filters ?? [];
+		try {
+			require dirname( __DIR__, 3 ) . '/clipisode-studio-theme/clipisode-studio-theme.php';
+			$themes = Clipisode_Composition::themes();
+			$this->assertIsArray( $themes );
+			$theme = current( array_filter( $themes, fn( $item ) => 'studio' === $item['id'] ) );
+			$this->assertSame( 'studio', $theme['renderer'] );
+			$this->assertSame( 'https://example.com/wp-content/plugins/clipisode-studio-theme/renderer.js?ver=1.0.0', $theme['rendererUrl'] );
+			$composition = CompositionTest::composition();
+			$composition['settings'] = $this->settings( $theme );
+			$clean = Clipisode_Composition::sanitize( $composition );
+			$this->assertIsArray( $clean );
+			$this->assertSame( '1.0.0', $clean['settings']['themeVersion'] );
+			$this->assertIsArray( Clipisode_Composition::resolve( wp_json_encode( $clean ) ) );
+			$stale = $clean;
+			$stale['settings']['themeVersion'] = '0.9.0';
+			$this->assertInstanceOf( WP_Error::class, Clipisode_Composition::resolve( wp_json_encode( $stale ) ) );
+			$composition['settings']['themeVersion'] = '0.9.0';
+			$this->assertInstanceOf( WP_Error::class, Clipisode_Composition::sanitize( $composition ) );
+		} finally {
+			$test_filters = $existing_filters;
+		}
 	}
 
 	public function test_baseball_team_pick_is_persisted_and_restricted_to_catalog_teams(): void {

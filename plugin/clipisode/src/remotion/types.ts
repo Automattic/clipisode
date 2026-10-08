@@ -71,9 +71,11 @@ export interface ThemeTag {
 
 export interface ThemeDefinition {
 	id: ThemeId;
+	version?: string;
 	label: string;
 	description: string;
 	renderer: string;
+	rendererUrl?: string;
 	groups: ThemeGroup[];
 	tags: ThemeTag[];
 	canvas: { backgroundField?: string; backgroundColor?: string };
@@ -87,6 +89,7 @@ export interface ThemeDefinition {
 
 export interface CompositionSettings extends ThemeValues {
 	themeId: ThemeId;
+	themeVersion?: string;
 	format: CompositionFormat;
 }
 
@@ -108,6 +111,7 @@ export interface CompositionClip {
 export type ClipisodeCompositionProps = {
 	clips: CompositionClip[];
 	settings: CompositionSettings;
+	themeDefinition?: ThemeDefinition;
 };
 
 export interface CardSegment {

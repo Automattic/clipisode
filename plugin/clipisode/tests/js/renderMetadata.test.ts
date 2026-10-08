@@ -1,5 +1,6 @@
 import { calculateCompositionMetadata } from '../../src/remotion/render-entry';
 import { createDefaultSettings } from '../../src/remotion/themes';
+import { createDefaultSettings as createThemeSettings, getThemeDefinition } from '../../src/remotion/theme-schema';
 import type { ClipisodeCompositionProps } from '../../src/remotion/types';
 
 jest.mock( 'remotion', () => ( {
@@ -62,6 +63,26 @@ describe( 'server render metadata', () => {
 		const props = input();
 		props.settings.themeId = 'none';
 		expect( metadata( props ) ).toMatchObject( { durationInFrames: 90 } );
+	} );
+
+	it( 'loads a plugin theme definition supplied with the render job', () => {
+		const props = input();
+		props.themeDefinition = {
+			...getThemeDefinition( 'default' ),
+			id: 'community-test',
+			version: '1.0.0',
+		};
+		props.settings.themeId = 'community-test';
+		props.settings.themeVersion = '1.0.0';
+		expect( metadata( props ) ).toMatchObject( {
+			durationInFrames: 180,
+		} );
+		expect( getThemeDefinition( 'community-test' ).label ).toBe(
+			'Clipisode'
+		);
+		expect( createThemeSettings( 'community-test' ).themeVersion ).toBe(
+			'1.0.0'
+		);
 	} );
 
 	it( 'requires explicit input instead of generating a substitute composition', () => {

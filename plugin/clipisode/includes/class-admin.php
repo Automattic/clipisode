@@ -92,6 +92,11 @@ class Clipisode_Admin {
 			'remotion_license_key'  => defined( 'CLIPISODE_REMOTION_LICENSE_KEY' ) ? (string) CLIPISODE_REMOTION_LICENSE_KEY : null,
 			'remotion_is_production' => 'production' === wp_get_environment_type(),
 		];
+		$composition_themes = Clipisode_Composition::themes();
+		if ( is_wp_error( $composition_themes ) ) {
+			throw new RuntimeException( $composition_themes->get_error_message() );
+		}
+		$config['composition_themes'] = $composition_themes;
 		wp_add_inline_script( 'clipisode-admin', 'window.clipisodeAdmin = ' . wp_json_encode( $config ) . ';', 'before' );
 	}
 
