@@ -113,7 +113,12 @@ Clipisode_Post_Types::set_flow_intro_video_url( $intro_video_url );
 //
 // Looked up once per request and threaded through the render_block filter.
 $invitation_url = home_url( trailingslashit( Clipisode_Invitation::get_prefix() . '/' . $slug ) );
-$social_image_url = Clipisode_Invitation::get_social_image_url( $link, $topic );
+$social_image = Clipisode_Invitation::get_social_image( $link, $topic );
+$social_image_url = $social_image['url'] ?? '';
+$invitation_share_url = Clipisode_Invitation::get_share_url(
+	$slug,
+	(int) ( $social_image['id'] ?? 0 )
+);
 $social_description = Clipisode_Invitation::get_social_description( $topic );
 $theme_asset_url = plugins_url(
 	'assets/themes/default',
@@ -651,9 +656,10 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 	<meta property="og:type" content="website">
 	<meta property="og:title" content="<?php echo esc_attr( $topic->title ); ?>">
 	<meta property="og:description" content="<?php echo esc_attr( $social_description ); ?>">
-	<meta property="og:url" content="<?php echo esc_url( $invitation_url ); ?>">
+	<meta property="og:url" content="<?php echo esc_url( $invitation_share_url ); ?>">
 	<?php if ( $social_image_url !== '' ) : ?>
 		<meta property="og:image" content="<?php echo esc_url( $social_image_url ); ?>">
+		<meta property="og:image:alt" content="<?php echo esc_attr( sprintf( 'Social preview for %s', $topic->title ) ); ?>">
 		<meta name="twitter:card" content="summary_large_image">
 		<meta name="twitter:image" content="<?php echo esc_url( $social_image_url ); ?>">
 	<?php else : ?>
@@ -1850,7 +1856,7 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			text-decoration: underline;
 		}
 	</style>
-	<?php wp_head(); ?>
+	<?php Clipisode_Social_Meta::print_filtered_wp_head(); ?>
 </head>
 <body class="clipisode-flow clipisode-flow-screen-<?php echo esc_attr( str_replace( '_', '-', $screen_type ) ); ?>">
 <div

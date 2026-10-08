@@ -121,7 +121,7 @@ $og_image = esc_url( $og_image );
 <?php endif; ?>
 	<meta name="twitter:image" content="<?php echo $og_image; ?>">
 	<meta name="twitter:player" content="<?php echo $og_url; ?>">
-	<?php wp_head(); ?>
+	<?php Clipisode_Social_Meta::print_filtered_wp_head(); ?>
 </head>
 <body>
 <?php echo $rendered; ?>

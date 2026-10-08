@@ -83,4 +83,15 @@ class InvitationTest extends TestCase {
 			Clipisode_Invitation::get_social_description( (object) [] )
 		);
 	}
+
+	public function test_share_url_changes_when_the_social_image_changes(): void {
+		$this->assertSame(
+			'https://example.com/site/invitation/ABC123/',
+			Clipisode_Invitation::get_share_url( 'ABC123' )
+		);
+		$this->assertSame(
+			'https://example.com/site/invitation/ABC123/?v=42',
+			Clipisode_Invitation::get_share_url( 'ABC123', 42 )
+		);
+	}
 }
