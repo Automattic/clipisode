@@ -2,18 +2,23 @@ import { useState, useRef, useCallback } from '@wordpress/element';
 import { Button, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import SocialImageComposer from './SocialImageComposer';
+import { createSocialImageVariants } from '../lib/social-image-variants';
+import {
+	SOCIAL_IMAGE_FORMAT_ORDER,
+	SOCIAL_IMAGE_FORMATS,
+	type SocialImageBlobSet,
+} from '../lib/social-image-formats';
+import type { SocialImageValue, SocialImageVariants } from '../types';
 
 interface SocialImagePickerProps {
-	value: { id: number; url: string } | null;
+	value: SocialImageValue | null;
 	videoRef: React.RefObject< HTMLVideoElement >;
 	hasVideo: boolean;
-	onChange: (
-		value: { id: number; url: string } | null
-	) => void | Promise< void >;
+	onChange: ( value: SocialImageValue | null ) => void | Promise< void >;
 	themeId?: string;
 	title?: string;
 	hostedBy?: string;
-	inheritedValue?: { url: string } | null;
+	inheritedValue?: Omit< SocialImageValue, 'id' > | null;
 	label?: string;
 }
 
@@ -22,6 +27,8 @@ const ALLOWED_ACCEPT = 'image/jpeg,image/png,image/webp';
 function uploadImage(
 	file: Blob,
 	filename: string,
+	label: string,
+	parentId: number | null,
 	onProgress: ( percent: number ) => void
 ): { promise: Promise< { id: number; url: string } >; abort: () => void } {
 	const xhr = new XMLHttpRequest();
@@ -30,6 +37,10 @@ function uploadImage(
 		( resolve, reject ) => {
 			const formData = new FormData();
 			formData.append( 'file', file, filename );
+			formData.append( 'label', label );
+			if ( parentId ) {
+				formData.append( 'parent_id', String( parentId ) );
+			}
 
 			xhr.upload.addEventListener( 'progress', ( e ) => {
 				if ( e.lengthComputable ) {
@@ -87,32 +98,72 @@ export default function SocialImagePicker( {
 	const abortRef = useRef< ( () => void ) | null >( null );
 
 	const doUpload = useCallback(
-		async ( blob: Blob, filename: string, throwOnError = false ) => {
+		async ( images: SocialImageBlobSet, throwOnError = false ) => {
 			setUploading( true );
 			setProgress( 0 );
 			setError( null );
 
-			const upload = uploadImage( blob, filename, setProgress );
-			abortRef.current = upload.abort;
-
+			let rootId = 0;
 			try {
-				const result = await upload.promise;
+				const uploaded = {} as SocialImageVariants;
+				for ( const [
+					index,
+					format,
+				] of SOCIAL_IMAGE_FORMAT_ORDER.entries() ) {
+					const upload = uploadImage(
+						images[ format ],
+						`clipisode-social-preview-${ format }.png`,
+						`social-${ format }`,
+						format === 'wide' ? null : rootId,
+						( percent ) =>
+							setProgress(
+								Math.round(
+									( ( index + percent / 100 ) /
+										SOCIAL_IMAGE_FORMAT_ORDER.length ) *
+										100
+								)
+							)
+					);
+					abortRef.current = upload.abort;
+					const result = await upload.promise;
+					if ( format === 'wide' ) {
+						rootId = result.id;
+					}
+					const dimensions = SOCIAL_IMAGE_FORMATS[ format ];
+					uploaded[ format ] = {
+						...result,
+						width: dimensions.width,
+						height: dimensions.height,
+						type: 'image/png',
+					};
+				}
+				const result: SocialImageValue = {
+					id: rootId,
+					url: uploaded.wide?.url || '',
+					variants: uploaded,
+				};
 				try {
 					await onChange( result );
 				} catch ( err ) {
 					apiFetch( {
-						path: `/clipisode/v1/media/${ result.id }`,
+						path: `/clipisode/v1/media/${ rootId }`,
 						method: 'DELETE',
 					} ).catch( () => {} );
 					throw err;
 				}
-				if ( value && value.id !== result.id ) {
+				if ( value && value.id !== rootId ) {
 					apiFetch( {
 						path: `/clipisode/v1/media/${ value.id }`,
 						method: 'DELETE',
 					} ).catch( () => {} );
 				}
 			} catch ( err: any ) {
+				if ( rootId ) {
+					apiFetch( {
+						path: `/clipisode/v1/media/${ rootId }`,
+						method: 'DELETE',
+					} ).catch( () => {} );
+				}
 				if ( err.message !== 'Upload cancelled.' ) {
 					setError( err.message || 'Upload failed.' );
 				}
@@ -128,17 +179,34 @@ export default function SocialImagePicker( {
 		[ onChange, value ]
 	);
 
+	const normalizeAndUpload = useCallback(
+		async ( blob: Blob ) => {
+			setError( null );
+			try {
+				const images = await createSocialImageVariants( blob );
+				await doUpload( images, true );
+			} catch ( err ) {
+				setError(
+					err instanceof Error
+						? err.message
+						: 'The social images could not be created.'
+				);
+			}
+		},
+		[ doUpload ]
+	);
+
 	const handleFileInput = useCallback(
 		( e: React.ChangeEvent< HTMLInputElement > ) => {
 			const file = e.target.files?.[ 0 ];
 			if ( file ) {
-				doUpload( file, file.name ).catch( () => {} );
+				normalizeAndUpload( file ).catch( () => {} );
 			}
 			if ( fileInputRef.current ) {
 				fileInputRef.current.value = '';
 			}
 		},
-		[ doUpload ]
+		[ normalizeAndUpload ]
 	);
 
 	const handleCaptureFrame = useCallback( () => {
@@ -166,12 +234,12 @@ export default function SocialImagePicker( {
 					setError( 'Failed to capture frame.' );
 					return;
 				}
-				doUpload( blob, 'social-image.jpg' ).catch( () => {} );
+				normalizeAndUpload( blob ).catch( () => {} );
 			},
 			'image/jpeg',
 			0.9
 		);
-	}, [ videoRef, doUpload ] );
+	}, [ videoRef, normalizeAndUpload ] );
 
 	const handleRemove = useCallback( async () => {
 		setError( null );
@@ -204,8 +272,8 @@ export default function SocialImagePicker( {
 					margin: '4px 0 8px',
 				} }
 			>
-				Used for link previews on Facebook, X, LinkedIn, and messaging
-				apps.
+				Stored as wide, square, and portrait images for social networks
+				and messaging apps.
 				{ ! value && inheritedValue
 					? ' This invitation currently inherits the topic image.'
 					: '' }
@@ -215,18 +283,23 @@ export default function SocialImagePicker( {
 			</p>
 
 			{ displayedImage && (
-				<div style={ { marginBottom: 8 } }>
-					<img
-						src={ displayedImage.url }
-						alt="Social preview"
-						style={ {
-							maxWidth: 300,
-							maxHeight: 200,
-							borderRadius: 4,
-							display: 'block',
-							border: '1px solid #ddd',
-						} }
-					/>
+				<div className="clipisode-social-image-variants">
+					{ displayedImage.variants ? (
+						SOCIAL_IMAGE_FORMAT_ORDER.map( ( format ) => {
+							const variant = displayedImage.variants?.[ format ];
+							return variant ? (
+								<figure key={ format }>
+									<img
+										src={ variant.url }
+										alt={ `${ format } social preview` }
+									/>
+									<figcaption>{ format }</figcaption>
+								</figure>
+							) : null;
+						} )
+					) : (
+						<img src={ displayedImage.url } alt="Social preview" />
+					) }
 				</div>
 			) }
 
@@ -265,13 +338,7 @@ export default function SocialImagePicker( {
 						title={ title }
 						hostedBy={ hostedBy }
 						disabled={ uploading }
-						onCreate={ ( blob ) =>
-							doUpload(
-								blob,
-								'clipisode-social-preview.png',
-								true
-							)
-						}
+						onCreate={ ( images ) => doUpload( images, true ) }
 					/>
 				) }
 				<Button

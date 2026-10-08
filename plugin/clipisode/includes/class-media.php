@@ -53,7 +53,7 @@ class Clipisode_Media {
 	 *
 	 * @return array{ id: int, url: string }|WP_Error
 	 */
-	public static function create( string $type, string $label, string $upload_key = 'video' ) {
+	public static function create( string $type, string $label, string $upload_key = 'video', ?int $parent_id = null ) {
 		require_once ABSPATH . 'wp-admin/includes/image.php';
 		require_once ABSPATH . 'wp-admin/includes/file.php';
 		require_once ABSPATH . 'wp-admin/includes/media.php';
@@ -65,7 +65,7 @@ class Clipisode_Media {
 
 		update_post_meta( $attachment_id, self::META_KEY, '1' );
 
-		return self::insert_row( $type, $label, $attachment_id );
+		return self::insert_row( $type, $label, $attachment_id, $parent_id );
 	}
 
 	/**
@@ -73,7 +73,7 @@ class Clipisode_Media {
 	 *
 	 * @return array{ id: int, url: string }|WP_Error
 	 */
-	public static function create_from_sideload( string $type, string $label, array $file_array ) {
+	public static function create_from_sideload( string $type, string $label, array $file_array, ?int $parent_id = null ) {
 		require_once ABSPATH . 'wp-admin/includes/image.php';
 		require_once ABSPATH . 'wp-admin/includes/file.php';
 		require_once ABSPATH . 'wp-admin/includes/media.php';
@@ -85,7 +85,7 @@ class Clipisode_Media {
 
 		update_post_meta( $attachment_id, self::META_KEY, '1' );
 
-		return self::insert_row( $type, $label, $attachment_id );
+		return self::insert_row( $type, $label, $attachment_id, $parent_id );
 	}
 
 	/**
@@ -133,6 +133,60 @@ class Clipisode_Media {
 		return null;
 	}
 
+	/**
+	 * Resolve a social-image root and its generated child variants.
+	 *
+	 * The referenced media row remains the wide/root image for backwards
+	 * compatibility. Square and portrait renders are stored as child rows so
+	 * replacing or deleting the root cleans up the complete set atomically.
+	 *
+	 * @return array<string, array{id: int, url: string, width: int, height: int, type: string}>
+	 */
+	public static function get_social_image_variants( int $id ): array {
+		global $wpdb;
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT id, label, storage, attachment_id, mime_type FROM {$wpdb->prefix}clipisode_media WHERE id = %d OR parent_id = %d ORDER BY id ASC",
+			$id,
+			$id
+		) );
+
+		$formats = [
+			'social-wide'     => [ 'wide', 1200, 630 ],
+			'social-square'   => [ 'square', 1200, 1200 ],
+			'social-portrait' => [ 'portrait', 1000, 1500 ],
+		];
+		$variants = [];
+		foreach ( $rows as $row ) {
+			if ( (int) $row->id === $id ) {
+				$format = 'wide';
+				$width  = 1200;
+				$height = 630;
+			} elseif ( isset( $formats[ $row->label ] ) ) {
+				[ $format, $width, $height ] = $formats[ $row->label ];
+			} else {
+				continue;
+			}
+
+			if ( 'local' !== $row->storage || ! $row->attachment_id ) {
+				continue;
+			}
+			$url = wp_get_attachment_url( (int) $row->attachment_id );
+			if ( ! $url ) {
+				continue;
+			}
+
+			$variants[ $format ] = [
+				'id'     => (int) $row->id,
+				'url'    => $url,
+				'width'  => $width,
+				'height' => $height,
+				'type'   => $row->mime_type ?: 'image/png',
+			];
+		}
+
+		return $variants;
+	}
+
 	public static function get_video_url( int $id ): ?string {
 		global $wpdb;
 		$media = $wpdb->get_row( $wpdb->prepare(
@@ -161,7 +215,7 @@ class Clipisode_Media {
 		return $media->path ? basename( $media->path ) : null;
 	}
 
-	private static function insert_row( string $type, string $label, int $attachment_id ): array|WP_Error {
+	private static function insert_row( string $type, string $label, int $attachment_id, ?int $parent_id = null ): array|WP_Error {
 		global $wpdb;
 
 		$path      = get_post_meta( $attachment_id, '_wp_attached_file', true );
@@ -174,6 +228,7 @@ class Clipisode_Media {
 			'storage'       => 'local',
 			'path'          => $path,
 			'attachment_id' => $attachment_id,
+			'parent_id'     => $parent_id,
 			'mime_type'     => $post->post_mime_type,
 			'file_size'     => $file_path ? filesize( $file_path ) : null,
 		] );

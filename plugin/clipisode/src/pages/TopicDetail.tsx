@@ -3,7 +3,7 @@ import { Button, Modal, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import ReplyModal from '../components/ReplyModal';
 import SocialImagePicker from '../components/SocialImagePicker';
-import type { Topic, InvitationLink, Reply } from '../types';
+import type { Topic, InvitationLink, Reply, SocialImageValue } from '../types';
 
 function formatBytes( bytes: number | null ): string {
 	if ( ! bytes ) {
@@ -140,7 +140,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 
 	const updateLinkSocialImage = async (
 		link: InvitationLink,
-		image: { id: number; url: string } | null
+		image: SocialImageValue | null
 	) => {
 		const updated = await apiFetch< InvitationLink >( {
 			path: `/clipisode/v1/invitation-links/${ link.id }`,
@@ -949,6 +949,8 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 								? {
 										id: socialImageLink.social_image_media_id,
 										url: socialImageLink.social_image_url,
+										variants:
+											socialImageLink.social_image_variants,
 								  }
 								: null
 						}
@@ -956,6 +958,8 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 							socialImageLink.topic_social_image_url
 								? {
 										url: socialImageLink.topic_social_image_url,
+										variants:
+											socialImageLink.topic_social_image_variants,
 								  }
 								: null
 						}

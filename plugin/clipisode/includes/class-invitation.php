@@ -15,27 +15,42 @@ class Clipisode_Invitation {
 	}
 
 	/**
-	 * Resolve the image used by social crawlers for an invitation URL.
+	 * Resolve the image set used by social crawlers for an invitation URL.
 	 * A link-level override wins; otherwise the topic's image is inherited.
 	 *
-	 * @return array{id: int, url: string}|null
+	 * @return array{id: int, variants: array<string, array{id: int, url: string, width: int, height: int, type: string}>}|null
 	 */
-	public static function get_social_image( object $link, object $topic ): ?array {
+	public static function get_social_images( object $link, object $topic ): ?array {
 		$media_ids = array_unique( array_filter( [
 			(int) ( $link->social_image_media_id ?? 0 ),
 			(int) ( $topic->social_image_media_id ?? 0 ),
 		] ) );
 		foreach ( $media_ids as $media_id ) {
-			$url = Clipisode_Media::get_url( $media_id );
-			if ( is_string( $url ) && $url !== '' ) {
+			$variants = Clipisode_Media::get_social_image_variants( $media_id );
+			if ( ! empty( $variants ) ) {
 				return [
-					'id'  => $media_id,
-					'url' => $url,
+					'id'       => $media_id,
+					'variants' => $variants,
 				];
 			}
 		}
 
 		return null;
+	}
+
+	/**
+	 * Resolve the primary wide image while preserving the v0.2 API shape.
+	 *
+	 * @return array{id: int, url: string}|null
+	 */
+	public static function get_social_image( object $link, object $topic ): ?array {
+		$images = self::get_social_images( $link, $topic );
+		if ( ! $images ) {
+			return null;
+		}
+		$variants = $images['variants'];
+		$primary  = $variants['wide'] ?? reset( $variants );
+		return $primary ? [ 'id' => $images['id'], 'url' => $primary['url'] ] : null;
 	}
 
 	public static function get_social_image_url( object $link, object $topic ): string {

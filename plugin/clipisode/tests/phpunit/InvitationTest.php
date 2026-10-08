@@ -41,21 +41,35 @@ class InvitationTest extends TestCase {
 	}
 
 	public function test_invitation_social_image_overrides_topic_image(): void {
-		global $wpdb, $test_attachment_urls;
+		global $wpdb, $test_attachment_urls, $test_social_media_rows;
 		$test_attachment_urls = [
 			11 => 'https://example.com/topic.png',
 			22 => 'https://example.com/invitation.png',
+			23 => 'https://example.com/invitation-square.png',
+			24 => 'https://example.com/invitation-portrait.png',
+		];
+		$test_social_media_rows = [
+			11 => [ (object) [ 'id' => 11, 'label' => 'asset', 'storage' => 'local', 'attachment_id' => 11, 'mime_type' => 'image/png' ] ],
+			22 => [
+				(object) [ 'id' => 22, 'label' => 'social-wide', 'storage' => 'local', 'attachment_id' => 22, 'mime_type' => 'image/png' ],
+				(object) [ 'id' => 23, 'label' => 'social-square', 'storage' => 'local', 'attachment_id' => 23, 'mime_type' => 'image/png' ],
+				(object) [ 'id' => 24, 'label' => 'social-portrait', 'storage' => 'local', 'attachment_id' => 24, 'mime_type' => 'image/png' ],
+			],
 		];
 		$wpdb = new class() {
 			public string $prefix = 'wp_';
-			public function prepare( string $query, int $id ): array {
-				return [ $query, $id ];
+			public function prepare( string $query, mixed ...$values ): array {
+				return [ $query, ...$values ];
 			}
 			public function get_row( array $prepared ): object {
 				return (object) [
 					'storage'       => 'local',
 					'attachment_id' => $prepared[1],
 				];
+			}
+			public function get_results( array $prepared ): array {
+				global $test_social_media_rows;
+				return $test_social_media_rows[ $prepared[1] ] ?? [];
 			}
 		};
 
@@ -71,6 +85,14 @@ class InvitationTest extends TestCase {
 				$topic
 			)
 		);
+		$images = Clipisode_Invitation::get_social_images(
+			(object) [ 'social_image_media_id' => 22 ],
+			$topic
+		);
+		$this->assertSame( 'https://example.com/invitation-square.png', $images['variants']['square']['url'] );
+		$this->assertSame( 1200, $images['variants']['square']['width'] );
+		$this->assertSame( 'https://example.com/invitation-portrait.png', $images['variants']['portrait']['url'] );
+		$this->assertSame( 1500, $images['variants']['portrait']['height'] );
 	}
 
 	public function test_social_description_names_the_host_when_available(): void {

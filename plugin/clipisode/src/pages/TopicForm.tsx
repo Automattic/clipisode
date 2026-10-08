@@ -9,7 +9,14 @@ import {
 import apiFetch from '@wordpress/api-fetch';
 import VideoUploader from '../components/VideoUploader';
 import SocialImagePicker from '../components/SocialImagePicker';
-import type { Topic, VideoValue, CustomTermsItem, Host, Theme } from '../types';
+import type {
+	Topic,
+	VideoValue,
+	SocialImageValue,
+	CustomTermsItem,
+	Host,
+	Theme,
+} from '../types';
 
 interface TopicFormProps {
 	id?: string;
@@ -25,10 +32,9 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 		invitation_id: '',
 	} );
 	const [ video, setVideo ] = useState< VideoValue | null >( null );
-	const [ socialImage, setSocialImage ] = useState< {
-		id: number;
-		url: string;
-	} | null >( null );
+	const [ socialImage, setSocialImage ] = useState< SocialImageValue | null >(
+		null
+	);
 	const [ customTerms, setCustomTerms ] = useState< CustomTermsItem[] >( [] );
 	const [ themes, setThemes ] = useState< Theme[] >( [] );
 	const [ hostNames, setHostNames ] = useState< string[] >( [] );
@@ -91,6 +97,7 @@ export default function TopicForm( { id, navigate }: TopicFormProps ) {
 							setSocialImage( {
 								id: topic.social_image_media_id,
 								url: topic.social_image_url,
+								variants: topic.social_image_variants,
 							} );
 						}
 					} else {

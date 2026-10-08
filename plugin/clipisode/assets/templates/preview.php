@@ -89,14 +89,25 @@ if ( $topic ) {
 	$og_description = esc_attr( implode( ', ', $parts ) );
 }
 $og_url   = esc_url( home_url( Clipisode_Preview::get_prefix() . '/' . $output->id . '/' . $output->media_id . '/' . $output->slug ) );
-$og_image = '';
+$og_image_variants = [];
 if ( $topic && ! empty( $topic->social_image_media_id ) ) {
-	$og_image = Clipisode_Media::get_url( (int) $topic->social_image_media_id );
+	$og_image_variants = Clipisode_Media::get_social_image_variants( (int) $topic->social_image_media_id );
 }
-if ( ! $og_image ) {
-	$og_image = plugins_url( 'assets/images/clipisode.png', CLIPISODE_PLUGIN_DIR . 'clipisode.php' );
+if ( empty( $og_image_variants ) ) {
+	$og_image_variants['square'] = [
+		'id'     => 0,
+		'url'    => plugins_url( 'assets/images/clipisode.png', CLIPISODE_PLUGIN_DIR . 'clipisode.php' ),
+		'width'  => 40,
+		'height' => 40,
+		'type'   => 'image/png',
+	];
 }
-$og_image = esc_url( $og_image );
+$ordered_og_images = Clipisode_Social_Meta::ordered_images(
+	$og_image_variants,
+	Clipisode_Social_Meta::request_user_agent()
+);
+$twitter_image = $og_image_variants['wide'] ?? $ordered_og_images[0];
+Clipisode_Social_Meta::send_crawler_headers();
 
 ?>
 <!DOCTYPE html>
@@ -111,16 +122,29 @@ $og_image = esc_url( $og_image );
 	<meta property="og:description" content="<?php echo $og_description; ?>">
 <?php endif; ?>
 	<meta property="og:url" content="<?php echo $og_url; ?>">
-	<meta property="og:image" content="<?php echo $og_image; ?>">
+	<?php foreach ( $ordered_og_images as $og_image ) : ?>
+		<meta property="og:image" content="<?php echo esc_url( $og_image['url'] ); ?>">
+		<meta property="og:image:secure_url" content="<?php echo esc_url( $og_image['url'] ); ?>">
+		<meta property="og:image:type" content="<?php echo esc_attr( $og_image['type'] ); ?>">
+		<meta property="og:image:width" content="<?php echo esc_attr( (string) $og_image['width'] ); ?>">
+		<meta property="og:image:height" content="<?php echo esc_attr( (string) $og_image['height'] ); ?>">
+		<meta property="og:image:alt" content="<?php echo esc_attr( sprintf( 'Social preview for %s', $output->name ) ); ?>">
+	<?php endforeach; ?>
 	<meta property="og:video" content="<?php echo esc_url( $video_url ); ?>">
+	<meta property="og:video:secure_url" content="<?php echo esc_url( $video_url ); ?>">
 	<meta property="og:video:type" content="video/mp4">
+	<meta property="og:video:width" content="1280">
+	<meta property="og:video:height" content="720">
 	<meta name="twitter:card" content="player">
 	<meta name="twitter:title" content="<?php echo $og_title; ?>">
 <?php if ( $og_description ) : ?>
 	<meta name="twitter:description" content="<?php echo $og_description; ?>">
 <?php endif; ?>
-	<meta name="twitter:image" content="<?php echo $og_image; ?>">
+	<meta name="twitter:image" content="<?php echo esc_url( $twitter_image['url'] ); ?>">
+	<meta name="twitter:image:alt" content="<?php echo esc_attr( sprintf( 'Social preview for %s', $output->name ) ); ?>">
 	<meta name="twitter:player" content="<?php echo $og_url; ?>">
+	<meta name="twitter:player:width" content="1280">
+	<meta name="twitter:player:height" content="720">
 	<?php Clipisode_Social_Meta::print_filtered_wp_head(); ?>
 </head>
 <body>

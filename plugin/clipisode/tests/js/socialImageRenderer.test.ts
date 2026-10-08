@@ -1,4 +1,7 @@
-import { renderInvitationSocialImage } from '../../src/lib/social-image-renderer';
+import {
+	renderInvitationSocialImage,
+	renderInvitationSocialImages,
+} from '../../src/lib/social-image-renderer';
 import { createDefaultSettings } from '../../src/remotion/themes';
 
 const mockRenderStill = jest.fn();
@@ -51,4 +54,52 @@ it( 'renders a stable 1200 by 630 frame from the selected theme', async () => {
 		} )
 	);
 	expect( mockBlob ).toHaveBeenCalledWith( { format: 'png' } );
+} );
+
+it( 'renders wide, square, and portrait variants from one theme', async () => {
+	const settings = {
+		...createDefaultSettings( 'wpvip' ),
+		format: 'landscape' as const,
+		title: 'An invitation',
+		subtitle: 'Hosted by Max',
+	};
+	await renderInvitationSocialImages( settings );
+
+	expect( mockRenderStill ).toHaveBeenCalledTimes( 3 );
+	expect( mockRenderStill ).toHaveBeenNthCalledWith(
+		1,
+		expect.objectContaining( {
+			composition: expect.objectContaining( {
+				width: 1200,
+				height: 630,
+			} ),
+			inputProps: {
+				settings: expect.objectContaining( { format: 'landscape' } ),
+			},
+		} )
+	);
+	expect( mockRenderStill ).toHaveBeenNthCalledWith(
+		2,
+		expect.objectContaining( {
+			composition: expect.objectContaining( {
+				width: 1200,
+				height: 1200,
+			} ),
+			inputProps: {
+				settings: expect.objectContaining( { format: 'square' } ),
+			},
+		} )
+	);
+	expect( mockRenderStill ).toHaveBeenNthCalledWith(
+		3,
+		expect.objectContaining( {
+			composition: expect.objectContaining( {
+				width: 1000,
+				height: 1500,
+			} ),
+			inputProps: {
+				settings: expect.objectContaining( { format: 'portrait' } ),
+			},
+		} )
+	);
 } );
