@@ -12,7 +12,11 @@ import { useEffect, useState } from '@wordpress/element';
 import { Video as BrowserVideo } from '@remotion/media';
 import { buildTimeline, FPS, getCardBackgroundClip } from './timeline';
 import { getThemeDefinition, registerThemeDefinition } from './theme-schema';
-import { isBuiltInRenderer, loadThemeRenderer, getThemeRenderer } from './theme-renderers';
+import {
+	isBuiltInRenderer,
+	loadThemeRenderer,
+	getThemeRenderer,
+} from './theme-renderers';
 import { getCompositionBackground, ThemeCard, ThemeOverlay } from './themes';
 import type { ClipisodeCompositionProps, CompositionClip } from './types';
 
@@ -70,11 +74,14 @@ export default function ClipisodeComposition( {
 		registerThemeDefinition( themeDefinition );
 	}
 	const theme = getThemeDefinition( settings.themeId );
-	const [ rendererReady, setRendererReady ] = useState( () =>
-		isBuiltInRenderer( theme.renderer ) || Boolean( getThemeRenderer( theme.renderer ) )
+	const [ rendererReady, setRendererReady ] = useState(
+		() =>
+			isBuiltInRenderer( theme.renderer ) ||
+			Boolean( getThemeRenderer( theme.renderer ) )
 	);
 	const [ renderHandle ] = useState( () =>
-		isBuiltInRenderer( theme.renderer ) || getThemeRenderer( theme.renderer )
+		isBuiltInRenderer( theme.renderer ) ||
+		getThemeRenderer( theme.renderer )
 			? null
 			: delayRender( `Loading theme ${ theme.id }` )
 	);
@@ -101,6 +108,8 @@ export default function ClipisodeComposition( {
 		return null;
 	}
 	const { segments } = buildTimeline( clips, settings );
+	const firstClipId = segments.find( ( segment ) => segment.type === 'clip' )
+		?.clip.id;
 	const background = getCardBackgroundClip( clips, settings );
 	const reportPlaybackError = ( name: string, error: Error ) => {
 		setPlaybackError(
@@ -142,6 +151,7 @@ export default function ClipisodeComposition( {
 								settings={ settings }
 								name={ segment.clip.name }
 								clip={ segment.clip }
+								isFirstClip={ segment.clip.id === firstClipId }
 							/>
 						</>
 					) : (

@@ -1,5 +1,8 @@
 import themeJson from '../../../clipisode-nasa-theme/theme.json';
-import { getVisibleGroups, validateThemeValues } from '../../src/remotion/theme-schema';
+import {
+	getVisibleGroups,
+	validateThemeValues,
+} from '../../src/remotion/theme-schema';
 import type {
 	CompositionClip,
 	CompositionSettings,
@@ -42,8 +45,14 @@ const clip: CompositionClip = {
 
 describe( 'NASA Mission Control theme', () => {
 	it( 'ships a complete valid default composition', () => {
-		expect( validateThemeValues( theme, settings, [ clip ] ) ).toEqual( [] );
-		expect( theme.groups.flatMap( ( group ) => group.fields ) ).toHaveLength( 66 );
+		expect( validateThemeValues( theme, settings, [ clip ] ) ).toEqual(
+			[]
+		);
+		expect( theme.id ).toBe( 'nasa-mission-control-v2' );
+		expect( theme.version ).toBe( '1.1.0' );
+		expect(
+			theme.groups.flatMap( ( group ) => group.fields )
+		).toHaveLength( 69 );
 	} );
 
 	it( 'reveals custom colors only in custom mode', () => {
@@ -51,11 +60,10 @@ describe( 'NASA Mission Control theme', () => {
 			.flatMap( ( group ) => group.fields )
 			.map( ( field ) => field.id );
 		expect( presetFields ).not.toContain( 'accentColor' );
-		const customFields = getVisibleGroups(
-			theme,
-			'composition',
-			{ ...settings, visualStyle: 'custom' }
-		)
+		const customFields = getVisibleGroups( theme, 'composition', {
+			...settings,
+			visualStyle: 'custom',
+		} )
 			.flatMap( ( group ) => group.fields )
 			.map( ( field ) => field.id );
 		expect( customFields ).toEqual(
@@ -66,5 +74,29 @@ describe( 'NASA Mission Control theme', () => {
 				'textColor',
 			] )
 		);
+	} );
+
+	it( 'defaults to a poster-first launch clock and deliberate clip reveals', () => {
+		expect( settings.titleDuration ).toBe( 4.5 );
+		expect( settings.posterHoldDuration ).toBe( 0.35 );
+		expect( settings.countdownStyle ).toBe( 'orbital-dial' );
+		expect( settings.countdownScale ).toBe( 100 );
+		expect( settings.transitionDuration ).toBe( 1.2 );
+		const transitions = theme.groups
+			.flatMap( ( group ) => group.fields )
+			.find( ( field ) => field.id === 'transitionType' );
+		expect(
+			transitions?.options?.map( ( option ) => option.value )
+		).toEqual( [
+			'orbital-iris',
+			'launch-wipe',
+			'signal-scan',
+			'clean-fade',
+			'hangar-doors',
+			'solar-eclipse',
+			'radar-sweep',
+			'constellation-tiles',
+			'none',
+		] );
 	} );
 } );

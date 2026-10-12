@@ -112,11 +112,27 @@ class CompositionSchemaTest extends TestCase {
 			require dirname( __DIR__, 3 ) . '/clipisode-nasa-theme/clipisode-nasa-theme.php';
 			$themes = Clipisode_Composition::themes();
 			$this->assertIsArray( $themes );
-			$theme = current( array_filter( $themes, fn( $item ) => 'nasa-mission-control' === $item['id'] ) );
-			$this->assertSame( 'nasa-mission-control', $theme['renderer'] );
-			$this->assertSame( '1.0.0', $theme['version'] );
-			$this->assertSame( 'https://example.com/wp-content/plugins/clipisode-nasa-theme/renderer.js?ver=1.0.0', $theme['rendererUrl'] );
+			$legacy = current( array_filter( $themes, fn( $item ) => 'nasa-mission-control' === $item['id'] ) );
+			$this->assertSame( 'nasa-mission-control', $legacy['renderer'] );
+			$this->assertSame( '1.0.0', $legacy['version'] );
+			$theme = current( array_filter( $themes, fn( $item ) => 'nasa-mission-control-v2' === $item['id'] ) );
+			$this->assertSame( 'nasa-mission-control-v2', $theme['renderer'] );
+			$this->assertSame( '1.1.0', $theme['version'] );
+			$this->assertSame( 'https://example.com/wp-content/plugins/clipisode-nasa-theme/renderer.js?ver=1.1.0', $theme['rendererUrl'] );
 			$this->assertFileExists( dirname( __DIR__, 3 ) . '/clipisode-nasa-theme/assets/contact-sheet.svg' );
+			$legacy_composition = CompositionTest::composition();
+			$legacy_composition['settings'] = $this->settings( $legacy );
+			$legacy_composition['settings']['transitionDuration'] = 0.25;
+			$legacy_clip_values = [];
+			foreach ( $legacy['groups'] as $group ) {
+				if ( 'clip' === $group['scope'] ) {
+					foreach ( $group['fields'] as $field ) {
+						$legacy_clip_values[ $field['id'] ] = $field['default'];
+					}
+				}
+			}
+			$legacy_composition['clips'][0]['values'] = $legacy_clip_values;
+			$this->assertIsArray( Clipisode_Composition::sanitize( $legacy_composition ) );
 			$composition = CompositionTest::composition();
 			$composition['settings'] = $this->settings( $theme );
 			$composition['clips'][0]['values'] = [

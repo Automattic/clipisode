@@ -1,7 +1,11 @@
 import * as React from 'react';
 import * as Remotion from 'remotion';
 import type { ComponentType } from 'react';
-import type { CompositionClip, CompositionSettings, ThemeDefinition } from './types';
+import type {
+	CompositionClip,
+	CompositionSettings,
+	ThemeDefinition,
+} from './types';
 
 export interface ThemeRenderer {
 	Card: ComponentType< {
@@ -13,6 +17,7 @@ export interface ThemeRenderer {
 		settings: CompositionSettings;
 		name: string;
 		clip?: CompositionClip;
+		isFirstClip?: boolean;
 	} >;
 }
 
@@ -20,7 +25,11 @@ const renderers = new Map< string, ThemeRenderer >();
 const loading = new Map< string, Promise< void > >();
 
 function registerRenderer( id: string, renderer: ThemeRenderer ): void {
-	if ( renderers.has( id ) || typeof renderer?.Card !== 'function' || typeof renderer?.Overlay !== 'function' ) {
+	if (
+		renderers.has( id ) ||
+		typeof renderer?.Card !== 'function' ||
+		typeof renderer?.Overlay !== 'function'
+	) {
 		throw new Error( `Invalid or duplicate composition renderer: ${ id }` );
 	}
 	renderers.set( id, renderer );
@@ -37,7 +46,10 @@ export function isBuiltInRenderer( id: string ): boolean {
 }
 
 export function loadThemeRenderer( theme: ThemeDefinition ): Promise< void > {
-	if ( isBuiltInRenderer( theme.renderer ) || renderers.has( theme.renderer ) ) {
+	if (
+		isBuiltInRenderer( theme.renderer ) ||
+		renderers.has( theme.renderer )
+	) {
 		return Promise.resolve();
 	}
 	const existing = loading.get( theme.renderer );
@@ -56,11 +68,17 @@ export function loadThemeRenderer( theme: ThemeDefinition ): Promise< void > {
 			if ( renderers.has( theme.renderer ) ) {
 				resolve();
 			} else {
-				reject( new Error( `Theme ${ theme.id } did not register its renderer.` ) );
+				reject(
+					new Error(
+						`Theme ${ theme.id } did not register its renderer.`
+					)
+				);
 			}
 		};
 		script.onerror = () =>
-			reject( new Error( `Theme ${ theme.id } renderer could not load.` ) );
+			reject(
+				new Error( `Theme ${ theme.id } renderer could not load.` )
+			);
 		document.head.appendChild( script );
 	} );
 	loading.set( theme.renderer, promise );
