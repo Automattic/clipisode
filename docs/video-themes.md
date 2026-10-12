@@ -8,6 +8,8 @@ Install `plugin/clipisode` in `wp-content/plugins/` and activate it. Install `pl
 
 For a fully custom design, install `plugin/clipisode-studio-theme`. It registers its own renderer script and draws custom cards and overlays in `renderer.js`. Both theme plugins declare `Requires Plugins: clipisode`, so WordPress requires the main plugin to be active before activation.
 
+`plugin/clipisode-nasa-theme` is the feature-rich custom-renderer showcase. It demonstrates format-aware cinematic cards, deterministic transitions, per-clip controls, inline vector illustration, and a reusable SVG asset pack without bundling a second copy of React or Remotion.
+
 The example registers its definition with `clipisode_composition_themes`:
 
 ```php

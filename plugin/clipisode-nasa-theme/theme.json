@@ -1,0 +1,326 @@
+{
+  "id": "nasa-mission-control",
+  "version": "1.0.0",
+  "label": "NASA · Mission Control",
+  "description": "A cinematic spaceflight broadcast package with mission patches, orbital scenes, telemetry, and playful launch details.",
+  "renderer": "nasa-mission-control",
+  "canvas": {
+    "backgroundField": "videoBackdropColor"
+  },
+  "timeline": {
+    "title": {
+      "label": "Launch card",
+      "enabledField": "showTitle",
+      "durationField": "titleDuration"
+    },
+    "ending": {
+      "label": "Return card",
+      "enabledField": "showEnding",
+      "durationField": "endingDuration"
+    },
+    "mediaSlots": [
+      {
+        "id": "transmissions",
+        "label": "Mission transmissions",
+        "description": "Crew messages and field reports play in mission order.",
+        "mode": "sequence"
+      }
+    ]
+  },
+  "tags": [],
+  "groups": [
+    {
+      "id": "identity",
+      "label": "Mission identity",
+      "scope": "composition",
+      "description": "Labels used throughout the flight package.",
+      "fields": [
+        { "id": "programName", "label": "Program name", "type": "text", "default": "CLIPISODE EXPLORATION PROGRAM" },
+        { "id": "missionName", "label": "Mission name", "type": "text", "default": "VOICES BEYOND THE HORIZON" },
+        { "id": "subtitle", "label": "Mission descriptor", "type": "textarea", "default": "Stories from the people building what comes next." },
+        { "id": "designation", "label": "Flight designation", "type": "text", "default": "CX-01 / ORBITAL" },
+        { "id": "statusLabel", "label": "Mission status", "type": "text", "default": "GO FOR LAUNCH" }
+      ]
+    },
+    {
+      "id": "appearance",
+      "label": "Look and color",
+      "scope": "composition",
+      "fields": [
+        {
+          "id": "videoFit",
+          "label": "Video fit",
+          "type": "select",
+          "default": "cover",
+          "options": [
+            { "value": "cover", "label": "Fill frame (crop)" },
+            { "value": "contain", "label": "Fit entire video" }
+          ]
+        },
+        {
+          "id": "visualStyle",
+          "label": "Visual style",
+          "type": "select",
+          "default": "mission-control",
+          "options": [
+            { "value": "mission-control", "label": "Mission Control" },
+            { "value": "lunar-archive", "label": "Lunar Archive" },
+            { "value": "deep-space", "label": "Deep Space" },
+            { "value": "custom", "label": "Custom colors" }
+          ]
+        },
+        {
+          "id": "typographyStyle",
+          "label": "Typography",
+          "type": "select",
+          "default": "flight",
+          "options": [
+            { "value": "flight", "label": "Modern flight" },
+            { "value": "archive", "label": "Technical archive" },
+            { "value": "future", "label": "Future mission" }
+          ]
+        },
+        { "id": "videoBackdropColor", "label": "Video letterbox color", "type": "color", "default": "#061528", "help": "Canvas color visible behind contain-fit video. Match it to the selected style when needed." },
+        { "id": "backgroundColor", "label": "Custom background", "type": "color", "default": "#061528", "when": { "field": "visualStyle", "equals": "custom" } },
+        { "id": "accentColor", "label": "Custom primary accent", "type": "color", "default": "#f04438", "when": { "field": "visualStyle", "equals": "custom" } },
+        { "id": "secondaryColor", "label": "Custom secondary accent", "type": "color", "default": "#48a9ff", "when": { "field": "visualStyle", "equals": "custom" } },
+        { "id": "textColor", "label": "Custom text", "type": "color", "default": "#f7f3e8", "when": { "field": "visualStyle", "equals": "custom" } }
+      ]
+    },
+    {
+      "id": "patch",
+      "label": "Mission patch",
+      "scope": "composition",
+      "fields": [
+        { "id": "showPatch", "label": "Show mission patch artwork", "type": "toggle", "default": true, "help": "Controls the card patch and the optional in-video patch watermark." },
+        {
+          "id": "logoStyle",
+          "label": "Rocket mark",
+          "type": "select",
+          "default": "multistage",
+          "options": [
+            { "value": "multistage", "label": "Multistage launch vehicle" },
+            { "value": "capsule", "label": "Retro capsule rocket" },
+            { "value": "shuttle", "label": "Orbital shuttle" },
+            { "value": "swoosh", "label": "Ascending swoosh" },
+            { "value": "patch", "label": "Circular rocket patch" },
+            { "value": "toy", "label": "Playful toy rocket" },
+            { "value": "custom", "label": "Uploaded logo" }
+          ]
+        },
+        { "id": "customLogoUrl", "label": "Uploaded logo", "type": "image", "default": "", "optional": true, "when": { "field": "logoStyle", "equals": "custom" } },
+        { "id": "patchLabel", "label": "Patch label", "type": "text", "default": "MISSION CX-01" },
+        {
+          "id": "patchShape",
+          "label": "Patch frame",
+          "type": "select",
+          "default": "circle",
+          "options": [
+            { "value": "circle", "label": "Circular" },
+            { "value": "shield", "label": "Flight shield" },
+            { "value": "none", "label": "No frame" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "opening",
+      "label": "Launch card",
+      "scope": "composition",
+      "card": "title",
+      "fields": [
+        { "id": "showTitle", "label": "Show launch card", "type": "toggle", "default": true },
+        { "id": "titleDuration", "label": "Duration", "type": "number", "default": 4, "min": 0.5, "max": 30 },
+        { "id": "showCountdown", "label": "Show launch countdown", "type": "toggle", "default": true },
+        { "id": "countdownFrom", "label": "Countdown starts at", "type": "number", "default": 3, "min": 3, "max": 10, "when": { "field": "showCountdown", "equals": true } },
+        {
+          "id": "titleAlignment",
+          "label": "Title alignment",
+          "type": "select",
+          "default": "left",
+          "options": [
+            { "value": "left", "label": "Flight left" },
+            { "value": "center", "label": "Centered poster" }
+          ]
+        },
+        { "id": "artworkScale", "label": "Space artwork scale", "type": "range", "default": 100, "min": 70, "max": 130, "step": 5 }
+      ]
+    },
+    {
+      "id": "backdrop",
+      "label": "Space backdrop",
+      "scope": "composition",
+      "fields": [
+        {
+          "id": "scene",
+          "label": "Scene",
+          "type": "select",
+          "default": "earth-orbit",
+          "options": [
+            { "value": "earth-orbit", "label": "Earth orbit" },
+            { "value": "lunar-surface", "label": "Lunar surface" },
+            { "value": "deep-field", "label": "Deep field" },
+            { "value": "technical-grid", "label": "Engineering grid" }
+          ]
+        },
+        { "id": "showStars", "label": "Show stars", "type": "toggle", "default": true },
+        { "id": "starDensity", "label": "Star density", "type": "range", "default": 60, "min": 15, "max": 80, "step": 5, "when": { "field": "showStars", "equals": true } },
+        { "id": "showOrbitLines", "label": "Show orbit paths", "type": "toggle", "default": true },
+        { "id": "showGrid", "label": "Show engineering grid", "type": "toggle", "default": true },
+        { "id": "showPlanet", "label": "Show planetary artwork", "type": "toggle", "default": true },
+        { "id": "vignetteStrength", "label": "Edge vignette", "type": "range", "default": 45, "min": 0, "max": 80, "step": 5 }
+      ]
+    },
+    {
+      "id": "motion",
+      "label": "Motion and transitions",
+      "scope": "composition",
+      "fields": [
+        {
+          "id": "motionLevel",
+          "label": "Motion level",
+          "type": "select",
+          "default": "cinematic",
+          "options": [
+            { "value": "none", "label": "None" },
+            { "value": "subtle", "label": "Subtle" },
+            { "value": "cinematic", "label": "Cinematic" }
+          ]
+        },
+        {
+          "id": "transitionType",
+          "label": "Clip transition",
+          "type": "select",
+          "default": "orbital-iris",
+          "options": [
+            { "value": "orbital-iris", "label": "Orbital iris" },
+            { "value": "launch-wipe", "label": "Launch wipe" },
+            { "value": "signal-scan", "label": "Signal scan" },
+            { "value": "clean-fade", "label": "Clean fade" },
+            { "value": "none", "label": "None" }
+          ]
+        },
+        { "id": "transitionDuration", "label": "Transition duration", "type": "range", "default": 0.45, "min": 0.2, "max": 0.8, "step": 0.05 },
+        { "id": "starDrift", "label": "Star drift", "type": "toggle", "default": true },
+        { "id": "orbitRotation", "label": "Orbit rotation", "type": "toggle", "default": true },
+        { "id": "filmGrain", "label": "Subtle film texture", "type": "toggle", "default": false }
+      ]
+    },
+    {
+      "id": "transmission",
+      "label": "Transmission overlay",
+      "scope": "composition",
+      "fields": [
+        { "id": "showNames", "label": "Show speaker names", "type": "toggle", "default": true },
+        {
+          "id": "lowerThirdStyle",
+          "label": "Lower third",
+          "type": "select",
+          "default": "flight-strip",
+          "options": [
+            { "value": "flight-strip", "label": "Flight strip" },
+            { "value": "mission-patch", "label": "Mission patch" },
+            { "value": "minimal", "label": "Minimal transmission" }
+          ]
+        },
+        {
+          "id": "overlayCorner",
+          "label": "Overlay position",
+          "type": "select",
+          "default": "bottom-left",
+          "options": [
+            { "value": "bottom-left", "label": "Bottom left" },
+            { "value": "bottom-right", "label": "Bottom right" },
+            { "value": "top-left", "label": "Top left" },
+            { "value": "top-right", "label": "Top right" }
+          ]
+        },
+        { "id": "showPatchWatermark", "label": "Show patch watermark", "type": "toggle", "default": true },
+        { "id": "showFrameCorners", "label": "Show flight-frame corners", "type": "toggle", "default": true },
+        { "id": "showTelemetry", "label": "Show stylized telemetry", "type": "toggle", "default": true },
+        { "id": "showTimer", "label": "Show elapsed transmission time", "type": "toggle", "default": true },
+        { "id": "telemetryLabel", "label": "Telemetry channel", "type": "text", "default": "DOWNLINK 7A" }
+      ]
+    },
+    {
+      "id": "playful",
+      "label": "Playful extras",
+      "scope": "composition",
+      "description": "Optional flourishes. They are deterministic and safe for exported video.",
+      "fields": [
+        { "id": "rocketFlyby", "label": "Rocket flyby", "type": "toggle", "default": false },
+        { "id": "floatingAstronaut", "label": "Floating astronaut", "type": "toggle", "default": false },
+        { "id": "satellitePass", "label": "Satellite pass", "type": "toggle", "default": false },
+        { "id": "signalStamp", "label": "Signal acquired stamp", "type": "toggle", "default": true },
+        { "id": "missionCompleteStars", "label": "Mission-complete star burst", "type": "toggle", "default": true }
+      ]
+    },
+    {
+      "id": "closing",
+      "label": "Return card",
+      "scope": "composition",
+      "card": "ending",
+      "fields": [
+        { "id": "showEnding", "label": "Show return card", "type": "toggle", "default": true },
+        { "id": "endingDuration", "label": "Duration", "type": "number", "default": 3.5, "min": 0.5, "max": 30 },
+        { "id": "endingText", "label": "Closing headline", "type": "textarea", "default": "MISSION COMPLETE" },
+        { "id": "endingMessage", "label": "Closing message", "type": "textarea", "default": "The signal continues." },
+        { "id": "closingStatusLabel", "label": "Closing status", "type": "text", "default": "SIGNAL RECEIVED" },
+        { "id": "ctaText", "label": "Call to action", "type": "text", "default": "FOLLOW THE NEXT TRANSMISSION", "optional": true },
+        { "id": "ctaUrl", "label": "Displayed URL", "type": "text", "default": "clipisode.com", "optional": true, "help": "Displayed in the video; it is not a clickable link." },
+        { "id": "showMissionComplete", "label": "Show mission-complete patch", "type": "toggle", "default": true }
+      ]
+    },
+    {
+      "id": "clip",
+      "label": "Per-clip flight data",
+      "scope": "clip",
+      "fields": [
+        { "id": "callsign", "label": "Callsign", "type": "text", "default": "", "optional": true },
+        { "id": "speakerRole", "label": "Crew role", "type": "text", "default": "", "optional": true },
+        { "id": "locationLabel", "label": "Location", "type": "text", "default": "", "optional": true },
+        { "id": "segmentLabel", "label": "Transmission label", "type": "text", "default": "FIELD REPORT" },
+        {
+          "id": "lowerThirdOverride",
+          "label": "Lower-third override",
+          "type": "select",
+          "default": "theme",
+          "options": [
+            { "value": "theme", "label": "Use theme setting" },
+            { "value": "flight-strip", "label": "Flight strip" },
+            { "value": "mission-patch", "label": "Mission patch" },
+            { "value": "minimal", "label": "Minimal transmission" }
+          ]
+        },
+        {
+          "id": "transitionOverride",
+          "label": "Transition override",
+          "type": "select",
+          "default": "theme",
+          "options": [
+            { "value": "theme", "label": "Use theme setting" },
+            { "value": "orbital-iris", "label": "Orbital iris" },
+            { "value": "launch-wipe", "label": "Launch wipe" },
+            { "value": "signal-scan", "label": "Signal scan" },
+            { "value": "clean-fade", "label": "Clean fade" },
+            { "value": "none", "label": "None" }
+          ]
+        },
+        {
+          "id": "overlayCornerOverride",
+          "label": "Overlay position override",
+          "type": "select",
+          "default": "theme",
+          "options": [
+            { "value": "theme", "label": "Use theme setting" },
+            { "value": "bottom-left", "label": "Bottom left" },
+            { "value": "bottom-right", "label": "Bottom right" },
+            { "value": "top-left", "label": "Top left" },
+            { "value": "top-right", "label": "Top right" }
+          ]
+        },
+        { "id": "hideOverlay", "label": "Hide flight overlay", "type": "toggle", "default": false }
+      ]
+    }
+  ]
+}

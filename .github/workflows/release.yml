@@ -47,6 +47,7 @@ jobs:
         working-directory: plugin
         run: |
           zip -q -r clipisode-community-theme.zip clipisode-community-theme
+          zip -q -r clipisode-nasa-theme.zip clipisode-nasa-theme
           zip -q -r clipisode-studio-theme.zip clipisode-studio-theme
 
       - name: Create Release
@@ -57,5 +58,6 @@ jobs:
           files: |
             plugin/clipisode/clipisode.zip
             plugin/clipisode-community-theme.zip
+            plugin/clipisode-nasa-theme.zip
             plugin/clipisode-studio-theme.zip
           generate_release_notes: true
