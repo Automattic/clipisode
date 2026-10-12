@@ -41,23 +41,8 @@ class Clipisode_Post_Types {
 	const DEFAULT_QR_OPTION = 'clipisode_default_qr_attachment_id';
 
 	/**
-	 * Font registry (single source of truth for invitation typography).
-	 *
-	 * This powers all three typography surfaces:
-	 *   1) Gutenberg font-family picker options for clipisode_screen posts
-	 *   2) CSS custom properties consumed by assets/themes/default/theme.css
-	 *   3) Remote font stylesheet URL enqueued for editor + guest flow
-	 *
-	 * Add a custom font by updating ONE entry:
-	 *   - slug               stable Gutenberg preset id
-	 *   - label              shown in the editor font-family dropdown
-	 *   - font_family        CSS stack applied via theme.css vars/rules
-	 *   - font_weight        SINGLE default weight used by theme.css vars/rules
-	 *   - google_css2_family Google Fonts css2 family descriptor
-	 *                        (omit if self-hosting fonts)
-	 *
-	 * If a new role is introduced beyond heading/body, also wire it into
-	 * font_registry_css_variables() and theme.css selectors.
+	 * Additional font presets for screen authors. Selecting a preset is
+	 * optional; unstyled blocks inherit the active site's typography.
 	 */
 	const FONT_REGISTRY = [
 		'heading' => [
@@ -1874,8 +1859,7 @@ class Clipisode_Post_Types {
 	/**
 	 * block_editor_settings_all filter for clipisode_screen posts.
 	 *
-	 * Adds FONT_REGISTRY font-family presets, maps size steps S/M to 12px/16px
-	 * (small + medium slugs), and appends a small Clipisode color palette so
+	 * Adds optional FONT_REGISTRY presets and a small Clipisode color palette so
 	 * typography and text/background picks stay usable in the iframe canvas.
 	 *
 	 * @param array<string,mixed> $settings
@@ -1931,14 +1915,6 @@ class Clipisode_Post_Types {
 		if ( ! isset( $settings['__experimentalFeatures']['typography'] ) || ! is_array( $settings['__experimentalFeatures']['typography'] ) ) {
 			$settings['__experimentalFeatures']['typography'] = [];
 		}
-
-		// Map invitation body size steps: S = 12px, M = 16px (small / medium slugs).
-		$settings['typography']['fontSizes'] = self::merge_clipisode_screen_editor_font_sizes(
-			$settings['typography']['fontSizes'] ?? []
-		);
-		$settings['__experimentalFeatures']['typography']['fontSizes'] = self::merge_clipisode_screen_editor_font_sizes(
-			$settings['__experimentalFeatures']['typography']['fontSizes'] ?? []
-		);
 
 		$clipisode_palette = self::clipisode_screen_editor_color_presets();
 		if ( $clipisode_palette !== [] ) {
@@ -2023,82 +1999,6 @@ class Clipisode_Post_Types {
 	}
 
 	/**
-	 * Font size presets for clipisode_screen: S and M match the two body sizes
-	 * used on invitation screens (12px and 16px).
-	 *
-	 * @param array<int,array<string,mixed>> $sizes
-	 * @return array<int,array<string,mixed>>
-	 */
-	/**
-	 * Replaces / adds the five-step size scale Gutenberg's font-size
-	 * picker exposes for clipisode_screen posts.
-	 *
-	 * Authors see S / M / L / XL / XXL in the sidebar; Gutenberg
-	 * stores the choice as `style.typography.fontSize` on the block,
-	 * which renders as inline CSS. Because the inline rule has
-	 * specificity 1,0,0 (style attribute) and beats most class
-	 * selectors, the chosen size flows through to the canvas and the
-	 * public flow without any class-based override fighting.
-	 *
-	 * Per-class typography rules elsewhere in this file MUST NOT use
-	 * `font-size: NNpx !important` if we want this picker to work —
-	 * !important elevates a class selector to beat the inline style.
-	 * The convention in this codebase is: per-class rules pin
-	 * margin/padding/color/text-align with !important, and pin
-	 * font-size WITHOUT !important so the picker (or block-level
-	 * inline style) can override.
-	 *
-	 * The previous implementation only filled in S and M, leaving
-	 * L/XL/XXL undefined and letting the active site theme provide
-	 * them — which produced the symptom that picking L/XL did
-	 * nothing visible (theme didn't define them) while picking XXL
-	 * sometimes shrank text (theme did define it but at a smaller
-	 * size than our base rule). Defining all five centrally fixes
-	 * both.
-	 */
-	private static function merge_clipisode_screen_editor_font_sizes( array $sizes ): array {
-		$patch = [
-			'small'    => [
-				'name' => __( 'S — small copy (12px)', 'clipisode' ),
-				'size' => '12px',
-			],
-			'medium'   => [
-				'name' => __( 'M — body (16px)', 'clipisode' ),
-				'size' => '16px',
-			],
-			'large'    => [
-				'name' => __( 'L — emphasis (22px)', 'clipisode' ),
-				'size' => '22px',
-			],
-			'x-large'  => [
-				'name' => __( 'XL — heading (32px)', 'clipisode' ),
-				'size' => '32px',
-			],
-			'xx-large' => [
-				'name' => __( 'XXL — hero (48px)', 'clipisode' ),
-				'size' => '48px',
-			],
-		];
-		$found = array_fill_keys( array_keys( $patch ), false );
-		foreach ( $sizes as $i => $entry ) {
-			if ( ! is_array( $entry ) || ! isset( $entry['slug'] ) ) {
-				continue;
-			}
-			$slug = (string) $entry['slug'];
-			if ( isset( $patch[ $slug ] ) ) {
-				$sizes[ $i ] = array_merge( $entry, $patch[ $slug ], [ 'slug' => $slug ] );
-				$found[ $slug ] = true;
-			}
-		}
-		foreach ( $patch as $slug => $def ) {
-			if ( empty( $found[ $slug ] ) ) {
-				$sizes[] = array_merge( [ 'slug' => $slug ], $def );
-			}
-		}
-		return $sizes;
-	}
-
-	/**
 	 * @return array<int,array{name:string,slug:string,color:string}>
 	 */
 	private static function clipisode_screen_editor_color_presets(): array {
@@ -2164,49 +2064,6 @@ class Clipisode_Post_Types {
 		return 'https://fonts.googleapis.com/css2?' . implode( '&', $query_parts );
 	}
 
-	public static function font_registry_css_variables(): string {
-		$fonts = self::font_registry();
-		$heading = ( isset( $fonts['heading'] ) && is_array( $fonts['heading'] ) ) ? $fonts['heading'] : [];
-		$body    = ( isset( $fonts['body'] ) && is_array( $fonts['body'] ) ) ? $fonts['body'] : [];
-
-		$heading_family = isset( $heading['font_family'] ) ? trim( (string) $heading['font_family'] ) : '';
-		$body_family    = isset( $body['font_family'] ) ? trim( (string) $body['font_family'] ) : '';
-		$heading_weight = self::normalize_font_weight(
-			isset( $heading['font_weight'] ) ? (string) $heading['font_weight'] : '',
-			'700'
-		);
-		$body_weight    = self::normalize_font_weight(
-			isset( $body['font_weight'] ) ? (string) $body['font_weight'] : '',
-			'400'
-		);
-
-		if ( $heading_family === '' || $body_family === '' ) {
-			return '';
-		}
-
-		return ':root{'
-			. '--clipisode-invite-heading-font-family:' . $heading_family . ';'
-			. '--clipisode-invite-heading-font-weight:' . $heading_weight . ';'
-			. '--clipisode-invite-body-font-family:' . $body_family . ';'
-			. '--clipisode-invite-body-font-weight:' . $body_weight . ';'
-			. '}';
-	}
-
-	private static function normalize_font_weight( string $raw, string $fallback ): string {
-		$raw = trim( $raw );
-		if ( $raw === '' ) {
-			return $fallback;
-		}
-		$normalized = strtolower( $raw );
-		if ( $normalized === 'normal' || $normalized === 'bold' ) {
-			return $normalized;
-		}
-		if ( preg_match( '/([1-9]00)/', $raw, $m ) ) {
-			return (string) $m[1];
-		}
-		return $fallback;
-	}
-
 	public static function layout_registry_css_variables(): string {
 		$layout = self::layout_registry();
 		$mobile_gutter = isset( $layout['mobile_gutter'] ) ? trim( (string) $layout['mobile_gutter'] ) : '';
@@ -2221,13 +2078,9 @@ class Clipisode_Post_Types {
 	}
 
 	/**
-	 * Enqueues the shared invitation theme stylesheet plus any remote font
-	 * stylesheet declared by FONT_REGISTRY, then injects CSS variables derived
-	 * from FONT_REGISTRY + LAYOUT_REGISTRY so theme.css and flow CSS can stay
-	 * role-based instead of hardcoding family names / phone gutters / content
-	 * widths in multiple files.
+	 * Shared control styles and tokens for the guest flow and screen editor.
 	 */
-	public static function enqueue_default_theme_style(): void {
+	public static function enqueue_default_theme_style( int $theme_id = 0 ): void {
 		$theme_css_path = CLIPISODE_PLUGIN_DIR . 'assets/themes/default/theme.css';
 		if ( ! file_exists( $theme_css_path ) ) {
 			return;
@@ -2252,7 +2105,7 @@ class Clipisode_Post_Types {
 			(string) filemtime( $theme_css_path )
 		);
 
-		$vars_css = self::font_registry_css_variables() . self::layout_registry_css_variables();
+		$vars_css = Clipisode_Invitation_Styles::css_variables( $theme_id ) . self::layout_registry_css_variables();
 		if ( $vars_css !== '' ) {
 			wp_add_inline_style( 'clipisode-default-theme-style', $vars_css );
 		}
@@ -2473,9 +2326,9 @@ class Clipisode_Post_Types {
 			}
 		}
 
-		// Shared typography/theme assets (font registry + theme.css) used by
-		// both guest flow and editor canvas.
-		self::enqueue_default_theme_style();
+		// The parent theme selects the same tokens in the editor and guest flow.
+		$screen_post = $post_id ? get_post( $post_id ) : null;
+		self::enqueue_default_theme_style( $screen_post ? (int) $screen_post->post_parent : 0 );
 
 		// Primary signal is the screen_type meta. If that's missing or
 		// wrong (older posts created before intro_desktop existed, or
@@ -2558,18 +2411,18 @@ class Clipisode_Post_Types {
 		// styles set max-width / margin via CSS variables with high specificity.
 		// The grey body background makes the empty space outside the canvas
 		// visually distinct from the white "phone" canvas itself.
-		$css = "/* clipisode_screen editor canvas constraint */
-body.editor-styles-wrapper {
+		$css = "
+:where(body.editor-styles-wrapper) {
 	background-color: #e8e8e8 !important;
 	padding: 20px 0 !important;
 }
-body.editor-styles-wrapper > .is-root-container,
+:where(body.editor-styles-wrapper > .is-root-container,
 body.editor-styles-wrapper > .wp-block-post-content,
-body.editor-styles-wrapper > .block-editor-block-list__layout {
+body.editor-styles-wrapper > .block-editor-block-list__layout) {
 	max-width: {$max_width} !important;
 	margin-left: auto !important;
 	margin-right: auto !important;
-	background-color: #ffffff !important;
+	background-color: var(--clipisode-invitation-background);
 	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 8px 30px rgba(0, 0, 0, 0.08) !important;
 	border-radius: 4px !important;
 	padding: 24px 16px !important;
@@ -2577,105 +2430,37 @@ body.editor-styles-wrapper > .block-editor-block-list__layout {
 	min-height: {$min_height} !important;
 	position: relative;
 }
-/* Global text-element baseline. Pins font-size to 16px and font-weight
- * to 400 as the floor so blocks rendered without explicit typography
- * (paragraphs, list items, form labels) match the public flow body
- * style by default. NOT !important on font-size: an author who picks
- * a size in the sidebar gets an inline style attribute on the block
- * with higher specificity than this class-level rule, so the picker
- * choice wins the cascade. The earlier !important version defeated
- * the size picker outright; the workaround was a font-size unset
- * !important rule targeting four of the five has-NN-font-size
- * classes, which had its own bugs (XXL not covered) and was deleted
- * along with the !important here. */
-body.editor-styles-wrapper .wp-block p,
-body.editor-styles-wrapper .wp-block li,
-body.editor-styles-wrapper .wp-block label:not(.wp-block-button__link),
-body.editor-styles-wrapper .wp-block input,
-body.editor-styles-wrapper .wp-block span {
-	font-size: 16px;
-	font-weight: 400;
-}
-body.editor-styles-wrapper .wp-block p strong,
-body.editor-styles-wrapper .wp-block p b,
-body.editor-styles-wrapper .wp-block li strong,
-body.editor-styles-wrapper .wp-block li b,
-body.editor-styles-wrapper .wp-block label strong,
-body.editor-styles-wrapper .wp-block label b,
-body.editor-styles-wrapper .wp-block span strong,
-body.editor-styles-wrapper .wp-block span b {
-	font-weight: 700;
-}
-/* Token preview swaps used to be wrapped in
- * <span class=\"clipisode-preview-token\"> by preview-values.js so we
- * could pin font inheritance against the .wp-block span baseline.
- * That approach was abandoned: inserting an element into a RichText
- * subtree desynced Gutenberg's internal model from the DOM and
- * corrupted typing in previewed blocks. The script now does plain-
- * text replacement (no element insertion), so there's no preview
- * span class to style. The text-node baseline rules above already
- * apply correctly to the swapped text since it lives directly inside
- * the heading / paragraph / etc. element. */";
 
-		// Intro screen: paint a faux phone-shape inside the editor canvas so
-		// the author can see the rough WYSIWYG of the public flow without
-		// us having to ship a custom block. The root .clipisode-intro-root
-		// Group already paints the gradient (its own block sidebar drives
-		// it); we just stretch it edge-to-edge inside the canvas, push the
-		// top and bottom Groups to the corners, and approximate the public
-		// flow's typography / button shape.
-		//
-		// Several `margin: 0 !important` resets target the gap WordPress
-		// otherwise leaves between the canvas top edge and the first
-		// block (default block spacing + appender area). Without them
-		// the gradient starts ~16-24px below the top of the white phone
-		// frame and breaks the illusion.
+";
+
 		if ( $screen_type === 'intro' ) {
 			$css .= '
 
-/* Make the root Group fill the canvas like it does in the public flow.   */
-/* The 24px/16px canvas padding from the rule above is removed so we can  */
-/* paint the gradient edge-to-edge, and the various default block-spacing */
-/* gaps are zeroed so the gradient is flush with the canvas top.          */
-/* margin: 0 auto keeps the canvas horizontally centred inside the body   */
-/* (the earlier `margin: 0` killed centering and snapped it to the left). */
-body.editor-styles-wrapper > .is-root-container,
+:where(body.editor-styles-wrapper > .is-root-container,
 body.editor-styles-wrapper > .wp-block-post-content,
-body.editor-styles-wrapper > .block-editor-block-list__layout {
+body.editor-styles-wrapper > .block-editor-block-list__layout) {
 	padding: 0 !important;
 	margin: 0 auto !important;
 	overflow: hidden !important;
 }
-body.editor-styles-wrapper .block-editor-block-list__layout > *:first-child,
+:where(body.editor-styles-wrapper .block-editor-block-list__layout > *:first-child,
 body.editor-styles-wrapper .wp-block-post-content > *:first-child,
-body.editor-styles-wrapper .is-root-container > *:first-child {
+body.editor-styles-wrapper .is-root-container > *:first-child) {
 	margin-top: 0 !important;
 }
-body.editor-styles-wrapper .block-editor-block-list__layout > *:last-child,
+:where(body.editor-styles-wrapper .block-editor-block-list__layout > *:last-child,
 body.editor-styles-wrapper .wp-block-post-content > *:last-child,
-body.editor-styles-wrapper .is-root-container > *:last-child {
+body.editor-styles-wrapper .is-root-container > *:last-child) {
 	margin-bottom: 0 !important;
 }
-/* Hide the trailing block-list appender (the "+" affordance below the    */
-/* last block) that adds ~20px of empty white space at the bottom of the  */
-/* canvas. Intro is a fixed structure: authors edit the existing groups,  */
-/* they do not add new top-level blocks below them.                       */
-body.editor-styles-wrapper .block-editor-block-list-appender,
+
+:where(body.editor-styles-wrapper .block-editor-block-list-appender,
 body.editor-styles-wrapper .block-list-appender,
-body.editor-styles-wrapper .block-editor-default-block-appender {
+body.editor-styles-wrapper .block-editor-default-block-appender) {
 	display: none !important;
 }
-/* Match the canvas min-height so the gradient fills edge-to-edge with no */
-/* trailing white below it. The 844px figure mirrors the iPhone-shape     */
-/* canvas constraint set on .is-root-container above.                     */
-/*                                                                        */
-/* The intro root paints two layers via the box-shadow + background       */
-/* stack: the editor-only sample video poster sits BEHIND the author      */
-/* gradient (which the root Group still owns via its block sidebar) so    */
-/* authors can see how their gradient + scrim choices read against an     */
-/* actual video frame. The poster is a darkened SVG hint that always      */
-/* says SAMPLE so no one mistakes it for the real topic video.            */
-body.editor-styles-wrapper .clipisode-intro-root {
+
+:where(body.editor-styles-wrapper .clipisode-intro-root) {
 	min-height: 844px;
 	margin: 0 !important;
 	position: relative;
@@ -2685,7 +2470,7 @@ body.editor-styles-wrapper .clipisode-intro-root {
 	justify-content: space-between;
 }
 ';
-			$css .= "body.editor-styles-wrapper .clipisode-intro-root::before {
+			$css .= ":where(body.editor-styles-wrapper .clipisode-intro-root::before) {
 	content: '';
 	position: absolute;
 	inset: 0;
@@ -2695,12 +2480,9 @@ body.editor-styles-wrapper .clipisode-intro-root {
 	pointer-events: none;
 }
 ";
-			$css .= '/* Top + bottom Groups already declare z-index: 2 + position: relative
- * below, which puts them above the ::before sample so the gradient
- * scrims paint on top of the sample video as they do on the public
- * flow. */
-body.editor-styles-wrapper .clipisode-intro-root .clipisode-intro-top,
-body.editor-styles-wrapper .clipisode-intro-root .clipisode-intro-bottom {
+			$css .= '
+:where(body.editor-styles-wrapper .clipisode-intro-root .clipisode-intro-top,
+body.editor-styles-wrapper .clipisode-intro-root .clipisode-intro-bottom) {
 	width: 100% !important;
 	position: relative;
 	z-index: 2;
@@ -2710,178 +2492,115 @@ body.editor-styles-wrapper .clipisode-intro-root .clipisode-intro-bottom {
 	margin-block-end: 0 !important;
 }
 
-/* Drop shadow on every text element so authors see the same legibility   */
-/* the guest gets when an intro video plays behind the scrims. Scoped to  */
-/* descendants of the intro root so it does not leak into chrome / lists. */
-body.editor-styles-wrapper .clipisode-intro-root,
+:where(body.editor-styles-wrapper .clipisode-intro-root,
 body.editor-styles-wrapper .clipisode-intro-root p,
 body.editor-styles-wrapper .clipisode-intro-root h1,
 body.editor-styles-wrapper .clipisode-intro-root h2,
-body.editor-styles-wrapper .clipisode-intro-root a {
+body.editor-styles-wrapper .clipisode-intro-root a) {
 	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
 }
 
-body.editor-styles-wrapper .clipisode-intro-host {
-	font-size: 16px;
-	font-weight: 400;
-	letter-spacing: 0.12em;
-	text-transform: uppercase;
+:where(body.editor-styles-wrapper .clipisode-intro-host) {
+
 	color: rgba(255, 255, 255, 1);
 	margin: 0 0 0.35em 0 !important;
 }
-/* See clipisode-introd-title for the rationale: heading-class
- * rules deliberately omit font-size/font-weight so the heading-
- * level dropdown drives the visual size. */
-body.editor-styles-wrapper .clipisode-intro-title,
-body.editor-styles-wrapper .clipisode-intro-title.wp-block-heading {
+
+:where(body.editor-styles-wrapper .clipisode-intro-title,
+body.editor-styles-wrapper .clipisode-intro-title.wp-block-heading) {
 	color: #ffffff;
-	line-height: 1.15 !important;
 	margin: 0 !important;
 }
 
-/* Record button — compact, ~1/3 width, centred. The Buttons block uses */
-/* layout=flex with justify-content:center so the single button row is  */
-/* horizontally centred; the button itself gets a min-width hint so it  */
-/* lands close to a third of the canvas regardless of label length.     */
-body.editor-styles-wrapper .clipisode-intro-bottom .wp-block-buttons {
+:where(body.editor-styles-wrapper .clipisode-intro-bottom .wp-block-buttons) {
 	display: flex;
 	justify-content: center;
 	width: 100%;
 	margin: 0;
 }
-body.editor-styles-wrapper .clipisode-intro-bottom .wp-block-button {
+:where(body.editor-styles-wrapper .clipisode-intro-bottom .wp-block-button) {
 	width: auto !important;
 	margin: 0 !important;
 }
-body.editor-styles-wrapper .clipisode-intro-bottom .wp-block-button__link {
+:where(body.editor-styles-wrapper .clipisode-intro-bottom .wp-block-button__link) {
 	display: inline-block;
 	min-width: 33%;
 	text-align: center;
-	padding: 8px 16px !important;
-	border-radius: 8px !important;
-	font-weight: 700;
-	font-size: 16px;
 	box-sizing: border-box;
 }
-/* Record button — Clipisode blue (#3964b0) with white text, matching   */
-/* the legacy invitation page. The block sidebar still lets the author  */
-/* override colour/border via core/button controls, but this is the    */
-/* default look out of the box.                                         */
-body.editor-styles-wrapper .clipisode-intro-record .wp-block-button__link {
-	background: #3964b0 !important;
-	color: #ffffff !important;
+
+:where(body.editor-styles-wrapper .clipisode-intro-record .wp-block-button__link) {
+
 	text-shadow: none;
 }
 
-/* Upload sentence is an inline paragraph link (not a button). Match the */
-/* size of the terms paragraph so the row reads as supporting copy.     */
-/* Both the editor (<a>) and the public flow (<label> after the magic-  */
-/* href rewrite) get the same underlined-link treatment.                */
-body.editor-styles-wrapper .clipisode-intro-upload,
-body.editor-styles-wrapper p.clipisode-intro-upload {
+:where(body.editor-styles-wrapper .clipisode-intro-upload,
+body.editor-styles-wrapper p.clipisode-intro-upload) {
 	color: rgba(255, 255, 255, 1);
-	font-size: 12px;
-	font-weight: 400;
 	margin: 8px 0 0 0 !important;
 }
-body.editor-styles-wrapper .clipisode-intro-upload label[for] {
-	color: rgba(138, 181, 242, 1);
+:where(body.editor-styles-wrapper .clipisode-intro-upload label[for]) {
+	color: var(--clipisode-invitation-link);
 	text-decoration: underline !important;
 	cursor: pointer;
 }
-body.editor-styles-wrapper .clipisode-intro-upload a {
-	color: rgba(138, 181, 242, 1);
+:where(body.editor-styles-wrapper .clipisode-intro-upload a) {
+	color: var(--clipisode-invitation-link);
 	text-decoration: underline !important;
 	cursor: pointer;
 }
 
-body.editor-styles-wrapper .clipisode-intro-terms,
-body.editor-styles-wrapper p.clipisode-intro-terms {
+:where(body.editor-styles-wrapper .clipisode-intro-terms,
+body.editor-styles-wrapper p.clipisode-intro-terms) {
 	color: rgba(255, 255, 255, 1);
-	font-size: 12px;
-	font-weight: 400;
 	margin: 4px 0 0 0 !important;
 }
-body.editor-styles-wrapper .clipisode-intro-terms a {
-	color: rgba(138, 181, 242, 1);
+:where(body.editor-styles-wrapper .clipisode-intro-terms a) {
+	color: var(--clipisode-invitation-link);
 }
 ';
 		}
 
-		// Intro Desktop editor canvas. Light-theme card layout matching
-		// the public-flow desktop screen. Authors see the editable
-		// pieces (heading / instructions / QR helper) AND realistic
-		// SAMPLE visuals in the four empty slot Groups: a real
-		// Clipisode mark, a representative QR code, the sample URL
-		// text styled like the live one, and the sample video poster
-		// in the left column. Authors can size + style every slot via
-		// the standard block sidebar; the dynamic content (real URL,
-		// real QR for the request URL, topic intro video) gets PHP-
-		// injected at request time.
 		if ( $is_desktop ) {
 			$css .= "
 
-/* Canvas container: sit inside whatever width the editor iframe gives
- * us. Don't force width:100% — the iframe runs in a 'desktop preview'
- * mode that reports a much wider viewport than the visible pane, and
- * setting width:100% there makes the canvas overflow horizontally by
- * thousands of pixels. Leaving width unset lets the container shrink
- * to the visible viewport while max-width:1280px caps it on truly
- * wide displays. */
-body.editor-styles-wrapper > .is-root-container,
+:where(body.editor-styles-wrapper > .is-root-container,
 body.editor-styles-wrapper > .wp-block-post-content,
-body.editor-styles-wrapper > .block-editor-block-list__layout {
+body.editor-styles-wrapper > .block-editor-block-list__layout) {
 	padding: 0 !important;
 	margin: 0 auto !important;
 	background: #f3f4f6 !important;
 	max-width: 1280px !important;
 }
-/* Top-level block wrappers (.wp-block) inherit theme.json's
- * contentSize as max-width (~620px on default themes), squeezing the
- * Root into a narrow column. Override max-width here, but NOT width:
- * an explicit width:100% interacts badly with the desktop-preview
- * iframe's reported viewport. */
-body.editor-styles-wrapper .is-root-container > .wp-block,
+
+:where(body.editor-styles-wrapper .is-root-container > .wp-block,
 body.editor-styles-wrapper .wp-block-post-content > .wp-block,
-body.editor-styles-wrapper .block-editor-block-list__layout > .wp-block {
+body.editor-styles-wrapper .block-editor-block-list__layout > .wp-block) {
 	max-width: none !important;
 	margin-left: 0 !important;
 	margin-right: 0 !important;
 }
-body.editor-styles-wrapper .block-editor-block-list__layout > *:first-child,
+:where(body.editor-styles-wrapper .block-editor-block-list__layout > *:first-child,
 body.editor-styles-wrapper .wp-block-post-content > *:first-child,
-body.editor-styles-wrapper .is-root-container > *:first-child {
+body.editor-styles-wrapper .is-root-container > *:first-child) {
 	margin-top: 0 !important;
 }
-body.editor-styles-wrapper .block-editor-block-list__layout > *:last-child,
+:where(body.editor-styles-wrapper .block-editor-block-list__layout > *:last-child,
 body.editor-styles-wrapper .wp-block-post-content > *:last-child,
-body.editor-styles-wrapper .is-root-container > *:last-child {
+body.editor-styles-wrapper .is-root-container > *:last-child) {
 	margin-bottom: 0 !important;
 }
-body.editor-styles-wrapper .block-editor-block-list-appender,
+:where(body.editor-styles-wrapper .block-editor-block-list-appender,
 body.editor-styles-wrapper .block-list-appender,
-body.editor-styles-wrapper .block-editor-default-block-appender {
+body.editor-styles-wrapper .block-editor-default-block-appender) {
 	display: none !important;
 }
-/* Root: stretch to the canvas's available width without forcing
- * width:100% (which interacts badly with the desktop-preview iframe).
- * The parent .wp-block already has max-width:none from above, so the
- * Root will naturally fill the canvas up to the canvas's own
- * max-width:1280px cap. */
-/* Card height drives everything else. The left column is a 9:16
- * portrait video fixed to the card's inner height; the right column
- * is forced to the same width as the left so the two halves of the
- * card are visually balanced. The card's overall width is therefore
- * (left.width + right.width + gap + padding), which collapses to
- * roughly 2 * (height * 9/16) + chrome.
- *
- * The card height tracks the editor viewport (90vh) but is capped so
- * the layout stops growing on huge displays. */
-body.editor-styles-wrapper .clipisode-introd-root {
+
+:where(body.editor-styles-wrapper .clipisode-introd-root) {
 	max-width: none !important;
 	margin: 0 !important;
 	background: #f3f4f6;
-	color: #111827;
+	color: inherit;
 	padding: 24px !important;
 	display: flex;
 	flex-direction: column;
@@ -2889,12 +2608,12 @@ body.editor-styles-wrapper .clipisode-introd-root {
 	justify-content: center;
 	box-sizing: border-box;
 }
-body.editor-styles-wrapper .clipisode-introd-card {
+:where(body.editor-styles-wrapper .clipisode-introd-card) {
 	width: auto !important;
 	max-width: none !important;
 	height: min(90vh, 800px) !important;
 	margin: 0 auto !important;
-	background: #ffffff;
+	background-color: var(--clipisode-invitation-background);
 	border-radius: 18px;
 	box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
 	display: flex !important;
@@ -2905,10 +2624,8 @@ body.editor-styles-wrapper .clipisode-introd-card {
 	padding: 24px !important;
 	box-sizing: border-box;
 }
-/* Left column: 9:16 portrait, full card-content height. Width is
- * implied by aspect-ratio, so the left column auto-sizes to
- * (card.innerHeight * 9 / 16). */
-body.editor-styles-wrapper .clipisode-introd-left {
+
+:where(body.editor-styles-wrapper .clipisode-introd-left) {
 	flex: 0 0 auto;
 	height: 100% !important;
 	aspect-ratio: 9 / 16;
@@ -2918,12 +2635,8 @@ body.editor-styles-wrapper .clipisode-introd-left {
 	position: relative;
 	overflow: hidden;
 }
-/* Right column: matches the left column's width by sharing its
- * aspect-ratio + 100% height, so the card's two halves are
- * dimensionally balanced regardless of viewport size. Content inside
- * is centered both axes so the logo / title / QR don't drift around
- * as the height changes. */
-body.editor-styles-wrapper .clipisode-introd-right {
+
+:where(body.editor-styles-wrapper .clipisode-introd-right) {
 	flex: 0 0 auto;
 	height: 100% !important;
 	aspect-ratio: 9 / 16;
@@ -2938,89 +2651,53 @@ body.editor-styles-wrapper .clipisode-introd-right {
 	padding: 24px !important;
 	box-sizing: border-box;
 }
-/* Logo: real core/image block in the markup with icon.png as the
- * default. No background-image, no fixed width — the image carries
- * its own height (64px) inline and width auto, so the rendered
- * preview matches what guests see. Authors can replace the image
- * via the block toolbar's Replace button. */
-body.editor-styles-wrapper .clipisode-introd-logo {
+
+:where(body.editor-styles-wrapper .clipisode-introd-logo) {
 	margin: 0 !important;
 }
-body.editor-styles-wrapper .clipisode-introd-logo img {
+:where(body.editor-styles-wrapper .clipisode-introd-logo img) {
 	display: block;
 }
-/* URL slot: render the sample URL string in the same monospace +
- * underline treatment the public flow uses for the live URL. The
- * displayed URL is sourced from preview-values.json's resolved
- * {invitation_url} token (so the hostname is whatever home_url()
- * returns and the path is whatever the configured invitation
- * prefix is) and stripped of its http(s):// scheme + trailing slash
- * for compact display inside the rounded pill. */
-body.editor-styles-wrapper .clipisode-introd-url-slot {
+
+:where(body.editor-styles-wrapper .clipisode-introd-url-slot) {
 	margin: 0 !important;
 	padding: 8px 12px !important;
 	background: rgba(15, 23, 42, 0.04) !important;
 	border-radius: 8px !important;
-	color: rgba(138, 181, 242, 1);
+	color: var(--clipisode-invitation-link);
 	font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-	font-size: 16px;
 	min-height: 32px;
 	text-align: center;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 }
-body.editor-styles-wrapper .clipisode-introd-url-slot::before {
+:where(body.editor-styles-wrapper .clipisode-introd-url-slot::before) {
 	content: '{$preview_invitation_display_css}';
 	text-decoration: underline;
 }
-/* QR placeholder: a real core/image block in the markup so authors
- * can resize, pad, border, and reorder it via standard image
- * controls. The seeded image points at sample-qr.png imported on
- * activation; the public renderer replaces the figure with the
- * live QR canvas mount at request time. We DO NOT pin width /
- * height on the figure here — Gutenberg's image-block resize
- * handle stores the chosen width as inline style on the <img>,
- * and forcing dimensions through this rule would defeat the
- * resize control. We only zero the figure margin for visual
- * consistency with the rest of the right column. */
-body.editor-styles-wrapper figure.clipisode-introd-qr-image {
+
+:where(body.editor-styles-wrapper figure.clipisode-introd-qr-image) {
 	margin: 0 !important;
 }
-/* Editable text inside the card. We deliberately do NOT pin
- * font-size or font-weight on the title here. The heading-level
- * dropdown (H1 / H2 / H3 …) needs to visibly change the title's
- * size, and a class-level font-size rule beats the heading tag's
- * own size (class specificity is higher than element specificity).
- * Letting the active site theme's h1/h2/h3 rules win means the
- * dropdown actually controls the size, and the size picker (S /
- * M / L / XL / XXL) still works because inline style beats class.
- * Color, line-height, margin, and alignment are NOT
- * level-sensitive, so they stay pinned. */
-body.editor-styles-wrapper .clipisode-introd-title,
-body.editor-styles-wrapper .clipisode-introd-title.wp-block-heading {
+
+:where(body.editor-styles-wrapper .clipisode-introd-title,
+body.editor-styles-wrapper .clipisode-introd-title.wp-block-heading) {
 	color: #111827 !important;
-	line-height: 1.25 !important;
 	margin: 0 !important;
 	text-align: center !important;
 }
-body.editor-styles-wrapper .clipisode-introd-instructions {
+:where(body.editor-styles-wrapper .clipisode-introd-instructions) {
 	color: #4b5563 !important;
-	font-size: 16px;
-	font-weight: 400;
-	line-height: 1.5 !important;
 	margin: 0 !important;
 	text-align: center !important;
 	max-width: 360px;
 }
-body.editor-styles-wrapper .clipisode-introd-instructions strong {
+:where(body.editor-styles-wrapper .clipisode-introd-instructions strong) {
 	color: #111827 !important;
 }
-body.editor-styles-wrapper .clipisode-introd-qr-helper {
+:where(body.editor-styles-wrapper .clipisode-introd-qr-helper) {
 	color: #4b5563 !important;
-	font-size: 16px;
-	font-weight: 400;
-	line-height: 1.4 !important;
 	margin: 0 !important;
 	text-align: center !important;
 	max-width: 320px;
@@ -3028,29 +2705,25 @@ body.editor-styles-wrapper .clipisode-introd-qr-helper {
 ";
 		}
 
-		// Name-screen editor canvas. Uses real, locked preview blocks for
-		// file info/progress/input/error instead of pseudo-element boxes so
-		// selection outlines behave naturally in Gutenberg and the canvas
-		// stays close to the live guest layout.
 		if ( $screen_type === 'name' ) {
 			$css .= '
 
-body.editor-styles-wrapper > .is-root-container,
+:where(body.editor-styles-wrapper > .is-root-container,
 body.editor-styles-wrapper > .wp-block-post-content,
-body.editor-styles-wrapper > .block-editor-block-list__layout {
+body.editor-styles-wrapper > .block-editor-block-list__layout) {
 	padding: 24px var(--clipisode-mobile-gutter) !important;
 	margin: 0 auto !important;
-	background: #ffffff !important;
-	color: #111111;
+	background-color: var(--clipisode-invitation-background);
+	color: inherit;
 	position: relative;
 }
-body.editor-styles-wrapper .clipisode-name-root {
+:where(body.editor-styles-wrapper .clipisode-name-root) {
 	color: inherit;
 	width: min(100%, var(--clipisode-mobile-content-max));
 	margin-left: auto !important;
 	margin-right: auto !important;
 }
-body.editor-styles-wrapper .clipisode-name-fileinfo-preview,
+:where(body.editor-styles-wrapper .clipisode-name-fileinfo-preview,
 body.editor-styles-wrapper .clipisode-name-progress-track-preview,
 body.editor-styles-wrapper .clipisode-name-progress-label-preview,
 body.editor-styles-wrapper .clipisode-field-label-row-preview,
@@ -3058,61 +2731,50 @@ body.editor-styles-wrapper .clipisode-name-input-preview,
 body.editor-styles-wrapper .clipisode-name-handle-input-preview,
 body.editor-styles-wrapper .clipisode-name-handle-instructions-preview,
 body.editor-styles-wrapper .clipisode-name-submit-wrap,
-body.editor-styles-wrapper .clipisode-name-error-preview {
+body.editor-styles-wrapper .clipisode-name-error-preview) {
 	width: min(100%, var(--clipisode-mobile-content-max));
 	margin-left: auto !important;
 	margin-right: auto !important;
 }
-body.editor-styles-wrapper .clipisode-name-heading,
-body.editor-styles-wrapper .clipisode-name-heading.wp-block-heading {
+:where(body.editor-styles-wrapper .clipisode-name-heading,
+body.editor-styles-wrapper .clipisode-name-heading.wp-block-heading) {
 	margin: 0 0 8px 0 !important;
 }
-body.editor-styles-wrapper .clipisode-name-instructions {
+:where(body.editor-styles-wrapper .clipisode-name-instructions) {
 	margin: 8px 0 !important;
-	line-height: 1.45 !important;
-	font-weight: 400;
 }
-body.editor-styles-wrapper .clipisode-name-handle-instructions-preview {
+:where(body.editor-styles-wrapper .clipisode-name-handle-instructions-preview) {
 	margin: 8px 0 !important;
-	line-height: 1.45 !important;
-	font-weight: 400;
-	color: #111111 !important;
+	color: inherit;
 }
-body.editor-styles-wrapper .clipisode-name-root a:not(.wp-block-button__link) {
-	color: rgba(57, 101, 76, 1);
+:where(body.editor-styles-wrapper .clipisode-name-root a:not(.wp-block-button__link)) {
 	text-decoration: underline !important;
 }
-body.editor-styles-wrapper .clipisode-name-fileinfo-preview {
+:where(body.editor-styles-wrapper .clipisode-name-fileinfo-preview) {
 	margin: 16px 0 0 0 !important;
-	color: #111111;
-	font-size: 16px;
-	font-weight: 400;
-	line-height: 1.4 !important;
+	color: inherit;
 }
-body.editor-styles-wrapper .clipisode-field-label-row-preview {
+:where(body.editor-styles-wrapper .clipisode-field-label-row-preview) {
 	margin: 8px 0 4px 0 !important;
 	display: flex !important;
 	align-items: center !important;
 	justify-content: space-between !important;
 	gap: 8px !important;
 }
-body.editor-styles-wrapper .clipisode-field-label-preview {
+:where(body.editor-styles-wrapper .clipisode-field-label-preview) {
 	margin: 0 !important;
-	font-size: 16px;
-	font-weight: 700;
-	line-height: 1.3 !important;
-	color: #6b7280 !important;
+	color: inherit;
 }
-body.editor-styles-wrapper .clipisode-field-label-right-preview {
+:where(body.editor-styles-wrapper .clipisode-field-label-right-preview) {
 	margin-left: auto !important;
 	text-align: right !important;
 }
-body.editor-styles-wrapper .clipisode-name-progress-track-preview {
+:where(body.editor-styles-wrapper .clipisode-name-progress-track-preview) {
 	margin: 10px 0 0 0 !important;
 	overflow: hidden;
 	position: relative;
 }
-body.editor-styles-wrapper .clipisode-name-progress-track-preview.clipisode-pin-top {
+:where(body.editor-styles-wrapper .clipisode-name-progress-track-preview.clipisode-pin-top) {
 	position: absolute !important;
 	top: 0;
 	left: 0;
@@ -3124,7 +2786,7 @@ body.editor-styles-wrapper .clipisode-name-progress-track-preview.clipisode-pin-
 	border-radius: 0 !important;
 	box-sizing: border-box;
 }
-body.editor-styles-wrapper .clipisode-name-progress-track-preview.clipisode-pin-bottom {
+:where(body.editor-styles-wrapper .clipisode-name-progress-track-preview.clipisode-pin-bottom) {
 	position: absolute !important;
 	bottom: 0;
 	left: 0;
@@ -3136,7 +2798,7 @@ body.editor-styles-wrapper .clipisode-name-progress-track-preview.clipisode-pin-
 	border-radius: 0 !important;
 	box-sizing: border-box;
 }
-body.editor-styles-wrapper .clipisode-name-progress-fill-preview {
+:where(body.editor-styles-wrapper .clipisode-name-progress-fill-preview) {
 	margin: 0 !important;
 	width: 35%;
 	height: 100%;
@@ -3144,44 +2806,35 @@ body.editor-styles-wrapper .clipisode-name-progress-fill-preview {
 	border-radius: inherit;
 	pointer-events: none;
 }
-body.editor-styles-wrapper .clipisode-name-progress-track-preview.clipisode-pin-top .clipisode-name-progress-fill-preview,
-body.editor-styles-wrapper .clipisode-name-progress-track-preview.clipisode-pin-bottom .clipisode-name-progress-fill-preview {
+:where(body.editor-styles-wrapper .clipisode-name-progress-track-preview.clipisode-pin-top .clipisode-name-progress-fill-preview,
+body.editor-styles-wrapper .clipisode-name-progress-track-preview.clipisode-pin-bottom .clipisode-name-progress-fill-preview) {
 	border-radius: 999px !important;
 }
-body.editor-styles-wrapper .clipisode-name-progress-label-preview {
+:where(body.editor-styles-wrapper .clipisode-name-progress-label-preview) {
 	margin: 0 !important;
-	color: #111111;
-	font-size: 16px;
-	font-weight: 400;
-	letter-spacing: 0.02em;
+	color: inherit;
 }
-body.editor-styles-wrapper .clipisode-name-input-preview {
+:where(body.editor-styles-wrapper .clipisode-name-input-preview) {
 	margin: 6px 0 0 0 !important;
 	padding: 14px 16px;
-	background: #ffffff;
-	border: 1px solid rgba(17, 17, 17, 0.18);
-	border-radius: 8px;
-	color: #111111;
-	font-size: 16px;
-	font-weight: 400;
-	line-height: 1.2;
+	background-color: var(--clipisode-invitation-background);
+	border: 1px solid var(--clipisode-invitation-border);
+	border-radius: var(--clipisode-invitation-radius);
+	color: inherit;
 }
-body.editor-styles-wrapper .clipisode-name-handle-input-preview {
+:where(body.editor-styles-wrapper .clipisode-name-handle-input-preview) {
 	margin: 6px 0 0 0 !important;
 	padding: 14px 16px;
-	background: #ffffff;
-	border: 1px solid rgba(17, 17, 17, 0.18);
-	border-radius: 8px;
-	color: #111111;
-	font-size: 16px;
-	font-weight: 400;
-	line-height: 1.2;
+	background-color: var(--clipisode-invitation-background);
+	border: 1px solid var(--clipisode-invitation-border);
+	border-radius: var(--clipisode-invitation-radius);
+	color: inherit;
 }
-body.editor-styles-wrapper .clipisode-social-only-preview {
+:where(body.editor-styles-wrapper .clipisode-social-only-preview) {
 	position: relative;
 }
-body.editor-styles-wrapper .clipisode-social-only-preview:hover::after,
-body.editor-styles-wrapper .clipisode-social-only-preview:focus-within::after {
+:where(body.editor-styles-wrapper .clipisode-social-only-preview:hover::after,
+body.editor-styles-wrapper .clipisode-social-only-preview:focus-within::after) {
 	content: "Appears only in social app contexts (Instagram, X, etc.).";
 	position: absolute;
 	left: 0;
@@ -3191,31 +2844,20 @@ body.editor-styles-wrapper .clipisode-social-only-preview:focus-within::after {
 	border-radius: 6px;
 	background: rgba(17, 24, 39, 0.94);
 	color: #ffffff;
-	font-size: 12px;
-	font-weight: 600;
-	line-height: 1.3;
 	pointer-events: none;
 	white-space: normal;
 	z-index: 30;
 	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
 }
-body.editor-styles-wrapper .clipisode-name-error-preview {
+:where(body.editor-styles-wrapper .clipisode-name-error-preview) {
 	margin: 8px 0 !important;
 	color:rgb(204, 0, 0);
-	font-size: 16px;
-	font-weight: 400;
-	line-height: 1.35 !important;
 }
-body.editor-styles-wrapper .clipisode-name-submit-wrap {
+:where(body.editor-styles-wrapper .clipisode-name-submit-wrap) {
 	margin-top: 16px !important;
 }
-body.editor-styles-wrapper .clipisode-name-submit .wp-block-button__link {
-	background: #3964b0;
-	color: #ffffff;
-	border-radius: 8px;
-	padding: 14px 16px;
-	font-size: 17px;
-	font-weight: 700;
+:where(body.editor-styles-wrapper .clipisode-name-submit .wp-block-button__link) {
+
 	text-align: center;
 	display: block;
 	width: 100%;
@@ -3224,23 +2866,18 @@ body.editor-styles-wrapper .clipisode-name-submit .wp-block-button__link {
 ';
 		}
 
-		// Email-screen editor canvas. Like Name, this uses real preview
-		// blocks (email input + opt-ins) rather than pseudo-element art so
-		// block hover/selection does not produce floating artifacts.
 		if ( $screen_type === 'email' ) {
 			$css .= '
 
-body.editor-styles-wrapper > .is-root-container,
+:where(body.editor-styles-wrapper > .is-root-container,
 body.editor-styles-wrapper > .wp-block-post-content,
-body.editor-styles-wrapper > .block-editor-block-list__layout {
+body.editor-styles-wrapper > .block-editor-block-list__layout) {
 	padding: 20px var(--clipisode-mobile-gutter) !important;
 	margin: 0 auto !important;
-	/* Email is an overlay modal over Name. Use a 10% black dimmer over
-	 * white so the canvas communicates "overlay over another screen". */
-	background: linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), #ffffff !important;
-	color: #111111;
+	background: var(--clipisode-invitation-background);
+	color: inherit;
 }
-body.editor-styles-wrapper .clipisode-email-root {
+:where(body.editor-styles-wrapper .clipisode-email-root) {
 	color: inherit;
 	min-height: 0;
 	margin: 96px auto 0 !important;
@@ -3252,22 +2889,18 @@ body.editor-styles-wrapper .clipisode-email-root {
 	box-shadow: 0 16px 44px rgba(0, 0, 0, 0.35);
 	overflow: hidden;
 }
-body.editor-styles-wrapper .clipisode-email-root:not(.has-background) {
-	background: #ffffff !important;
-	color: #111111;
+:where(body.editor-styles-wrapper .clipisode-email-root:not(.has-background)) {
+	background-color: var(--clipisode-invitation-background);
+	color: inherit;
 }
-body.editor-styles-wrapper .clipisode-email-heading,
-body.editor-styles-wrapper .clipisode-email-heading.wp-block-heading {
+:where(body.editor-styles-wrapper .clipisode-email-heading,
+body.editor-styles-wrapper .clipisode-email-heading.wp-block-heading) {
 	margin: 0 0 4px 0 !important;
-	line-height: 1.2 !important;
 }
-body.editor-styles-wrapper .clipisode-email-instructions {
+:where(body.editor-styles-wrapper .clipisode-email-instructions) {
 	margin: 8px 0 !important;
-	font-size: 16px;
-	line-height: 1.45;
-	font-weight: 400;
 }
-body.editor-styles-wrapper .clipisode-email-root .clipisode-field-label-row-preview {
+:where(body.editor-styles-wrapper .clipisode-email-root .clipisode-field-label-row-preview) {
 	margin: 8px 0 4px 0 !important;
 	display: flex !important;
 	align-items: center !important;
@@ -3275,101 +2908,69 @@ body.editor-styles-wrapper .clipisode-email-root .clipisode-field-label-row-prev
 	gap: 8px !important;
 	width: 100%;
 }
-body.editor-styles-wrapper .clipisode-email-root .clipisode-field-label-preview {
+:where(body.editor-styles-wrapper .clipisode-email-root .clipisode-field-label-preview) {
 	margin: 0 !important;
-	font-size: 16px;
-	font-weight: 700;
-	line-height: 1.3 !important;
-	color: #6b7280 !important;
+	color: inherit;
 }
-body.editor-styles-wrapper .clipisode-email-root .clipisode-field-label-right-preview {
+:where(body.editor-styles-wrapper .clipisode-email-root .clipisode-field-label-right-preview) {
 	margin-left: auto !important;
 	text-align: right !important;
 }
-body.editor-styles-wrapper .clipisode-email-input-preview {
+:where(body.editor-styles-wrapper .clipisode-email-input-preview) {
 	margin: 6px 0 0 0 !important;
 	padding: 14px 16px;
-	background: #ffffff;
-	border: 1px solid rgba(17, 17, 17, 0.18);
-	border-radius: 8px;
-	color: #111111;
-	font-size: 16px;
-	font-weight: 400;
-	line-height: 1.2;
+	background-color: var(--clipisode-invitation-background);
+	border: 1px solid var(--clipisode-invitation-border);
+	border-radius: var(--clipisode-invitation-radius);
+	color: inherit;
 }
-body.editor-styles-wrapper .clipisode-email-optin-preview {
+:where(body.editor-styles-wrapper .clipisode-email-optin-preview) {
 	margin: 6px 0 0 0 !important;
-	color: #111111;
-	font-size: 16px;
-	font-weight: 400;
-	line-height: 1.3 !important;
+	color: inherit;
 }
-body.editor-styles-wrapper .clipisode-email-submit-wrap {
+:where(body.editor-styles-wrapper .clipisode-email-submit-wrap) {
 	margin-top: 12px !important;
 }
-body.editor-styles-wrapper .clipisode-email-submit .wp-block-button__link {
-	background: #3964b0;
-	color: #ffffff;
-	border-radius: 8px;
-	padding: 14px 16px;
-	font-size: 17px;
-	font-weight: 700;
+:where(body.editor-styles-wrapper .clipisode-email-submit .wp-block-button__link) {
+
 	text-align: center;
 	display: block;
 	width: 100%;
 	box-sizing: border-box;
 }
-body.editor-styles-wrapper .clipisode-email-skip,
-body.editor-styles-wrapper p.clipisode-email-skip {
-	color: #111111;
-	font-size: 16px;
-	font-weight: 400;
+:where(body.editor-styles-wrapper .clipisode-email-skip,
+body.editor-styles-wrapper p.clipisode-email-skip) {
+	color: inherit;
 	margin: 12px 0 0 0 !important;
 	text-align: center !important;
 }
-body.editor-styles-wrapper .clipisode-email-skip a,
-body.editor-styles-wrapper .clipisode-email-root a:not(.wp-block-button__link) {
-	color: rgba(138, 181, 242, 1);
+:where(body.editor-styles-wrapper .clipisode-email-skip a,
+body.editor-styles-wrapper .clipisode-email-root a:not(.wp-block-button__link)) {
 	text-decoration: underline !important;
 }
 ';
 		}
 
-		// Success-screen editor canvas: light baseline with centered
-		// mark + heading + message + action button row. The screen is
-		// rooted in a core/cover block so authors can pick a stretched-
-		// to-cover background image (or solid colour, or gradient) from
-		// the standard sidebar without us shipping a custom block.
-		//
-		// Cover wraps children in .wp-block-cover__inner-container, so
-		// the flex-centering layout that used to sit on the root must
-		// move one level deeper. The root keeps min-height + width
-		// constraints so the canvas mimics the public flow's mobile
-		// content frame; the inner container does the column-center
-		// stack of mark / heading / message / buttons.
 		if ( $screen_type === 'success' ) {
 			$css .= "
 
-body.editor-styles-wrapper > .is-root-container,
+:where(body.editor-styles-wrapper > .is-root-container,
 body.editor-styles-wrapper > .wp-block-post-content,
-body.editor-styles-wrapper > .block-editor-block-list__layout {
+body.editor-styles-wrapper > .block-editor-block-list__layout) {
 	padding: 8px var(--clipisode-mobile-gutter) !important;
 	margin: 0 auto !important;
-	background: #ffffff !important;
-	color: #111111;
+	background-color: var(--clipisode-invitation-background);
+	color: inherit;
 }
-body.editor-styles-wrapper .clipisode-success-root {
+:where(body.editor-styles-wrapper .clipisode-success-root) {
 	color: inherit;
 	min-height: 780px;
 	width: min(100%, var(--clipisode-mobile-content-max));
 	margin-left: auto !important;
 	margin-right: auto !important;
 }
-/* Cover defaults to 1.5em padding on the inner container; we zero
- * it so authors get the same gutter the rest of the screens have.
- * The flex column layout then centres mark / heading / message /
- * buttons exactly as it did when the root was a plain Group. */
-body.editor-styles-wrapper .clipisode-success-root .wp-block-cover__inner-container {
+
+:where(body.editor-styles-wrapper .clipisode-success-root .wp-block-cover__inner-container) {
 	padding: 0 !important;
 	display: flex;
 	flex-direction: column;
@@ -3381,18 +2982,7 @@ body.editor-styles-wrapper .clipisode-success-root .wp-block-cover__inner-contai
 	width: 100%;
 }
 
-/* Success mark slot: real Clipisode mark painted as a background.
- * 96px lands as a confident hero glyph without competing with the
- * heading; authors can resize via the slot Group Dimensions
- * sidebar. The slot is locked from being moved (lock.move:true) but
- * is now author-removable (lock.remove:false) so a host running a
- * sponsor ad can strip it out and leave a Cover/Group background
- * on the success screen. The slot carries a 0-height locked
- * core/spacer (clipisode-success-slot-filler) so the Gutenberg
- * pick-a-layout UI does not fire for what looks like an empty
- * Group; the public renderer strips the spacer div before render
- * (see clipisode-flow.php slot-filler strip). */
-body.editor-styles-wrapper .clipisode-success-mark-slot {
+:where(body.editor-styles-wrapper .clipisode-success-mark-slot) {
 	margin: 0 0 8px 0 !important;
 	padding: 0 !important;
 	background: url('{$sample_logo}') center / contain no-repeat !important;
@@ -3401,35 +2991,27 @@ body.editor-styles-wrapper .clipisode-success-mark-slot {
 	align-self: center;
 }
 
-body.editor-styles-wrapper .clipisode-success-heading,
-body.editor-styles-wrapper .clipisode-success-heading.wp-block-heading {
-	line-height: 1.15 !important;
+:where(body.editor-styles-wrapper .clipisode-success-heading,
+body.editor-styles-wrapper .clipisode-success-heading.wp-block-heading) {
+
 	margin: 0 !important;
 	text-align: center !important;
 }
-body.editor-styles-wrapper .clipisode-success-message {
-	color: #111111;
-	font-size: 16px;
-	line-height: 1.45 !important;
+:where(body.editor-styles-wrapper .clipisode-success-message) {
+	color: inherit;
 	margin: 0 !important;
 	text-align: center !important;
 	max-width: 320px;
 }
-body.editor-styles-wrapper .clipisode-success-root a:not(.wp-block-button__link) {
-	color: rgba(138, 181, 242, 1);
+:where(body.editor-styles-wrapper .clipisode-success-root a:not(.wp-block-button__link)) {
 	text-decoration: underline !important;
 }
-body.editor-styles-wrapper .clipisode-success-actions {
+:where(body.editor-styles-wrapper .clipisode-success-actions) {
 	margin-top: 16px !important;
 	width: 100%;
 }
-body.editor-styles-wrapper .clipisode-success-action .wp-block-button__link {
-	background: #3964b0;
-	color: #ffffff;
-	border-radius: 8px !important;
-	padding: 14px 16px !important;
-	font-size: 17px;
-	font-weight: 700;
+:where(body.editor-styles-wrapper .clipisode-success-action .wp-block-button__link) {
+
 	text-align: center !important;
 	display: block !important;
 	min-width: 240px;
@@ -3438,40 +3020,37 @@ body.editor-styles-wrapper .clipisode-success-action .wp-block-button__link {
 ";
 		}
 
-		// Closed/warning editor canvas: keep all text fully opaque and
-		// normalize action buttons to the same blue used by Intro Record.
 		if ( in_array( $screen_type, [ 'closed', 'warning_camera', 'warning_network', 'warning_silent', 'warning_wide' ], true ) ) {
 			$css .= '
 
-body.editor-styles-wrapper > .is-root-container,
+:where(body.editor-styles-wrapper > .is-root-container,
 body.editor-styles-wrapper > .wp-block-post-content,
-body.editor-styles-wrapper > .block-editor-block-list__layout {
+body.editor-styles-wrapper > .block-editor-block-list__layout) {
 	padding: 8px var(--clipisode-mobile-gutter) !important;
 	margin: 0 auto !important;
-	background: #ffffff !important;
-	color: #111111;
+	background-color: var(--clipisode-invitation-background);
+	color: inherit;
 }
-body.editor-styles-wrapper .clipisode-closed-root,
-body.editor-styles-wrapper .clipisode-warning-root {
-	color: #111111;
+:where(body.editor-styles-wrapper .clipisode-closed-root,
+body.editor-styles-wrapper .clipisode-warning-root) {
+	color: inherit;
 }
-body.editor-styles-wrapper .clipisode-warning-message,
-body.editor-styles-wrapper .clipisode-closed-message {
-	color: #111111;
+:where(body.editor-styles-wrapper .clipisode-warning-message,
+body.editor-styles-wrapper .clipisode-closed-message) {
+	color: inherit;
 	margin: 8px 0 !important;
 }
-body.editor-styles-wrapper .clipisode-warning-root p,
-body.editor-styles-wrapper .clipisode-closed-root p {
+:where(body.editor-styles-wrapper .clipisode-warning-root p,
+body.editor-styles-wrapper .clipisode-closed-root p) {
 	margin-top: 8px !important;
 	margin-bottom: 8px !important;
 }
-body.editor-styles-wrapper .clipisode-warning-root a:not(.wp-block-button__link),
-body.editor-styles-wrapper .clipisode-closed-root a:not(.wp-block-button__link) {
-	color: rgba(138, 181, 242, 1);
+:where(body.editor-styles-wrapper .clipisode-warning-root a:not(.wp-block-button__link),
+body.editor-styles-wrapper .clipisode-closed-root a:not(.wp-block-button__link)) {
 	text-decoration: underline !important;
 }
-body.editor-styles-wrapper .clipisode-warning-root .wp-block-buttons,
-body.editor-styles-wrapper .clipisode-closed-root .wp-block-buttons {
+:where(body.editor-styles-wrapper .clipisode-warning-root .wp-block-buttons,
+body.editor-styles-wrapper .clipisode-closed-root .wp-block-buttons) {
 	display: flex;
 	flex-direction: column;
 	align-items: stretch;
@@ -3480,23 +3059,15 @@ body.editor-styles-wrapper .clipisode-closed-root .wp-block-buttons {
 	margin-left: auto !important;
 	margin-right: auto !important;
 }
-body.editor-styles-wrapper .clipisode-warning-root .wp-block-button,
-body.editor-styles-wrapper .clipisode-closed-root .wp-block-button {
+:where(body.editor-styles-wrapper .clipisode-warning-root .wp-block-button,
+body.editor-styles-wrapper .clipisode-closed-root .wp-block-button) {
 	width: 100%;
 	margin: 0 !important;
 }
-body.editor-styles-wrapper .clipisode-warning-root .wp-block-button__link,
-body.editor-styles-wrapper .clipisode-closed-root .wp-block-button__link {
+:where(body.editor-styles-wrapper .clipisode-warning-root .wp-block-button__link,
+body.editor-styles-wrapper .clipisode-closed-root .wp-block-button__link) {
 	display: block !important;
 	width: 100% !important;
-	padding: 14px 16px !important;
-	border: 0 !important;
-	border-radius: 8px !important;
-	background: #3964b0 !important;
-	color: #ffffff !important;
-	font-size: 17px;
-	font-weight: 700;
-	line-height: 1.3 !important;
 	text-align: center !important;
 	box-sizing: border-box !important;
 }

@@ -432,8 +432,8 @@ $upload_progress_template = Clipisode_Post_Types::apply_flow_placeholders( $uplo
 // These are authored on the editor-only preview blocks in name.html and
 // mirrored into the runtime-injected progress bar so the live UI matches.
 $name_progress_height      = '8px';
-$name_progress_track_color = '#e5e7eb';
-$name_progress_fill_color  = '#3964b0';
+$name_progress_track_color = 'var(--clipisode-invitation-border)';
+$name_progress_fill_color  = 'var(--clipisode-invitation-accent)';
 $name_progress_radius      = '999px';
 $name_progress_pin         = 'none';
 if ( $name_markup_for_progress !== '' ) {
@@ -585,7 +585,7 @@ wp_interactivity_state( 'clipisode/flow', [
 ] );
 
 // Shared typography/theme assets (font registry + theme.css).
-Clipisode_Post_Types::enqueue_default_theme_style();
+Clipisode_Post_Types::enqueue_default_theme_style( $theme_id );
 
 // Register and enqueue the IAPI module. We register inline here rather than
 // on a wp_enqueue_scripts hook because this template only loads when the
@@ -685,75 +685,31 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 	<meta name="twitter:title" content="<?php echo esc_attr( $topic->title ); ?>">
 	<meta name="twitter:description" content="<?php echo esc_attr( $social_description ); ?>">
 	<style>
-		/*
-		 * App-shell lock. We want the flow to feel like a native app:
-		 * no body scroll, no rubber-band, no URL-bar-induced viewport jumps,
-		 * no gap above content from the default 8px body margin or a stray
-		 * admin-bar push. The pattern is:
-		 *
-		 *   html, body          -> zero margin/padding, fill the viewport
-		 *   body.clipisode-flow -> position:fixed inset:0, overflow:hidden
-		 *   IAPI region wrapper -> position:absolute inset:0 (fills body)
-		 *   each screen section -> position:absolute inset:0 (stacked)
-		 *
-		 * Because all 10 sections are stacked at the same coordinates and
-		 * only one isn't [hidden], the active screen owns the entire
-		 * viewport. Screen content can use `height: 100%` confidently
-		 * (vs. 100vh which jitters on iOS Safari as the URL bar shows
-		 * and hides). overscroll-behavior:none kills the iOS rubber-band
-		 * pull-to-refresh that would otherwise reveal the body backdrop.
-		 *
-		 * The !important on html/body resets defends against theme.json
-		 * and admin-bar styles leaking in via wp_head().
-		 */
 		html, body {
 			margin: 0 !important;
 			padding: 0 !important;
 			height: 100%;
 		}
-		body.clipisode-flow {
+		:where(body.clipisode-flow) {
 			position: fixed;
 			inset: 0;
 			overflow: hidden;
 			overscroll-behavior: none;
 			-webkit-tap-highlight-color: transparent;
-			background: #ffffff;
+			background: var(--clipisode-invitation-background);
 			/* Mobile spacing vars are injected from
 			 * Clipisode_Post_Types::LAYOUT_REGISTRY via
 			 * enqueue_default_theme_style(). */
 		}
-		body.clipisode-flow > [data-wp-interactive="clipisode/flow"] {
+		:where(body.clipisode-flow > [data-wp-interactive="clipisode/flow"]) {
+			background: var(--clipisode-invitation-background);
 			position: absolute;
 			inset: 0;
 		}
-		/*
-		 * Screen crossfade.
-		 *
-		 * All ten screens render into the DOM at page load. Only the
-		 * one matching state.screen is .is-active. CSS handles a 300ms
-		 * opacity crossfade between them. We deliberately do NOT use
-		 * the [hidden] attribute (which sets display: none) — display
-		 * can't be transitioned, so swapping it would be the jarring
-		 * blink the host wants to avoid.
-		 *
-		 * Inactive screens get visibility: hidden + pointer-events:
-		 * none so they don't catch taps or steal focus, even though
-		 * they're still in the layout. The visibility transition has a
-		 * 300ms delay on the way out so the element stays interactive
-		 * exactly as long as it's visually present, and 0ms on the way
-		 * in so the incoming screen accepts taps as soon as it begins
-		 * fading up.
-		 *
-		 * is-active is set both server-side (via the active-class
-		 * helper below, so the first paint matches state.screen with
-		 * no flash of "all screens stacked at opacity 0") and client-
-		 * side (via data-wp-class--is-active, which IAPI toggles when
-		 * state.screen changes).
-		 */
 		.clipisode-flow-screen {
 			position: absolute;
 			inset: 0;
-			overflow: hidden;
+			overflow: auto;
 			opacity: 0;
 			visibility: hidden;
 			pointer-events: none;
@@ -765,34 +721,11 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			pointer-events: auto;
 			transition: opacity 300ms ease, visibility 0s linear 0s;
 		}
-		body.clipisode-flow .clipisode-flow-screen p,
-		body.clipisode-flow .clipisode-flow-screen li,
-		body.clipisode-flow .clipisode-flow-screen label:not(.wp-block-button__link),
-		body.clipisode-flow .clipisode-flow-screen input,
-		body.clipisode-flow .clipisode-flow-screen span {
-			font-size: 16px;
-			font-weight: 400;
-		}
-		/* Editor-only placeholder blocks should never render to guests.
-		 * They exist only to make the block editor canvas WYSIWYG for
-		 * runtime-injected fields (name/email inputs, progress, opt-ins). */
-		body.clipisode-flow .clipisode-editor-only {
+		:where(body.clipisode-flow .clipisode-editor-only) {
 			display: none !important;
 		}
 
-		/*
-		 * Intro screen layout.
-		 *
-		 * The intro is now built from plain core/group blocks (no Cover,
-		 * no Custom HTML) so the editor reliably round-trips its own
-		 * markup. The root Group paints the editable gradient (or solid
-		 * color / image) via its own block sidebar and we just stretch
-		 * it edge-to-edge inside the screen and lock it to flex column
-		 * with space-between so the top and bottom Groups pin to the
-		 * corners. Author edits to padding / gap / text follow through
-		 * the way they do in any normal Group block.
-		 */
-		body.clipisode-flow .clipisode-flow-screen-intro .clipisode-intro-root {
+		:where(body.clipisode-flow .clipisode-flow-screen-intro .clipisode-intro-root) {
 			position: absolute;
 			inset: 0;
 			min-height: 100%;
@@ -810,8 +743,8 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			 * the audible-but-invisible-video bug. */
 			isolation: isolate;
 		}
-		body.clipisode-flow .clipisode-intro-top,
-		body.clipisode-flow .clipisode-intro-bottom {
+		:where(body.clipisode-flow .clipisode-intro-top,
+		body.clipisode-flow .clipisode-intro-bottom) {
 			position: relative;
 			z-index: 3;
 			width: 100% !important;
@@ -825,37 +758,13 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			box-sizing: border-box;
 			transition: opacity 250ms ease;
 		}
-		body.clipisode-flow .clipisode-intro-top.clipisode-dimmed,
-		body.clipisode-flow .clipisode-intro-bottom.clipisode-dimmed {
+		:where(body.clipisode-flow .clipisode-intro-top.clipisode-dimmed,
+		body.clipisode-flow .clipisode-intro-bottom.clipisode-dimmed) {
 			opacity: 0;
 			pointer-events: none;
 		}
 
-		/* Topic intro video.
-		 *
-		 * Two-element trick:
-		 *   .clipisode-intro-video-wrap   stacking context + GPU layer + tap target
-		 *   .clipisode-intro-video        bare full-bleed media element
-		 *
-		 * The wrap div, not the video itself, carries the compositing
-		 * properties (isolation: isolate creates a stacking context;
-		 * transform: translateZ(0) + will-change: transform promote it
-		 * to its own GPU compositing layer). This is the fix for the
-		 * Android Chrome "audio plays but no picture" symptom: the
-		 * video element renders into the wrap's compositing layer,
-		 * cleanly above the gradient that paints on .clipisode-intro-
-		 * root, regardless of whether Android picks SurfaceView or
-		 * TextureView for the underlying decoder.
-		 *
-		 * The wrap is ALSO the click target for togglePlayback. The
-		 * play button sits inside the wrap as a visual-only child
-		 * (pointer-events: none) so taps on it bubble to the wrap.
-		 * Scrims at z-index: 3 sit above the wrap and cleanly own
-		 * their own clicks (Record/Upload/Terms) — no full-screen
-		 * tap interceptor that some Android Chrome versions let
-		 * swallow scrim taps if the stacking context is borderline.
-		 */
-		body.clipisode-flow .clipisode-intro-video-wrap {
+		:where(body.clipisode-flow .clipisode-intro-video-wrap) {
 			position: absolute;
 			inset: 0;
 			z-index: 1;
@@ -871,7 +780,7 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			align-items: center;
 			justify-content: center;
 		}
-		body.clipisode-flow .clipisode-intro-video {
+		:where(body.clipisode-flow .clipisode-intro-video) {
 			position: absolute;
 			inset: 0;
 			width: 100%;
@@ -882,13 +791,7 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			pointer-events: none;
 		}
 
-		/* Hidden file inputs. We position them offscreen rather than use  */
-		/* `display: none` (the HTML `hidden` attribute) because iOS       */
-		/* Safari refuses to open a file picker for a display:none file   */
-		/* input — even when triggered via a native <label for="...">.    */
-		/* opacity 0 + 1px size keeps them invisible without taking them  */
-		/* out of the layout in a way iOS rejects.                         */
-		body.clipisode-flow .clipisode-file-input {
+		:where(body.clipisode-flow .clipisode-file-input) {
 			position: absolute;
 			left: -9999px;
 			top: -9999px;
@@ -898,14 +801,7 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			pointer-events: none;
 		}
 
-		/* Centre play-button glyph (only mounted when intro_media_id     */
-		/* resolves). Lives inside .clipisode-intro-video-wrap and is    */
-		/* pointer-events: none so taps anywhere in the wrap bubble to   */
-		/* the wrap's togglePlayback handler — including taps on the     */
-		/* button itself. The wrap is below the scrims (z-index: 1 vs    */
-		/* scrims at z-index: 3) so scrim buttons are unambiguously      */
-		/* above this tap region.                                         */
-		body.clipisode-flow .clipisode-intro-play-button {
+		:where(body.clipisode-flow .clipisode-intro-play-button) {
 			background: transparent;
 			border: 0;
 			padding: 0;
@@ -914,144 +810,82 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.5));
 			transition: opacity 250ms ease;
 		}
-		body.clipisode-flow .clipisode-intro-play-button.is-hidden {
+		:where(body.clipisode-flow .clipisode-intro-play-button.is-hidden) {
 			opacity: 0;
 		}
 
-		/*
-		 * Intro typography — small bold uppercase host line above a big
-		 * topic title. Selectors are scoped to .clipisode-flow so normal
-		 * Heading/Paragraph blocks elsewhere on the WP site are unaffected.
-		 *
-		 * Every text descendant of .clipisode-intro-root gets a soft
-		 * drop-shadow (text-shadow) so copy stays legible whether the
-		 * background is the gradient fallback or a topic intro video.
-		 * The button link itself overrides text-shadow to none so the
-		 * dark "Record a reply" label on a white pill stays crisp.
-		 */
-		body.clipisode-flow .clipisode-intro-root,
+		:where(body.clipisode-flow .clipisode-intro-root,
 		body.clipisode-flow .clipisode-intro-root p,
 		body.clipisode-flow .clipisode-intro-root h1,
 		body.clipisode-flow .clipisode-intro-root h2,
-		body.clipisode-flow .clipisode-intro-root a {
+		body.clipisode-flow .clipisode-intro-root a) {
 			text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
 		}
-		body.clipisode-flow .clipisode-intro-host {
+		:where(body.clipisode-flow .clipisode-intro-host) {
 			margin: 0 0 0.35em 0;
-			font-size: 16px;
-			font-weight: 400;
-			letter-spacing: 0.12em;
-			text-transform: none;
 			color: rgba(255, 255, 255, 1);
 		}
-		body.clipisode-flow .clipisode-intro-title,
-		body.clipisode-flow h1.clipisode-intro-title {
+		:where(body.clipisode-flow .clipisode-intro-title,
+		body.clipisode-flow h1.clipisode-intro-title) {
 			margin: 0;
 			color: #ffffff;
-			font-size: 34px;
-			line-height: 1.15;
-			font-weight: 700;
 		}
 
-		/*
-		 * Record button. Compact pill, ~1/3 of the screen width, centred
-		 * inside the Buttons row. Tight 8px padding per design — the
-		 * button stays small enough not to dominate the bottom of the
-		 * frame. min-width: 33% lets longer button labels grow past a
-		 * third while keeping the floor.
-		 */
-		body.clipisode-flow .clipisode-intro-bottom .wp-block-buttons {
+		:where(body.clipisode-flow .clipisode-intro-bottom .wp-block-buttons) {
 			display: flex;
 			justify-content: center;
 			width: 100%;
 			margin: 0;
 		}
-		body.clipisode-flow .clipisode-intro-bottom .wp-block-button {
+		:where(body.clipisode-flow .clipisode-intro-bottom .wp-block-button) {
 			width: auto;
 			margin: 0;
 		}
-		body.clipisode-flow .clipisode-intro-bottom .wp-block-button__link {
+		:where(body.clipisode-flow .clipisode-intro-bottom .wp-block-button__link) {
 			display: inline-block;
 			min-width: 33%;
 			text-align: center;
-			padding: 8px 16px;
-			border-radius: 8px;
-			font-weight: 700;
-			font-size: 16px;
 			box-sizing: border-box;
-			box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
 		}
-		/* Record CTA fill — Clipisode blue (#3964b0) with white text.    */
-		/* The render_block magic-href rewrite turns the inner <a> into a */
-		/* <label for="clipisode-record-input">, so we style both         */
-		/* descendants here so the look is identical between the editor  */
-		/* (still <a>) and the public flow (now <label>).                 */
-		body.clipisode-flow .clipisode-intro-record .wp-block-button__link,
-		body.clipisode-flow .clipisode-intro-record label.wp-block-button__link {
-			background: #3964b0;
-			color: #ffffff;
+		:where(body.clipisode-flow .clipisode-intro-record .wp-block-button__link,
+		body.clipisode-flow .clipisode-intro-record label.wp-block-button__link) {
+
 			text-shadow: none;
 			cursor: pointer;
 			-webkit-tap-highlight-color: transparent;
 		}
-		body.clipisode-flow .clipisode-intro-record label.wp-block-button__link:active {
-			background: #2f558e;
-		}
 
-		/*
-		 * Upload + terms rows. Both are plain paragraphs with an inline
-		 * link. The upload link has been rewritten to a <label> by the
-		 * magic-href filter so it natively triggers the file picker —
-		 * styling has to cover both the editor's <a> form and the public
-		 * flow's <label> form so the look is consistent.
-		 */
-		body.clipisode-flow .clipisode-intro-upload,
-		body.clipisode-flow p.clipisode-intro-upload {
+		:where(body.clipisode-flow .clipisode-intro-upload,
+		body.clipisode-flow p.clipisode-intro-upload) {
 			margin: 12px 0 0 0;
 			color: rgba(255, 255, 255, 1);
-			font-size: 12px;
-			font-weight: 400;
-			line-height: 1.4;
 			text-align: center;
 		}
-		body.clipisode-flow .clipisode-intro-upload a,
-		body.clipisode-flow .clipisode-intro-upload label[for] {
-			color: rgba(138, 181, 242, 1);
+		:where(body.clipisode-flow .clipisode-intro-upload a,
+		body.clipisode-flow .clipisode-intro-upload label[for]) {
+			color: var(--clipisode-invitation-link);
 			text-decoration: underline;
 			cursor: pointer;
 			-webkit-tap-highlight-color: transparent;
 		}
-		body.clipisode-flow .clipisode-intro-terms,
-		body.clipisode-flow p.clipisode-intro-terms {
+		:where(body.clipisode-flow .clipisode-intro-terms,
+		body.clipisode-flow p.clipisode-intro-terms) {
 			margin: 8px 0 0 0;
 			color: rgba(255, 255, 255, 1);
-			font-size: 12px;
-			font-weight: 400;
-			line-height: 1.4;
 			text-align: center;
 		}
-		body.clipisode-flow .clipisode-intro-terms a {
-			color: rgba(138, 181, 242, 1);
+		:where(body.clipisode-flow .clipisode-intro-terms a) {
+			color: var(--clipisode-invitation-link);
 			text-decoration: underline;
 			cursor: pointer;
 		}
 
-		/*
-		 * Terms modal. A flat fullscreen sheet — white background, dark
-		 * text, X close in the top-right. Hidden by default via the
-		 * native `hidden` attribute (so no flash before hydration); IAPI
-		 * toggles it via data-wp-bind--hidden="!state.termsOpen".
-		 *
-		 * The sheet itself scrolls when terms are long; touch-action and
-		 * overscroll-behavior keep that scroll local to the sheet so it
-		 * doesn't bubble out and rubber-band the underlying app shell.
-		 */
 		.clipisode-terms-modal {
 			position: fixed;
 			inset: 0;
 			z-index: 1000;
-			background: #ffffff;
-			color: #1a1a1a;
+			background: var(--clipisode-invitation-background);
+			color: inherit;
 			overflow-y: auto;
 			-webkit-overflow-scrolling: touch;
 			overscroll-behavior: contain;
@@ -1069,10 +903,10 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			justify-content: center;
 			width: 44px;
 			height: 44px;
-			background: rgba(255, 255, 255, 1);
+			background: var(--clipisode-invitation-background);
 			backdrop-filter: blur(6px);
 			border: 0;
-			color: #1a1a1a;
+			color: inherit;
 			cursor: pointer;
 			-webkit-tap-highlight-color: transparent;
 			z-index: 2;
@@ -1084,15 +918,12 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			padding: 0 20px 16px;
 			max-width: 640px;
 			margin: 0 auto;
-			line-height: 1.55;
-			font-size: 16px;
 		}
 		.clipisode-terms-content h1,
 		.clipisode-terms-content h2 {
-			line-height: 1.25;
 		}
 		.clipisode-terms-content a {
-			color: rgba(138, 181, 242, 1);
+			color: var(--clipisode-invitation-link);
 			text-decoration: underline;
 		}
 		.clipisode-terms-content h2.clipisode-terms-heading {
@@ -1138,66 +969,39 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			white-space: nowrap;
 		}
 
-		/* ----- Name screen form -----------------------------------------
-		 * Layout strategy mirrors the intro screen: the screen <section>
-		 * already covers the viewport, the block content (heading + a
-		 * short instructional paragraph) lives in the upper third, and
-		 * the form widgets float underneath it, full-bleed minus 20px of
-		 * safe-area padding. blockGap on the form drives vertical
-		 * rhythm so each piece can be hidden / shown via data-wp-bind
-		 * without needing margin reshuffles. ---------------------------- */
-		body.clipisode-flow .clipisode-flow-screen-name {
+		:where(body.clipisode-flow .clipisode-flow-screen-name) {
 			display: flex;
 			flex-direction: column;
 			justify-content: flex-start;
 			position: relative;
 			padding: 8px var(--clipisode-mobile-gutter) 16px;
-			background: #ffffff;
-			color: #111111;
+			background: var(--clipisode-invitation-background);
+			color: inherit;
 			z-index: 10;
 		}
-		body.clipisode-flow .clipisode-name-root {
+		:where(body.clipisode-flow .clipisode-name-root) {
 			width: min(100%, var(--clipisode-mobile-content-max));
 			margin-left: auto;
 			margin-right: auto;
 		}
-		/*
-		 * Name screen form layout.
-		 *
-		 * The form is a single flex column whose children appear in
-		 * visual order:
-		 *   heading + instructions Group  (editor block)
-		 *   file info                     (PHP, injected at render)
-		 *   progress + label              (PHP, injected at render)
-		 *   name input                    (PHP, injected at render)
-		 *   submit button                 (editor block)
-		 *   error                         (PHP, injected at render)
-		 *
-		 * The runtime widgets are injected into the rendered HTML between
-		 * the heading Group and submit Buttons block. DOM order equals
-		 * visual order, so keyboard tab flow stays natural.
-		 */
-		body.clipisode-flow .clipisode-name-form {
+		:where(body.clipisode-flow .clipisode-name-form) {
 			display: flex;
 			flex-direction: column;
 			gap: 12px;
 			width: min(100%, var(--clipisode-mobile-content-max));
 			margin: 24px auto 0;
 		}
-		body.clipisode-flow .clipisode-name-fileinfo {
+		:where(body.clipisode-flow .clipisode-name-fileinfo) {
 			margin: 0;
-			color: #111111;
-			font-size: 16px;
-			font-weight: 400;
-			line-height: 1.4;
+			color: inherit;
 		}
-		body.clipisode-flow .clipisode-name-fileinfo[hidden] {
+		:where(body.clipisode-flow .clipisode-name-fileinfo[hidden]) {
 			display: none !important;
 		}
-		body.clipisode-flow .clipisode-name-progress {
+		:where(body.clipisode-flow .clipisode-name-progress) {
 			--clipisode-progress-height: 8px;
-			--clipisode-progress-track: #e5e7eb;
-			--clipisode-progress-fill: #3964b0;
+			--clipisode-progress-track: var(--clipisode-invitation-border);
+			--clipisode-progress-fill: var(--clipisode-invitation-accent);
 			--clipisode-progress-radius: 999px;
 			--clipisode-progress-fill-radius: var(--clipisode-progress-radius);
 			height: var(--clipisode-progress-height);
@@ -1206,7 +1010,7 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			border-radius: var(--clipisode-progress-radius);
 			overflow: hidden;
 		}
-		body.clipisode-flow .clipisode-name-progress.clipisode-name-progress--pin-top {
+		:where(body.clipisode-flow .clipisode-name-progress.clipisode-name-progress--pin-top) {
 			position: absolute;
 			top: 0;
 			left: 0;
@@ -1215,7 +1019,7 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			z-index: 12;
 			border-radius: 0;
 		}
-		body.clipisode-flow .clipisode-name-progress.clipisode-name-progress--pin-bottom {
+		:where(body.clipisode-flow .clipisode-name-progress.clipisode-name-progress--pin-bottom) {
 			position: absolute;
 			bottom: 0;
 			left: 0;
@@ -1224,43 +1028,39 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			z-index: 12;
 			border-radius: 0;
 		}
-		body.clipisode-flow .clipisode-name-progress[hidden] {
+		:where(body.clipisode-flow .clipisode-name-progress[hidden]) {
 			display: none !important;
 		}
-		body.clipisode-flow .clipisode-name-progress-bar {
+		:where(body.clipisode-flow .clipisode-name-progress-bar) {
 			height: 100%;
 			width: 0%;
 			background: var(--clipisode-progress-fill);
 			border-radius: var(--clipisode-progress-fill-radius);
 			transition: width 0.2s ease-out;
 		}
-		body.clipisode-flow .clipisode-name-progress-label {
+		:where(body.clipisode-flow .clipisode-name-progress-label) {
 			margin: 0;
-			color: #111111;
-			font-size: 16px;
-			font-weight: 400;
-			line-height: 1.4;
-			letter-spacing: 0.02em;
+			color: inherit;
 		}
-		body.clipisode-flow .clipisode-field-control {
+		:where(body.clipisode-flow .clipisode-field-control) {
 			display: flex;
 			flex-direction: column;
 			gap: 6px;
 			width: 100%;
 		}
-		body.clipisode-flow .clipisode-name-handle-field {
+		:where(body.clipisode-flow .clipisode-name-handle-field) {
 			display: flex;
 			flex-direction: column;
 			gap: 8px;
 			width: 100%;
 		}
-		body.clipisode-flow .clipisode-name-instructions,
+		:where(body.clipisode-flow .clipisode-name-instructions,
 		body.clipisode-flow .clipisode-email-instructions,
-		body.clipisode-flow .clipisode-name-handle-instructions {
+		body.clipisode-flow .clipisode-name-handle-instructions) {
 			margin-top: 8px;
 			margin-bottom: 8px;
 		}
-		body.clipisode-flow .clipisode-field-label-row {
+		:where(body.clipisode-flow .clipisode-field-label-row) {
 			display: flex;
 			align-items: center;
 			justify-content: space-between;
@@ -1268,82 +1068,56 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			margin: 0;
 			width: 100%;
 		}
-		body.clipisode-flow .clipisode-field-label {
+		:where(body.clipisode-flow .clipisode-field-label) {
 			margin: 0;
-			font-size: 16px;
-			font-weight: 700;
-			line-height: 1.3;
-			color: #6b7280;
+			color: inherit;
 		}
-		body.clipisode-flow .clipisode-field-label-right {
+		:where(body.clipisode-flow .clipisode-field-label-right) {
 			margin-left: auto;
 			text-align: right;
 		}
-		body.clipisode-flow .clipisode-name-handle-instructions {
-			color: #111111;
-			font-size: 16px;
-			font-weight: 400;
-			line-height: 1.45;
+		:where(body.clipisode-flow .clipisode-name-handle-instructions) {
+			color: inherit;
 		}
-		body.clipisode-flow .clipisode-name-root a:not(.wp-block-button__link) {
-			color: rgba(138, 181, 242, 1);
+		:where(body.clipisode-flow .clipisode-name-root a:not(.wp-block-button__link)) {
 			text-decoration: underline;
 		}
-		body.clipisode-flow .clipisode-name-progress-label[hidden] {
+		:where(body.clipisode-flow .clipisode-name-progress-label[hidden]) {
 			display: none !important;
 		}
-		body.clipisode-flow .clipisode-name-input,
+		:where(body.clipisode-flow .clipisode-name-input,
 		body.clipisode-flow .clipisode-name-handle-input,
-		body.clipisode-flow .clipisode-email-input {
+		body.clipisode-flow .clipisode-email-input) {
 			-webkit-appearance: none;
 			appearance: none;
 			width: 100%;
 			padding: 14px 16px;
-			border: 1px solid rgba(17, 17, 17, 0.2);
-			border-radius: 8px;
-			background: #ffffff;
-			color: #111111;
-			font-size: 16px; /* ≥16px stops iOS auto-zoom on focus. */
-			font-weight: 400;
-			line-height: 1.3;
+			border: 1px solid var(--clipisode-invitation-border);
+			border-radius: var(--clipisode-invitation-radius);
+			background: var(--clipisode-invitation-background);
+			color: inherit;
+			font: inherit;
+			font-size: max(16px, 1em);
 			box-sizing: border-box;
 		}
-		body.clipisode-flow .clipisode-name-input:focus,
+		:where(body.clipisode-flow .clipisode-name-input:focus,
 		body.clipisode-flow .clipisode-name-handle-input:focus,
-		body.clipisode-flow .clipisode-email-input:focus {
-			outline: 2px solid #3964b0;
+		body.clipisode-flow .clipisode-email-input:focus) {
+			outline: 2px solid var(--clipisode-invitation-accent);
 			outline-offset: 1px;
-			background: #ffffff;
+			background: var(--clipisode-invitation-background);
 		}
-		/*
-		 * Submit button (Pattern B).
-		 *
-		 * The visible <a> is rendered by core/button via name.html;
-		 * PHP injects IAPI directives into it at render time. We
-		 * style the rendered button to match the original hardcoded
-		 * one (Clipisode blue, white text, full-width pill). Authors
-		 * can override the colour / radius / spacing via the block
-		 * sidebar; these rules are the floor.
-		 */
-		body.clipisode-flow .clipisode-name-submit-wrap {
+		:where(body.clipisode-flow .clipisode-name-submit-wrap) {
 			margin: 0 !important;
 			width: 100%;
 		}
-		body.clipisode-flow .clipisode-name-submit-wrap .wp-block-button {
+		:where(body.clipisode-flow .clipisode-name-submit-wrap .wp-block-button) {
 			margin: 0;
 			width: 100%;
 		}
-		body.clipisode-flow .clipisode-name-submit .wp-block-button__link {
+		:where(body.clipisode-flow .clipisode-name-submit .wp-block-button__link) {
 			display: block;
 			width: 100%;
-			padding: 14px 16px;
-			border: 0;
-			border-radius: 8px;
-			background: #3964b0;
-			color: #ffffff;
-			font-size: 17px;
-			font-weight: 700;
-			line-height: 1.3;
 			text-align: center;
 			text-decoration: none;
 			cursor: pointer;
@@ -1351,23 +1125,12 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			box-sizing: border-box;
 			transition: background 0.15s ease-out, opacity 0.15s ease-out;
 		}
-		body.clipisode-flow .clipisode-name-submit .wp-block-button__link:active {
-			background: #2c4f8c;
-		}
-		body.clipisode-flow .clipisode-name-submit .wp-block-button__link.is-disabled,
-		body.clipisode-flow .clipisode-name-submit .wp-block-button__link[aria-disabled="true"] {
-			background: rgba(57, 100, 176, 0.5);
+		:where(body.clipisode-flow .clipisode-name-submit .wp-block-button__link.is-disabled,
+		body.clipisode-flow .clipisode-name-submit .wp-block-button__link[aria-disabled="true"]) {
 			cursor: not-allowed;
 			opacity: 0.7;
 		}
-		/* Pending pulse: applied via data-wp-class--is-pending while
-		 * the submit is queued behind an in-flight upload. Slow,
-		 * gentle opacity oscillation makes the wait state visible
-		 * even on devices where the label change alone is too quick
-		 * to register. Pointer-events stays on so a re-tap is
-		 * idempotent, not blocked. */
-		body.clipisode-flow .clipisode-name-submit .wp-block-button__link.is-pending {
-			background: #3964b0;
+		:where(body.clipisode-flow .clipisode-name-submit .wp-block-button__link.is-pending) {
 			opacity: 1;
 			cursor: progress;
 			animation: clipisode-pending-pulse 1.6s ease-in-out infinite;
@@ -1377,79 +1140,41 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			50%      { opacity: 0.55; }
 		}
 		@media (prefers-reduced-motion: reduce) {
-			body.clipisode-flow .clipisode-name-submit .wp-block-button__link.is-pending {
+			:where(body.clipisode-flow .clipisode-name-submit .wp-block-button__link.is-pending) {
 				animation: none;
 				opacity: 0.85;
 			}
 		}
-		body.clipisode-flow .clipisode-name-error {
+		:where(body.clipisode-flow .clipisode-name-error) {
 			margin: 8px 0;
 			color:rgb(204, 0, 0);
-			font-size: 16px;
-			font-weight: 400;
-			line-height: 1.35;
 			text-align: center;
 		}
-		body.clipisode-flow .clipisode-name-error[hidden] {
+		:where(body.clipisode-flow .clipisode-name-error[hidden]) {
 			display: none !important;
 		}
 
-		/* ----- Intro Desktop screen ------------------------------------
-		 * "Watch + scan" card layout matching the desktop reference
-		 * mockup: white viewport, centred white card, portrait video
-		 * on the left taking ~85vh, a vertical stack on the right
-		 * with logo / title / instruction / URL / QR-helper / QR.
-		 *
-		 * Authoring vs. injection.
-		 *   The editor markup defines a .clipisode-introd-card with
-		 *   .clipisode-introd-left + .clipisode-introd-right inside.
-		 *   Four pieces are author-controlled (real core blocks):
-		 *     - the logo (core/image, default icon.png, replaceable)
-		 *     - the heading and instructions paragraph
-		 *     - the QR-helper paragraph
-		 *     - the QR placeholder (core/image, replaced at render
-		 *       time with the live QR canvas mount; authors can
-		 *       resize / pad / border / move it via standard image
-		 *       block controls; lock prevents removal so the public
-		 *       flow always finds a target to inject into)
-		 *   One piece is PHP-injected into a templateLocked slot
-		 *   inside the right column:
-		 *     .clipisode-introd-url-slot    (the live invitation URL)
-		 *   The QR figure is matched by class
-		 *   (.clipisode-introd-qr-image) and its full markup —
-		 *   figure + inner <img> — is replaced with the QR mount.
-		 *   The left column is NOT templateLocked: authors may add
-		 *   their own blocks, and PHP appends the topic intro video
-		 *   below whatever they put there.
-		 *
-		 * Visual rules.
-		 *   - Card sized to fit a portrait video at 85vh, with the
-		 *     right column matching the video's height.
-		 *   - Light theme: dark text on white, no text-shadow.
-		 *   - Aspect-ratio 9/16 on the video slot keeps proportions
-		 *     stable even when the topic has no intro video yet.
-		 * ---------------------------------------------------------- */
-		body.clipisode-flow .clipisode-flow-screen-intro_desktop,
-		body.clipisode-flow .clipisode-flow-screen-intro-desktop {
+		:where(body.clipisode-flow .clipisode-flow-screen-intro_desktop,
+		body.clipisode-flow .clipisode-flow-screen-intro-desktop) {
 			overflow: auto; /* desktop is fine to scroll if window < layout. */
-			background: #ffffff;
+			background: var(--clipisode-invitation-background);
 		}
-		body.clipisode-flow .clipisode-introd-root {
+		:where(body.clipisode-flow .clipisode-introd-root) {
 			position: absolute;
 			inset: 0;
 			min-height: 100%;
-			background: #ffffff;
-			color: #111827;
+			background: var(--clipisode-invitation-background);
+			color: inherit;
 			display: flex;
 			flex-direction: column;
 			justify-content: center;
 			align-items: center;
 			padding: 24px;
 		}
-		body.clipisode-flow .clipisode-introd-card {
+		:where(body.clipisode-flow .clipisode-introd-card) {
 			width: 100%;
 			max-width: 1080px;
-			background: #ffffff;
+			background: var(--clipisode-invitation-background);
 			border-radius: 18px;
 			box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
 			display: flex !important;
@@ -1461,7 +1186,7 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			padding: 24px !important;
 			gap: 24px !important;
 		}
-		body.clipisode-flow .clipisode-introd-left {
+		:where(body.clipisode-flow .clipisode-introd-left) {
 			flex: 0 0 auto;
 			width: clamp(280px, 38vw, 480px);
 			height: min(85vh, 854px);
@@ -1470,19 +1195,19 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			border-radius: 12px;
 			overflow: hidden;
 		}
-		body.clipisode-flow .clipisode-introd-video-mount {
+		:where(body.clipisode-flow .clipisode-introd-video-mount) {
 			position: absolute;
 			inset: 0;
 			background: #000000;
 		}
-		body.clipisode-flow .clipisode-introd-video {
+		:where(body.clipisode-flow .clipisode-introd-video) {
 			width: 100%;
 			height: 100%;
 			object-fit: cover;
 			display: block;
 			background: #000000;
 		}
-		body.clipisode-flow .clipisode-introd-video-play {
+		:where(body.clipisode-flow .clipisode-introd-video-play) {
 			position: absolute;
 			top: 50%;
 			left: 50%;
@@ -1497,14 +1222,14 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.5));
 			transition: opacity 200ms ease, transform 150ms ease;
 		}
-		body.clipisode-flow .clipisode-introd-video-play.is-hidden {
+		:where(body.clipisode-flow .clipisode-introd-video-play.is-hidden) {
 			opacity: 0;
 			pointer-events: none;
 		}
-		body.clipisode-flow .clipisode-introd-video-play:active {
+		:where(body.clipisode-flow .clipisode-introd-video-play:active) {
 			transform: translate(-50%, -50%) scale(0.95);
 		}
-		body.clipisode-flow .clipisode-introd-video-fallback {
+		:where(body.clipisode-flow .clipisode-introd-video-fallback) {
 			position: absolute;
 			inset: 0;
 			display: flex;
@@ -1516,7 +1241,7 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			padding: 16px;
 			text-align: center;
 		}
-		body.clipisode-flow .clipisode-introd-right {
+		:where(body.clipisode-flow .clipisode-introd-right) {
 			flex: 1 1 auto;
 			min-width: 0;
 			display: flex !important;
@@ -1527,205 +1252,139 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			gap: 12px !important;
 			padding: 24px !important;
 		}
-		/* Logo: real wp:image block in intro_desktop.html with        */
-		/* icon.png as the default. Sizing is set inline on the <img>  */
-		/* element (height:64px;width:auto) so the image preserves its */
-		/* natural aspect ratio when authors replace it with a wider   */
-		/* or narrower logo. We deliberately do NOT constrain the      */
-		/* container here — adding width/height rules would override   */
-		/* the inline style and squish replacement logos.              */
-		body.clipisode-flow .clipisode-introd-logo {
+		:where(body.clipisode-flow .clipisode-introd-logo) {
 			margin: 0;
 		}
-		/* Heading + paragraph copy is authored in the editor. We just */
-		/* tighten typography and remove the dark-theme text-shadow.   */
-		body.clipisode-flow .clipisode-introd-title {
+		:where(body.clipisode-flow .clipisode-introd-title) {
 			margin: 0 !important;
-			font-size: clamp(22px, 2.4vw, 28px);
-			line-height: 1.25;
-			font-weight: 700;
-			color: #111827;
+			color: inherit;
 			text-shadow: none;
 		}
-		body.clipisode-flow .clipisode-introd-instructions {
+		:where(body.clipisode-flow .clipisode-introd-instructions) {
 			margin: 0 !important;
-			font-size: 16px;
-			font-weight: 400;
-			line-height: 1.5;
-			color: #4b5563;
+			color: inherit;
 			max-width: 360px;
 			text-shadow: none;
 		}
-		body.clipisode-flow .clipisode-introd-instructions strong {
-			color: #111827;
+		:where(body.clipisode-flow .clipisode-introd-instructions strong) {
+			color: inherit;
 		}
-		body.clipisode-flow .clipisode-introd-continue .wp-block-button__link {
-			background: #1d4ed8;
-			color: #ffffff;
+		:where(body.clipisode-flow .clipisode-introd-continue .wp-block-button__link) {
+
 			text-decoration: none;
 		}
-		/* URL slot. PHP fills with the bare host+path of the invite   */
-		/* link in a bold, click-to-select-friendly chunk of text.     */
-		body.clipisode-flow .clipisode-introd-url-slot {
+		:where(body.clipisode-flow .clipisode-introd-url-slot) {
 			margin: 4px 0 !important;
 		}
-		body.clipisode-flow .clipisode-introd-url {
+		:where(body.clipisode-flow .clipisode-introd-url) {
 			display: inline-block;
-			font-size: 16px;
-			font-weight: 400;
-			color: rgba(138, 181, 242, 1);
+			color: var(--clipisode-invitation-link);
 			text-decoration: none;
 			padding: 4px 0;
-			letter-spacing: 0.01em;
 			word-break: break-all;
 		}
-		body.clipisode-flow .clipisode-introd-qr-helper {
+		:where(body.clipisode-flow .clipisode-introd-qr-helper) {
 			margin: 0 !important;
-			font-size: 16px;
-			font-weight: 400;
-			line-height: 1.4;
-			color: #4b5563;
+			color: inherit;
 			max-width: 320px;
 			text-shadow: none;
 		}
-		/* QR mount. The desktop intro screen seeds a core/image block
-		 * (.clipisode-introd-qr-image) in the editor as a placeholder
-		 * authors can resize / pad / border / move; the renderer
-		 * replaces that figure with this <div> at request time. The
-		 * dimensions are pinned so layout doesn't reflow when the
-		 * canvas hydrates. */
-		body.clipisode-flow .clipisode-introd-qr {
+		:where(body.clipisode-flow .clipisode-introd-qr) {
 			display: flex;
 			align-items: center;
 			justify-content: center;
 			width: 180px;
 			height: 180px;
 			margin: 12px auto 0;
-			background: #ffffff;
+			background: var(--clipisode-invitation-background);
 			border-radius: 12px;
 			padding: 8px;
 			box-sizing: border-box;
 			box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 		}
-		/* The bundled qrcode.js drops a <canvas data-clipisode-qr> in
-		 * here on hydration. Sizing the canvas explicitly keeps it from
-		 * blowing past the 164px (180 - 2*8 padding) inner area on
-		 * displays where the library returns a larger native size. */
-		body.clipisode-flow .clipisode-introd-qr canvas[data-clipisode-qr] {
+		:where(body.clipisode-flow .clipisode-introd-qr canvas[data-clipisode-qr]) {
 			display: block;
 			width: 100%;
 			height: 100%;
 			max-width: 100%;
 			max-height: 100%;
 		}
-		/* Visible only when JS hasn't filled the slot yet. We hide it
-		 * the moment a canvas appears so authors don't see a flash of
-		 * helper text behind the QR. */
-		body.clipisode-flow .clipisode-introd-qr-fallback {
-			font-size: 16px;
-			font-weight: 400;
-			line-height: 1.3;
-			color: #555555;
+		:where(body.clipisode-flow .clipisode-introd-qr-fallback) {
+
+			color: inherit;
 			text-align: center;
 			padding: 0 6px;
 		}
-		body.clipisode-flow .clipisode-introd-qr:has(canvas[data-clipisode-qr]) .clipisode-introd-qr-fallback {
+		:where(body.clipisode-flow .clipisode-introd-qr:has(canvas[data-clipisode-qr]) .clipisode-introd-qr-fallback) {
 			display: none;
 		}
 		@media (max-width: 880px) {
-			body.clipisode-flow .clipisode-introd-card {
+			:where(body.clipisode-flow .clipisode-introd-card) {
 				flex-direction: column !important;
 				padding: 16px !important;
 			}
-			body.clipisode-flow .clipisode-introd-left {
+			:where(body.clipisode-flow .clipisode-introd-left) {
 				width: min(100%, 360px);
 				height: auto;
 				aspect-ratio: 9 / 16;
 				margin: 0 auto;
 			}
-			body.clipisode-flow .clipisode-introd-right {
+			:where(body.clipisode-flow .clipisode-introd-right) {
 				padding: 16px !important;
 			}
 		}
 
-		/* ----- Closed / warning / email screens ------------------------
-		 * Shared baseline: light surface by default, centred readable
-		 * content width, and full-width action buttons. Authors can
-		 * still override background + text styles in block controls. */
-		body.clipisode-flow .clipisode-closed-root,
-		body.clipisode-flow .clipisode-warning-root {
+		:where(body.clipisode-flow .clipisode-closed-root,
+		body.clipisode-flow .clipisode-warning-root) {
 			position: absolute;
 			inset: 0;
 			min-height: 100%;
 			display: flex;
 			flex-direction: column;
 			justify-content: center;
-			color: #111111;
+			color: inherit;
 		}
-		body.clipisode-flow .clipisode-closed-root > *,
-		body.clipisode-flow .clipisode-warning-root > * {
+		:where(body.clipisode-flow .clipisode-closed-root > *,
+		body.clipisode-flow .clipisode-warning-root > *) {
 			width: min(100%, var(--clipisode-mobile-content-max));
 			margin-left: auto !important;
 			margin-right: auto !important;
 		}
-		body.clipisode-flow .clipisode-warning-heading,
-		body.clipisode-flow .clipisode-closed-heading {
+		:where(body.clipisode-flow .clipisode-warning-heading,
+		body.clipisode-flow .clipisode-closed-heading) {
 			margin: 0 0 8px 0;
-			font-size: 28px;
-			line-height: 1.2;
-			font-weight: 700;
 		}
-		body.clipisode-flow .clipisode-warning-message,
-		body.clipisode-flow .clipisode-closed-message {
+		:where(body.clipisode-flow .clipisode-warning-message,
+		body.clipisode-flow .clipisode-closed-message) {
 			margin: 8px 0;
-			font-size: 16px;
-			font-weight: 400;
-			line-height: 1.45;
-			color: #111111;
+			color: inherit;
 		}
-		body.clipisode-flow .clipisode-warning-root a:not(.wp-block-button__link),
-		body.clipisode-flow .clipisode-closed-root a:not(.wp-block-button__link) {
-			color: rgba(138, 181, 242, 1);
+		:where(body.clipisode-flow .clipisode-warning-root a:not(.wp-block-button__link),
+		body.clipisode-flow .clipisode-closed-root a:not(.wp-block-button__link)) {
 			text-decoration: underline;
 		}
-		body.clipisode-flow .clipisode-warning-root .wp-block-buttons,
-		body.clipisode-flow .clipisode-closed-root .wp-block-buttons {
+		:where(body.clipisode-flow .clipisode-warning-root .wp-block-buttons,
+		body.clipisode-flow .clipisode-closed-root .wp-block-buttons) {
 			display: flex;
 			flex-direction: column;
 			gap: 10px;
 			align-items: stretch;
 			width: 100%;
 		}
-		body.clipisode-flow .clipisode-warning-root .wp-block-button,
-		body.clipisode-flow .clipisode-closed-root .wp-block-button {
+		:where(body.clipisode-flow .clipisode-warning-root .wp-block-button,
+		body.clipisode-flow .clipisode-closed-root .wp-block-button) {
 			width: 100%;
 		}
-		body.clipisode-flow .clipisode-warning-root .wp-block-button__link,
-		body.clipisode-flow .clipisode-closed-root .wp-block-button__link {
+		:where(body.clipisode-flow .clipisode-warning-root .wp-block-button__link,
+		body.clipisode-flow .clipisode-closed-root .wp-block-button__link) {
 			display: block;
 			width: 100%;
-			padding: 14px 16px;
-			border-radius: 8px;
-			font-weight: 700;
 			text-align: center;
 			text-shadow: none;
 			box-sizing: border-box;
 		}
-		body.clipisode-flow .clipisode-warning-root .is-style-fill .wp-block-button__link,
-		body.clipisode-flow .clipisode-closed-root .is-style-fill .wp-block-button__link {
-			background: #3964b0;
-			color: #ffffff;
-			border: 0;
-		}
-		body.clipisode-flow .clipisode-warning-root .is-style-outline .wp-block-button__link,
-		body.clipisode-flow .clipisode-closed-root .is-style-outline .wp-block-button__link {
-			background: #3964b0;
-			color: #ffffff;
-			border: 0;
-		}
 
-		/* ----- Email overlay (on top of Name) ------------------------- */
-		body.clipisode-flow .clipisode-flow-screen-email {
+		:where(body.clipisode-flow .clipisode-flow-screen-email) {
 			z-index: 20;
 			display: flex;
 			align-items: center;
@@ -1733,7 +1392,7 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			padding: 20px var(--clipisode-mobile-gutter);
 			background: rgba(0, 0, 0, 0.1);
 		}
-		body.clipisode-flow .clipisode-flow-screen-email .clipisode-email-root {
+		:where(body.clipisode-flow .clipisode-flow-screen-email .clipisode-email-root) {
 			position: relative;
 			inset: auto;
 			min-height: 0;
@@ -1743,139 +1402,92 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 			border-radius: 14px;
 			border: 1px solid rgba(0, 0, 0, 0.12);
 			box-shadow: 0 16px 44px rgba(0, 0, 0, 0.35);
-			color: #111111;
+			color: inherit;
 		}
-		/* Fallback card fill when the root group has no explicit
-		 * background style. If the author sets a background in the block
-		 * sidebar, `.has-background` wins and this fallback is ignored. */
-		body.clipisode-flow .clipisode-flow-screen-email .clipisode-email-root:not(.has-background) {
-			background: #ffffff;
+		:where(body.clipisode-flow .clipisode-flow-screen-email .clipisode-email-root:not(.has-background)) {
+			background: var(--clipisode-invitation-background);
 		}
-		body.clipisode-flow .clipisode-email-form {
+		:where(body.clipisode-flow .clipisode-email-form) {
 			display: flex;
 			flex-direction: column;
 			gap: 12px;
 			width: min(100%, var(--clipisode-mobile-content-max));
 			margin: 0 auto;
 		}
-		body.clipisode-flow .clipisode-email-error {
+		:where(body.clipisode-flow .clipisode-email-error) {
 			margin: 8px 0;
 			color: rgb(204, 0, 0);
-			font-size: 16px;
-			font-weight: 400;
-			line-height: 1.35;
 			text-align: left;
 		}
-		body.clipisode-flow .clipisode-email-error[hidden] {
+		:where(body.clipisode-flow .clipisode-email-error[hidden]) {
 			display: none !important;
 		}
-		body.clipisode-flow .clipisode-email-submit-wrap {
+		:where(body.clipisode-flow .clipisode-email-submit-wrap) {
 			margin-top: 12px !important;
 		}
-		body.clipisode-flow .clipisode-email-submit-wrap .wp-block-button {
+		:where(body.clipisode-flow .clipisode-email-submit-wrap .wp-block-button) {
 			margin: 0;
 			width: 100%;
 		}
-		body.clipisode-flow .clipisode-email-submit .wp-block-button__link {
+		:where(body.clipisode-flow .clipisode-email-submit .wp-block-button__link) {
 			display: block;
 			width: 100%;
-			padding: 14px 16px;
-			border: 0;
-			border-radius: 8px;
-			background: #3964b0;
-			color: #ffffff;
-			font-size: 17px;
-			font-weight: 700;
-			line-height: 1.3;
 			text-align: center;
 			text-decoration: none;
 			cursor: pointer;
 			-webkit-tap-highlight-color: transparent;
 			box-sizing: border-box;
 		}
-		body.clipisode-flow .clipisode-email-submit .wp-block-button__link:active {
-			background: #2c4f8c;
-		}
-		body.clipisode-flow .clipisode-email-skip,
-		body.clipisode-flow p.clipisode-email-skip {
-			color: #111111;
-			font-size: 16px;
-			font-weight: 400;
-			line-height: 1.4;
+		:where(body.clipisode-flow .clipisode-email-skip,
+		body.clipisode-flow p.clipisode-email-skip) {
+			color: inherit;
 			margin: 12px 0 0 0;
 			text-align: center;
 		}
-		body.clipisode-flow .clipisode-email-skip a,
-		body.clipisode-flow .clipisode-email-root a:not(.wp-block-button__link) {
-			color: rgba(138, 181, 242, 1);
+		:where(body.clipisode-flow .clipisode-email-skip a,
+		body.clipisode-flow .clipisode-email-root a:not(.wp-block-button__link)) {
 			text-decoration: underline;
 		}
 
-		/* ----- Success screen -------------------------------------------
-		 *
-		 * The success screen is rooted in a core/cover block so authors
-		 * can pick a stretched-to-cover background (image, gradient, or
-		 * solid colour) via the standard block sidebar. Cover wraps its
-		 * children in .wp-block-cover__inner-container; we zero out
-		 * Cover's default 1.5em padding on that container so the screen
-		 * frame's gutter (set on .clipisode-flow-screen-success below)
-		 * stays the single source of truth for horizontal spacing.
-		 *
-		 * The Cover root itself just inherits the existing width-min
-		 * rule — Cover renders as <div class="wp-block-cover ...
-		 * clipisode-success-root">, so the selector keeps matching.
-		 */
-		body.clipisode-flow .clipisode-flow-screen-success {
+		:where(body.clipisode-flow .clipisode-flow-screen-success) {
 			display: flex;
 			flex-direction: column;
 			justify-content: center;
 			align-items: stretch;
 			padding: 8px var(--clipisode-mobile-gutter);
-			background: #ffffff;
-			color: #111111;
+			background: var(--clipisode-invitation-background);
+			color: inherit;
 			text-align: center;
 		}
-		body.clipisode-flow .clipisode-success-root {
+		:where(body.clipisode-flow .clipisode-success-root) {
 			width: min(100%, var(--clipisode-mobile-content-max));
 			margin-left: auto;
 			margin-right: auto;
 		}
-		body.clipisode-flow .clipisode-success-root .wp-block-cover__inner-container {
+		:where(body.clipisode-flow .clipisode-success-root .wp-block-cover__inner-container) {
 			padding: 0;
 			width: 100%;
 		}
-		body.clipisode-flow .clipisode-success-actions .wp-block-button {
+		:where(body.clipisode-flow .clipisode-success-actions .wp-block-button) {
 			margin: 0;
 			width: 100%;
 		}
-		body.clipisode-flow .clipisode-success-action .wp-block-button__link {
+		:where(body.clipisode-flow .clipisode-success-action .wp-block-button__link) {
 			display: block;
 			width: 100%;
-			padding: 14px 16px;
-			border: 0;
-			border-radius: 8px;
-			background: #3964b0;
-			color: #ffffff;
-			font-size: 17px;
-			font-weight: 700;
-			line-height: 1.3;
 			text-align: center;
 			text-decoration: none;
 			cursor: pointer;
 			-webkit-tap-highlight-color: transparent;
 			box-sizing: border-box;
 		}
-		body.clipisode-flow .clipisode-success-action .wp-block-button__link:active {
-			background: #2c4f8c;
-		}
-		body.clipisode-flow .clipisode-success-root a:not(.wp-block-button__link) {
-			color: rgba(138, 181, 242, 1);
+		:where(body.clipisode-flow .clipisode-success-root a:not(.wp-block-button__link)) {
 			text-decoration: underline;
 		}
 	</style>
 	<?php Clipisode_Social_Meta::print_filtered_wp_head(); ?>
 </head>
-<body class="clipisode-flow clipisode-flow-screen-<?php echo esc_attr( str_replace( '_', '-', $screen_type ) ); ?>">
+<body class="clipisode-flow clipisode-invitation-theme-<?php echo esc_attr( (string) $theme_id ); ?> clipisode-flow-screen-<?php echo esc_attr( str_replace( '_', '-', $screen_type ) ); ?>">
 <div
 	data-wp-interactive="clipisode/flow"
 	data-wp-init="callbacks.init"
