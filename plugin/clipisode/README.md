@@ -28,3 +28,7 @@ To prepare a release, run the **Create release PR** GitHub Actions workflow and 
 ## Invitation URLs
 
 The invitation URL path defaults to `invitation`, producing `/invitation/{code}`. In **Clipisode → Settings → General**, set **Invitation URL Path** to a path such as `clipisode/invitation` to produce `/clipisode/invitation/{code}`. The setting accepts multiple path segments, with or without surrounding slashes. Saving rebuilds WordPress rewrite rules. Existing shared invitation URLs using the previous path stop resolving after a change.
+
+## Invitation styling
+
+Invitation screens inherit the site’s WordPress global styles. Configure runtime form and upload controls in `settings.custom.clipisode.invitation` in the site’s `theme.json`, then customize individual Clipisode themes through their screen blocks or the `clipisode_invitation_style_tokens` filter. See [invitation styling](../../docs/invitation-styling.md) for examples and precedence.

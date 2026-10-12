@@ -17,6 +17,7 @@ define( 'CLIPISODE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-database.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-post-types.php';
+require_once CLIPISODE_PLUGIN_DIR . 'includes/class-invitation-styles.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-media.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-composition.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-renderer.php';
