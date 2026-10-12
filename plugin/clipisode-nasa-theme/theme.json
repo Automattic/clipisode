@@ -1,9 +1,9 @@
 {
-  "id": "nasa-mission-control",
-  "version": "1.0.0",
+  "id": "nasa-mission-control-v2",
+  "version": "1.1.0",
   "label": "NASA · Mission Control",
   "description": "A cinematic spaceflight broadcast package with mission patches, orbital scenes, telemetry, and playful launch details.",
-  "renderer": "nasa-mission-control",
+  "renderer": "nasa-mission-control-v2",
   "canvas": {
     "backgroundField": "videoBackdropColor"
   },
@@ -130,9 +130,24 @@
       "card": "title",
       "fields": [
         { "id": "showTitle", "label": "Show launch card", "type": "toggle", "default": true },
-        { "id": "titleDuration", "label": "Duration", "type": "number", "default": 4, "min": 0.5, "max": 30 },
+        { "id": "titleDuration", "label": "Duration", "type": "number", "default": 4.5, "min": 0.5, "max": 30 },
         { "id": "showCountdown", "label": "Show launch countdown", "type": "toggle", "default": true },
         { "id": "countdownFrom", "label": "Countdown starts at", "type": "number", "default": 3, "min": 3, "max": 10, "when": { "field": "showCountdown", "equals": true } },
+        { "id": "posterHoldDuration", "label": "Poster hold", "type": "range", "default": 0.35, "min": 0, "max": 1, "step": 0.05, "optional": true, "help": "Keeps the finished poster composition still before decorative motion begins." },
+        {
+          "id": "countdownStyle",
+          "label": "Countdown style",
+          "type": "select",
+          "default": "orbital-dial",
+          "optional": true,
+          "when": { "field": "showCountdown", "equals": true },
+          "options": [
+            { "value": "orbital-dial", "label": "Orbital launch clock" },
+            { "value": "digital-panel", "label": "Digital flight panel" },
+            { "value": "minimal", "label": "Minimal countdown" }
+          ]
+        },
+        { "id": "countdownScale", "label": "Countdown scale", "type": "range", "default": 100, "min": 80, "max": 120, "step": 5, "optional": true, "when": { "field": "showCountdown", "equals": true } },
         {
           "id": "titleAlignment",
           "label": "Title alignment",
@@ -197,10 +212,14 @@
             { "value": "launch-wipe", "label": "Launch wipe" },
             { "value": "signal-scan", "label": "Signal scan" },
             { "value": "clean-fade", "label": "Clean fade" },
+            { "value": "hangar-doors", "label": "Hangar doors" },
+            { "value": "solar-eclipse", "label": "Solar eclipse" },
+            { "value": "radar-sweep", "label": "Radar sweep" },
+            { "value": "constellation-tiles", "label": "Constellation tiles" },
             { "value": "none", "label": "None" }
           ]
         },
-        { "id": "transitionDuration", "label": "Transition duration", "type": "range", "default": 0.45, "min": 0.2, "max": 0.8, "step": 0.05 },
+        { "id": "transitionDuration", "label": "Transition duration", "type": "range", "default": 1.2, "min": 0.2, "max": 2.5, "step": 0.05, "help": "Reveals incoming video; automatically shortened for short clips." },
         { "id": "starDrift", "label": "Star drift", "type": "toggle", "default": true },
         { "id": "orbitRotation", "label": "Orbit rotation", "type": "toggle", "default": true },
         { "id": "filmGrain", "label": "Subtle film texture", "type": "toggle", "default": false }
@@ -303,6 +322,10 @@
             { "value": "launch-wipe", "label": "Launch wipe" },
             { "value": "signal-scan", "label": "Signal scan" },
             { "value": "clean-fade", "label": "Clean fade" },
+            { "value": "hangar-doors", "label": "Hangar doors" },
+            { "value": "solar-eclipse", "label": "Solar eclipse" },
+            { "value": "radar-sweep", "label": "Radar sweep" },
+            { "value": "constellation-tiles", "label": "Constellation tiles" },
             { "value": "none", "label": "None" }
           ]
         },

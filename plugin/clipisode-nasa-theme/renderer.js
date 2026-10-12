@@ -22,6 +22,17 @@
 		return 1 - Math.pow( 1 - progress, 3 );
 	}
 
+	function smoothstep( value ) {
+		const progress = clamp( value );
+		return progress * progress * ( 3 - 2 * progress );
+	}
+
+	function posterHoldFrames( settings, fps ) {
+		const totalFrames = Math.max( 1, Math.round( Number( settings.titleDuration ) * fps ) );
+		const configured = Math.max( 0, Number( settings.posterHoldDuration ?? 0.35 ) * fps );
+		return Math.min( Math.round( configured ), Math.floor( totalFrames * 0.15 ) );
+	}
+
 	function rgba( hex, alpha ) {
 		const value = /^#[0-9a-f]{6}$/i.test( hex || '' ) ? hex : '#ffffff';
 		return `rgba(${ parseInt( value.slice( 1, 3 ), 16 ) }, ${ parseInt( value.slice( 3, 5 ), 16 ) }, ${ parseInt( value.slice( 5, 7 ), 16 ) }, ${ alpha })`;
@@ -187,18 +198,71 @@
 		);
 	}
 
-	function Countdown( { settings, colors, frame, fps, unit } ) {
+	function Countdown( { settings, colors, frame, motionFrame, fps, width, height, unit, portrait, wide, centered } ) {
 		if ( ! settings.showCountdown ) {
 			return null;
 		}
 		const start = Math.max( 3, Math.min( 10, Number( settings.countdownFrom ) || 3 ) );
-		const availableFrames = Math.max( 1, Number( settings.titleDuration ) * fps );
-		const stepFrames = availableFrames / ( start + 1 );
-		const value = Math.max( 0, start - Math.floor( frame / stepFrames ) );
-		const pulse = settings.motionLevel === 'none' ? 1 : 0.7 + enter( frame % Math.max( 1, stepFrames ), stepFrames * 0.35 ) * 0.3;
-		return el( 'div', { style: { display: 'flex', alignItems: 'baseline', gap: unit * 0.012, fontFamily: mono, color: colors.accent } },
-			el( 'span', { style: { fontSize: unit * 0.015, letterSpacing: '0.12em', fontWeight: 800 } }, value > 0 ? 'T MINUS' : 'LIFTOFF' ),
-			el( 'span', { style: { fontSize: unit * 0.05, lineHeight: 1, fontWeight: 900, transform: `scale(${ pulse })` } }, String( value ).padStart( 2, '0' ) )
+		if ( settings.themeId === 'nasa-mission-control' ) {
+			const availableFrames = Math.max( 1, Number( settings.titleDuration ) * fps );
+			const stepFrames = availableFrames / ( start + 1 );
+			const value = Math.max( 0, start - Math.floor( frame / stepFrames ) );
+			const pulse = settings.motionLevel === 'none' ? 1 : 0.7 + enter( frame % Math.max( 1, stepFrames ), stepFrames * 0.35 ) * 0.3;
+			return el( 'div', { style: { display: 'flex', alignItems: 'baseline', gap: unit * 0.012, fontFamily: mono, color: colors.accent } },
+				el( 'span', { style: { fontSize: unit * 0.015, letterSpacing: '0.12em', fontWeight: 800 } }, value > 0 ? 'T MINUS' : 'LIFTOFF' ),
+				el( 'span', { style: { fontSize: unit * 0.05, lineHeight: 1, fontWeight: 900, transform: `scale(${ pulse })` } }, String( value ).padStart( 2, '0' ) )
+			);
+		}
+		const totalFrames = Math.max( 1, Math.round( Number( settings.titleDuration ) * fps ) );
+		const holdFrames = posterHoldFrames( settings, fps );
+		const liftoffFrames = Math.min( Math.round( 0.6 * fps ), Math.floor( totalFrames * 0.2 ) );
+		const countFrames = Math.max( 1, totalFrames - holdFrames - liftoffFrames );
+		const countFrame = Math.max( 0, frame - holdFrames );
+		const liftoff = frame >= totalFrames - liftoffFrames;
+		const value = liftoff ? 0 : Math.max( 1, start - Math.floor( countFrame * start / countFrames ) );
+		const stepFrames = countFrames / start;
+		const stepProgress = clamp( ( countFrame % Math.max( 1, stepFrames ) ) / Math.max( 1, stepFrames ) );
+		const pulse = settings.motionLevel === 'none' ? 1 : 1 + Math.sin( stepProgress * Math.PI ) * 0.035;
+		const sequenceProgress = liftoff ? 1 : clamp( countFrame / countFrames );
+		const visualProgress = settings.motionLevel === 'none' ? 0 : sequenceProgress;
+		const style = settings.countdownStyle || 'orbital-dial';
+		const scale = ( Number( settings.countdownScale ) || 100 ) / 100;
+		const inset = unit * 0.072;
+		const clockTop = centered
+			? portrait ? height * 0.62 : wide ? height * 0.55 : height * 0.61
+			: portrait
+				? height * 0.62
+				: wide
+					? height * 0.29
+					: height * 0.53;
+		const requestedDialSize = unit * ( portrait || wide ? 0.41 : 0.36 ) * scale;
+		const dialSize = Math.max( unit * 0.24, Math.min( requestedDialSize, height - inset * 1.55 - clockTop ) );
+		const clockUnit = dialSize / 0.41;
+		const position = centered || portrait
+			? { left: '50%', top: clockTop, transform: 'translateX(-50%)' }
+			: { right: inset, top: clockTop };
+		const label = liftoff ? 'LIFTOFF' : String( value ).padStart( 2, '0' );
+		const common = { position: 'absolute', zIndex: 3, fontFamily: mono, color: colors.text, textAlign: 'center', ...position };
+		if ( style === 'minimal' ) {
+			return el( 'div', { style: { ...common, minWidth: dialSize * 0.74, padding: `${ clockUnit * 0.018 }px ${ clockUnit * 0.025 }px`, borderTop: `${ clockUnit * 0.004 }px solid ${ colors.accent }`, borderBottom: `${ clockUnit * 0.0015 }px solid ${ rgba( colors.text, 0.42 ) }`, backgroundColor: rgba( colors.background, 0.72 ) } },
+				el( 'div', { style: { fontSize: clockUnit * 0.015, fontWeight: 800, letterSpacing: '0.18em', color: colors.accent } }, liftoff ? 'LAUNCH COMMITTED' : 'T MINUS' ),
+				el( 'div', { style: { marginTop: clockUnit * 0.006, fontSize: liftoff ? clockUnit * 0.065 : clockUnit * 0.105, lineHeight: 1, fontWeight: 900, letterSpacing: liftoff ? '0.05em' : '-0.06em', transform: `scale(${ pulse })` } }, label )
+			);
+		}
+		if ( style === 'digital-panel' ) {
+			return el( 'div', { style: { ...common, width: dialSize, boxSizing: 'border-box', padding: `${ clockUnit * 0.026 }px ${ clockUnit * 0.03 }px`, border: `${ clockUnit * 0.003 }px solid ${ rgba( colors.text, 0.55 ) }`, borderLeft: `${ clockUnit * 0.012 }px solid ${ colors.accent }`, borderRadius: clockUnit * 0.01, background: `linear-gradient(135deg, ${ rgba( colors.panel, 0.96 ) }, ${ rgba( colors.background, 0.92 ) })`, boxShadow: `0 ${ clockUnit * 0.02 }px ${ clockUnit * 0.06 }px ${ rgba( '#000000', 0.35 ) }` } },
+				el( 'div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: clockUnit * 0.014, fontWeight: 800, letterSpacing: '0.13em', color: colors.accent } }, el( 'span', null, liftoff ? 'IGNITION' : 'T MINUS' ), el( 'span', null, settings.designation ) ),
+				el( 'div', { style: { marginTop: clockUnit * 0.018, fontSize: liftoff ? clockUnit * 0.074 : clockUnit * 0.19, lineHeight: 0.86, fontWeight: 900, letterSpacing: liftoff ? '0.035em' : '-0.08em', transform: `scale(${ pulse })` } }, label ),
+				el( 'div', { style: { height: clockUnit * 0.008, marginTop: clockUnit * 0.022, backgroundColor: rgba( colors.text, 0.15 ), overflow: 'hidden' } }, el( 'div', { style: { width: `${ visualProgress * 100 }%`, height: '100%', backgroundColor: colors.accent } } ) )
+			);
+		}
+		const ringRotation = settings.motionLevel === 'none' ? 0 : motionFrame * 0.18;
+		return el( 'div', { style: { ...common, width: dialSize, height: dialSize, borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: `radial-gradient(circle, ${ rgba( colors.background, 0.94 ) } 0 55%, ${ rgba( colors.panel, 0.82 ) } 56% 67%, transparent 68%)`, boxShadow: `0 0 ${ clockUnit * 0.08 }px ${ rgba( colors.secondary, 0.24 ) }` } },
+			el( 'div', { style: { position: 'absolute', inset: 0, borderRadius: '50%', background: `conic-gradient(${ colors.accent } ${ visualProgress * 360 }deg, ${ rgba( colors.text, 0.18 ) } 0)`, WebkitMask: `radial-gradient(circle, transparent 0 65%, #000 66% 71%, transparent 72%)`, mask: `radial-gradient(circle, transparent 0 65%, #000 66% 71%, transparent 72%)`, transform: `rotate(${ -90 + ringRotation }deg)` } } ),
+			Array.from( { length: 12 }, ( _, index ) => el( 'span', { key: index, style: { position: 'absolute', left: '50%', top: '50%', width: clockUnit * 0.004, height: clockUnit * 0.025, backgroundColor: index % 3 === 0 ? colors.accent : rgba( colors.text, 0.55 ), transformOrigin: `50% ${ dialSize * 0.43 }px`, transform: `translate(-50%, -${ dialSize * 0.43 }px) rotate(${ index * 30 }deg)` } } ) ),
+			el( 'div', { style: { fontSize: clockUnit * 0.015, lineHeight: 1, fontWeight: 800, letterSpacing: '0.18em', color: colors.accent } }, liftoff ? 'IGNITION' : 'T MINUS' ),
+			el( 'div', { style: { marginTop: clockUnit * 0.014, fontSize: liftoff ? clockUnit * 0.07 : clockUnit * 0.215, lineHeight: 0.82, fontWeight: 900, fontVariantNumeric: 'tabular-nums', letterSpacing: liftoff ? '0.04em' : '-0.09em', transform: `scale(${ pulse })` } }, label ),
+			el( 'div', { style: { marginTop: clockUnit * 0.018, fontSize: clockUnit * 0.012, lineHeight: 1, fontWeight: 800, letterSpacing: '0.15em', color: colors.muted } }, liftoff ? 'ALL SYSTEMS GO' : 'LAUNCH SEQUENCE' )
 		);
 	}
 
@@ -247,28 +311,37 @@
 		const centered = settings.titleAlignment === 'center';
 		const inset = unit * 0.072;
 		const still = settings.motionLevel === 'none';
-		const primary = still ? 1 : enter( frame, fps * 0.72 );
-		const secondary = still ? 1 : enter( Math.max( 0, frame - fps * 0.18 ), fps * 0.72 );
+		const legacy = settings.themeId === 'nasa-mission-control';
+		const holdFrames = legacy ? 0 : posterHoldFrames( settings, fps );
+		const motionFrame = still ? 0 : legacy ? frame : Math.max( 0, frame - holdFrames );
+		const primary = legacy && ! still ? enter( frame, fps * 0.72 ) : 1;
+		const secondary = legacy && ! still ? enter( Math.max( 0, frame - fps * 0.18 ), fps * 0.72 ) : 1;
 		const closing = kind === 'ending';
 		const headline = closing ? settings.endingText : settings.missionName;
 		const body = closing ? settings.endingMessage : settings.subtitle;
 		const artScale = ( Number( settings.artworkScale ) || 100 ) / 100;
-		const textWidth = centered ? width - inset * 2 : wide ? width * 0.58 : width - inset * 2;
+		const showLaunchClock = ! legacy && ! closing && settings.showCountdown;
+		const reservesClockColumn = showLaunchClock && ! centered && ! portrait;
+		const textWidth = legacy
+			? centered ? width - inset * 2 : wide ? width * 0.58 : width - inset * 2
+			: centered ? width - inset * 2 : reservesClockColumn ? width * ( wide ? 0.58 : 0.54 ) : wide ? width * 0.68 : width - inset * 2;
 		const headlineSize = Math.min( unit * ( portrait ? 0.09 : 0.098 ), Math.max( unit * 0.046, textWidth * 2.65 / Math.max( String( headline ).length, 19 ) ) );
 		const patchSize = unit * ( portrait ? 0.17 : 0.15 );
+		const animatedArtScale = artScale * ( 1 + ( still || legacy ? 0 : enter( motionFrame, fps * 4 ) * 0.015 ) );
 
 		return el( AbsoluteFill, { style: { color: colors.text, fontFamily: typeface( settings ), overflow: 'hidden' } },
-			el( Backdrop, { settings, colors, frame, width, height, unit, hasBackground, scale: artScale } ),
+			el( Backdrop, { settings, colors, frame: motionFrame, width, height, unit, hasBackground, scale: animatedArtScale } ),
 			closing && settings.missionCompleteStars && stars.slice( 0, 16 ).map( ( star, index ) => {
-				const burst = still ? 1 : enter( Math.max( 0, frame - fps * 0.35 - index ), fps * 0.45 );
-				return el( 'span', { key: `burst-${ index }`, style: { position: 'absolute', right: `${ 5 + Math.cos( index * 2.4 ) * ( 3 + index * 0.8 ) * burst }%`, bottom: `${ 7 + Math.sin( index * 2.4 ) * ( 3 + index * 0.65 ) * burst }%`, width: unit * 0.007, height: unit * 0.007, backgroundColor: index % 3 ? colors.text : colors.accent, transform: 'rotate(45deg)', opacity: burst * 0.72 } } );
+				const burst = legacy ? still ? 1 : enter( Math.max( 0, frame - fps * 0.35 - index ), fps * 0.45 ) : 1;
+				const drift = legacy || still ? 0 : enter( motionFrame, fps * 1.6 ) * 0.8;
+				return el( 'span', { key: `burst-${ index }`, style: { position: 'absolute', right: `${ 5 + Math.cos( index * 2.4 ) * ( 3 + index * 0.8 + drift ) * burst }%`, bottom: `${ 7 + Math.sin( index * 2.4 ) * ( 3 + index * 0.65 + drift ) * burst }%`, width: unit * 0.007, height: unit * 0.007, backgroundColor: index % 3 ? colors.text : colors.accent, transform: 'rotate(45deg)', opacity: burst * 0.72 } } );
 			} ),
-			el( Flyby, { settings, colors, frame, width, height, unit } ),
-			el( Astronaut, { settings, colors, frame, width, height, unit } ),
-			el( Satellite, { settings, colors, frame, width, height, unit } ),
+			el( Flyby, { settings, colors, frame: motionFrame, width, height, unit } ),
+			el( Astronaut, { settings, colors, frame: motionFrame, width, height, unit } ),
+			el( Satellite, { settings, colors, frame: motionFrame, width, height, unit } ),
 			el( 'div', { style: { position: 'absolute', left: inset, right: inset, top: inset, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: unit * 0.035, opacity: secondary } },
 				el( 'div', { style: { display: 'flex', alignItems: 'center', gap: unit * 0.025 } },
-					el( MissionPatch, { settings, colors, size: patchSize, frame, compact: false } ),
+					el( MissionPatch, { settings, colors, size: patchSize, frame: motionFrame, compact: false } ),
 					el( 'div', { style: { maxWidth: portrait ? width * 0.43 : width * 0.4, overflowWrap: 'anywhere' } },
 						el( 'div', { style: { fontFamily: mono, fontSize: unit * 0.018, fontWeight: 800, lineHeight: 1.25, letterSpacing: '0.13em', color: colors.accent } }, settings.programName ),
 						el( 'div', { style: { marginTop: unit * 0.009, fontFamily: mono, fontSize: unit * 0.015, letterSpacing: '0.1em', color: colors.muted } }, settings.designation )
@@ -276,10 +349,11 @@
 				),
 				el( 'div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: unit * 0.016 } },
 					el( StatusPill, { settings, colors, unit, progress: secondary, label: closing ? settings.closingStatusLabel : settings.statusLabel } ),
-					! closing && el( Countdown, { settings, colors, frame, fps, unit } )
+					legacy && ! closing && el( Countdown, { settings, colors, frame, motionFrame, fps, width, height, unit, portrait, wide, centered } )
 				)
 			),
-			el( 'div', { style: { position: 'absolute', left: centered ? inset : inset, right: centered ? inset : wide ? width * 0.34 : inset, top: portrait ? height * 0.39 : height * 0.31, textAlign: centered ? 'center' : 'left', opacity: primary, transform: `translateY(${ ( 1 - primary ) * unit * 0.065 }px)`, display: 'flex', flexDirection: 'column', alignItems: centered ? 'center' : 'flex-start' } },
+			showLaunchClock && el( Countdown, { settings, colors, frame, motionFrame, fps, width, height, unit, portrait, wide, centered } ),
+			el( 'div', { style: { position: 'absolute', left: inset, right: centered ? inset : legacy ? wide ? width * 0.34 : inset : reservesClockColumn ? width * ( wide ? 0.34 : 0.4 ) : inset, top: legacy ? portrait ? height * 0.39 : height * 0.31 : portrait ? height * 0.34 : height * 0.3, textAlign: centered ? 'center' : 'left', opacity: primary, transform: `translateY(${ legacy ? ( 1 - primary ) * unit * 0.065 : 0 }px)`, display: 'flex', flexDirection: 'column', alignItems: centered ? 'center' : 'flex-start' } },
 				el( 'div', { style: { display: 'flex', alignItems: 'center', gap: unit * 0.016, marginBottom: unit * 0.03, fontFamily: mono, fontSize: unit * 0.017, fontWeight: 800, letterSpacing: '0.15em', color: colors.accent } },
 					el( 'span', { style: { width: unit * 0.07, height: unit * 0.006, backgroundColor: colors.accent } } ),
 					closing ? 'RETURN / DEBRIEF' : 'LAUNCH / TRANSMISSION'
@@ -291,7 +365,7 @@
 					settings.ctaUrl && el( 'span', { style: { color: colors.text } }, settings.ctaUrl )
 				)
 			),
-			closing && settings.showMissionComplete && el( 'div', { style: { position: 'absolute', right: inset, bottom: inset * 1.45, opacity: secondary, transform: `rotate(${ -8 + ( settings.motionLevel === 'none' ? 0 : Math.sin( frame * 0.02 ) * 2 ) }deg)` } },
+			closing && settings.showMissionComplete && el( 'div', { style: { position: 'absolute', right: inset, bottom: inset * 1.45, opacity: secondary, transform: `rotate(${ -8 + ( settings.motionLevel === 'none' ? 0 : Math.sin( motionFrame * 0.02 ) * 2 ) }deg)` } },
 				el( 'div', { style: { width: unit * 0.17, height: unit * 0.17, boxSizing: 'border-box', padding: unit * 0.018, borderRadius: '50%', border: `${ unit * 0.006 }px double ${ colors.accent }`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: mono, fontSize: unit * 0.014, fontWeight: 900, lineHeight: 1.18, letterSpacing: '0.055em', textAlign: 'center', color: colors.accent, backgroundColor: rgba( colors.background, 0.72 ) } },
 					el( 'span', { style: { display: 'block' } }, 'MISSION' ),
 					el( 'span', { style: { display: 'block' } }, 'COMPLETE' )
@@ -305,27 +379,91 @@
 	}
 
 	function Transition( { type, duration, settings, colors, frame, fps, width, height, unit } ) {
-		if ( type === 'none' || settings.motionLevel === 'none' ) {
+		if ( settings.themeId === 'nasa-mission-control' ) {
+			if ( type === 'none' || settings.motionLevel === 'none' ) {
+				return null;
+			}
+			const legacyProgress = enter( frame, fps * Number( duration || 0.45 ) );
+			if ( legacyProgress >= 1 ) {
+				return null;
+			}
+			if ( type === 'launch-wipe' ) {
+				return el( 'div', { style: { position: 'absolute', inset: 0, backgroundColor: colors.background, transform: `translateY(${ -legacyProgress * 104 }%)`, boxShadow: `0 ${ unit * 0.02 }px 0 ${ colors.accent }, 0 ${ unit * 0.05 }px ${ unit * 0.08 }px ${ rgba( colors.accent, 0.35 ) }` } } );
+			}
+			if ( type === 'signal-scan' ) {
+				return el( React.Fragment, null,
+					el( 'div', { style: { position: 'absolute', inset: 0, backgroundColor: colors.background, opacity: 1 - legacyProgress } } ),
+					Array.from( { length: 12 }, ( _, index ) => el( 'div', { key: index, style: { position: 'absolute', left: 0, right: 0, top: `${ index * 9 + legacyProgress * 18 - 16 }%`, height: `${ 8 - legacyProgress * 6 }%`, backgroundColor: index % 3 === 0 ? colors.accent : colors.background, opacity: ( 1 - legacyProgress ) * ( index % 3 === 0 ? 0.9 : 0.65 ), transform: `translateX(${ ( index % 2 ? 1 : -1 ) * legacyProgress * width * 0.12 }px)` } } ) )
+				);
+			}
+			if ( type === 'clean-fade' ) {
+				return el( 'div', { style: { position: 'absolute', inset: 0, backgroundColor: colors.background, opacity: 1 - legacyProgress } } );
+			}
+			const legacyDiameter = Math.max( width, height ) * ( 0.02 + legacyProgress * 1.7 );
+			return el( 'div', { style: { position: 'absolute', width: legacyDiameter, height: legacyDiameter, borderRadius: '50%', left: width * 0.5 - legacyDiameter * 0.5, top: height * 0.5 - legacyDiameter * 0.5, boxShadow: `0 0 0 ${ Math.max( width, height ) * 2 }px ${ colors.background }, 0 0 ${ unit * 0.08 }px ${ unit * 0.015 }px ${ colors.secondary }`, border: `${ unit * 0.005 }px solid ${ colors.accent }` } } );
+		}
+		const durationFrames = Math.max( 0, Math.round( Number( duration ) * fps ) );
+		if ( type === 'none' || settings.motionLevel === 'none' || durationFrames <= 1 || frame >= durationFrames - 1 ) {
 			return null;
 		}
-		const progress = enter( frame, fps * Number( duration || 0.45 ) );
-		if ( progress >= 1 ) {
-			return null;
-		}
+		const progress = smoothstep( frame / ( durationFrames - 1 ) );
 		if ( type === 'launch-wipe' ) {
-			return el( 'div', { style: { position: 'absolute', inset: 0, backgroundColor: colors.background, transform: `translateY(${ -progress * 104 }%)`, boxShadow: `0 ${ unit * 0.02 }px 0 ${ colors.accent }, 0 ${ unit * 0.05 }px ${ unit * 0.08 }px ${ rgba( colors.accent, 0.35 ) }` } } );
+			return el( 'div', { style: { position: 'absolute', inset: 0, background: `linear-gradient(90deg, ${ colors.background }, ${ colors.panel }, ${ colors.background })`, transform: `translateY(${ -progress * 104 }%)`, boxShadow: `0 ${ unit * 0.012 }px 0 ${ colors.accent }, 0 ${ unit * 0.035 }px 0 ${ rgba( colors.accent, 0.45 ) }, 0 ${ unit * 0.06 }px ${ unit * 0.08 }px ${ rgba( colors.accent, 0.26 ) }` } } );
 		}
 		if ( type === 'signal-scan' ) {
 			return el( React.Fragment, null,
-				el( 'div', { style: { position: 'absolute', inset: 0, backgroundColor: colors.background, opacity: 1 - progress } } ),
-				Array.from( { length: 12 }, ( _, index ) => el( 'div', { key: index, style: { position: 'absolute', left: 0, right: 0, top: `${ index * 9 + progress * 18 - 16 }%`, height: `${ 8 - progress * 6 }%`, backgroundColor: index % 3 === 0 ? colors.accent : colors.background, opacity: ( 1 - progress ) * ( index % 3 === 0 ? 0.9 : 0.65 ), transform: `translateX(${ ( index % 2 ? 1 : -1 ) * progress * width * 0.12 }px)` } } ) )
+				el( 'div', { style: { position: 'absolute', left: 0, right: 0, top: `${ progress * 100 }%`, bottom: 0, backgroundColor: colors.background } } ),
+				el( 'div', { style: { position: 'absolute', left: 0, right: 0, top: `${ progress * 100 }%`, height: unit * 0.04, transform: 'translateY(-50%)', background: `linear-gradient(180deg, transparent, ${ rgba( colors.secondary, 0.34 ) }, ${ colors.accent }, ${ rgba( colors.secondary, 0.22 ) }, transparent)`, boxShadow: `0 0 ${ unit * 0.055 }px ${ rgba( colors.accent, 0.35 ) }` } } )
 			);
 		}
 		if ( type === 'clean-fade' ) {
 			return el( 'div', { style: { position: 'absolute', inset: 0, backgroundColor: colors.background, opacity: 1 - progress } } );
 		}
-		const diameter = Math.max( width, height ) * ( 0.02 + progress * 1.7 );
-		return el( 'div', { style: { position: 'absolute', width: diameter, height: diameter, borderRadius: '50%', left: width * 0.5 - diameter * 0.5, top: height * 0.5 - diameter * 0.5, boxShadow: `0 0 0 ${ Math.max( width, height ) * 2 }px ${ colors.background }, 0 0 ${ unit * 0.08 }px ${ unit * 0.015 }px ${ colors.secondary }`, border: `${ unit * 0.005 }px solid ${ colors.accent }` } } );
+		if ( type === 'hangar-doors' ) {
+			const doorWidth = width * 0.5 * ( 1 - progress );
+			return el( React.Fragment, null,
+				el( 'div', { style: { position: 'absolute', left: 0, top: 0, bottom: 0, width: doorWidth, background: `repeating-linear-gradient(90deg, ${ colors.background } 0 ${ unit * 0.09 }px, ${ colors.panel } ${ unit * 0.09 }px ${ unit * 0.18 }px)`, borderRight: `${ unit * 0.008 }px solid ${ colors.accent }`, boxShadow: `${ unit * 0.025 }px 0 ${ unit * 0.06 }px ${ rgba( '#000000', 0.4 ) }` } } ),
+				el( 'div', { style: { position: 'absolute', right: 0, top: 0, bottom: 0, width: doorWidth, background: `repeating-linear-gradient(90deg, ${ colors.panel } 0 ${ unit * 0.09 }px, ${ colors.background } ${ unit * 0.09 }px ${ unit * 0.18 }px)`, borderLeft: `${ unit * 0.008 }px solid ${ colors.accent }`, boxShadow: `-${ unit * 0.025 }px 0 ${ unit * 0.06 }px ${ rgba( '#000000', 0.4 ) }` } } )
+			);
+		}
+		if ( type === 'solar-eclipse' ) {
+			const diameter = Math.hypot( width, height ) * 2.05;
+			const travel = Math.hypot( width, height ) * 1.8;
+			return el( 'div', { style: { position: 'absolute', width: diameter, height: diameter, borderRadius: '50%', left: width * 0.5 - diameter * 0.5 + travel * progress, top: height * 0.5 - diameter * 0.5 - travel * progress * 0.58, backgroundColor: colors.background, boxShadow: `-${ unit * 0.012 }px ${ unit * 0.012 }px 0 ${ colors.accent }, -${ unit * 0.035 }px ${ unit * 0.035 }px ${ unit * 0.07 }px ${ rgba( colors.secondary, 0.46 ) }` } } );
+		}
+		if ( type === 'radar-sweep' ) {
+			const angle = progress * 360;
+			return el( React.Fragment, null,
+				el( 'div', { style: { position: 'absolute', inset: 0, background: `conic-gradient(from -90deg at 50% 50%, transparent 0deg ${ angle }deg, ${ colors.background } ${ angle }deg 360deg)` } } ),
+				el( 'div', { style: { position: 'absolute', inset: 0, opacity: 1 - progress, background: `conic-gradient(from ${ -92 + angle }deg at 50% 50%, transparent 0deg 355deg, ${ colors.accent } 358deg, ${ rgba( colors.secondary, 0.05 ) } 360deg)` } } )
+			);
+		}
+		if ( type === 'constellation-tiles' ) {
+			const columns = 5;
+			const rows = 4;
+			const order = Array.from( { length: columns * rows }, ( _, index ) => ( {
+				index,
+				distance: Math.hypot( index % columns - ( columns - 1 ) / 2, Math.floor( index / columns ) - ( rows - 1 ) / 2 ),
+			} ) ).sort( ( a, b ) => a.distance - b.distance || a.index - b.index );
+			const rank = Object.fromEntries( order.map( ( item, index ) => [ item.index, index ] ) );
+			return el( React.Fragment, null, Array.from( { length: columns * rows }, ( _, index ) => {
+				const column = index % columns;
+				const row = Math.floor( index / columns );
+				const threshold = rank[ index ] / ( columns * rows ) * 0.72;
+				const tileProgress = smoothstep( ( progress - threshold ) / 0.28 );
+				return el( 'div', { key: index, style: { position: 'absolute', left: `${ column * 20 }%`, top: `${ row * 25 }%`, width: '20.2%', height: '25.2%', boxSizing: 'border-box', backgroundColor: colors.background, border: `${ unit * 0.001 }px solid ${ rgba( colors.secondary, 0.28 ) }`, opacity: 1 - tileProgress, transform: `scale(${ 1 - tileProgress * 0.08 })` } },
+					el( 'span', { style: { position: 'absolute', right: unit * 0.008, bottom: unit * 0.008, width: unit * 0.008, height: unit * 0.008, borderRadius: '50%', backgroundColor: index % 4 === 0 ? colors.accent : colors.text, boxShadow: `0 0 ${ unit * 0.018 }px ${ colors.accent }` } } )
+				);
+			} ) );
+		}
+		const apertureProgress = Math.min( 1, progress * 1.015 );
+		const decorationOpacity = 1 - smoothstep( ( progress - 0.78 ) / 0.22 );
+		const radius = Math.hypot( width, height ) * 0.5 * apertureProgress;
+		const diameter = radius * 2;
+		return el( React.Fragment, null,
+			el( 'div', { style: { position: 'absolute', width: diameter, height: diameter, borderRadius: '50%', left: width * 0.5 - radius, top: height * 0.5 - radius, boxShadow: `0 0 0 ${ Math.hypot( width, height ) }px ${ colors.background }`, border: `${ unit * 0.005 }px solid ${ rgba( colors.accent, decorationOpacity ) }` } } ),
+			el( 'div', { style: { position: 'absolute', width: diameter * 1.08, height: diameter * 0.34, borderRadius: '50%', left: width * 0.5 - diameter * 0.54, top: height * 0.5 - diameter * 0.17, border: `${ unit * 0.002 }px solid ${ rgba( colors.secondary, 0.72 ) }`, opacity: 1 - smoothstep( ( progress - 0.75 ) / 0.25 ), transform: `rotate(${ -18 + progress * 160 }deg)` } } )
+		);
 	}
 
 	function FrameCorners( { colors, unit, inset } ) {
@@ -344,21 +482,27 @@
 		return `${ String( Math.floor( seconds / 60 ) ).padStart( 2, '0' ) }:${ String( seconds % 60 ).padStart( 2, '0' ) }:${ String( frame % fps ).padStart( 2, '0' ) }`;
 	}
 
-	function Overlay( { settings, name, clip } ) {
+	function Overlay( { settings, name, clip, isFirstClip = false } ) {
 		const frame = useCurrentFrame();
 		const { fps, width, height } = useVideoConfig();
 		const unit = Math.min( width, height );
 		const colors = palette( settings );
 		const values = clip?.values || {};
-		const transition = values.transitionOverride && values.transitionOverride !== 'theme' ? values.transitionOverride : settings.transitionType;
+		const selectedTransition = values.transitionOverride && values.transitionOverride !== 'theme' ? values.transitionOverride : settings.transitionType;
+		const transition = isFirstClip && settings.showTitle === false ? 'none' : selectedTransition;
 		const lowerThird = values.lowerThirdOverride && values.lowerThirdOverride !== 'theme' ? values.lowerThirdOverride : settings.lowerThirdStyle;
 		const corner = values.overlayCornerOverride && values.overlayCornerOverride !== 'theme' ? values.overlayCornerOverride : settings.overlayCorner || 'bottom-left';
 		const top = corner.startsWith( 'top' );
 		const right = corner.endsWith( 'right' );
 		const inset = unit * 0.052;
-		const progress = settings.motionLevel === 'none' ? 1 : enter( frame, fps * 0.48 );
 		const clipDuration = clip ? Math.max( 1 / fps, clip.trimEnd - clip.trimStart ) : Number( settings.transitionDuration );
-		const transitionDuration = Math.min( Number( settings.transitionDuration ), clipDuration * 0.35 );
+		const clipDurationFrames = Math.max( 1, Math.round( clipDuration * fps ) );
+		const legacy = settings.themeId === 'nasa-mission-control';
+		const transitionDuration = clipDurationFrames <= 1 ? 0 : Math.min( Number( settings.transitionDuration ), clipDuration * ( legacy ? 0.35 : 0.4 ) );
+		const transitionFrames = Math.max( 0, Math.round( transitionDuration * fps ) );
+		const overlayStart = legacy || transition === 'none' || transitionFrames <= 1 ? 0 : Math.round( transitionFrames * 0.6 );
+		const overlayFrames = Math.max( 1, Math.min( fps * 0.4, clipDurationFrames - overlayStart ) );
+		const progress = settings.motionLevel === 'none' ? 1 : legacy ? enter( frame, fps * 0.48 ) : enter( Math.max( 0, frame - overlayStart ), overlayFrames );
 		const callsign = values.callsign;
 		const role = values.speakerRole;
 		const location = values.locationLabel;
@@ -401,4 +545,5 @@
 	}
 
 	registerRenderer( 'nasa-mission-control', { Card, Overlay } );
+	registerRenderer( 'nasa-mission-control-v2', { Card, Overlay } );
 } )();

@@ -103,7 +103,13 @@ export function ThemeCard( {
 	}
 	if ( ! isBuiltInRenderer( renderer ) ) {
 		const Card = getThemeRenderer( renderer )!.Card;
-		return <Card settings={ inputSettings } kind={ kind } hasBackground={ hasBackground } />;
+		return (
+			<Card
+				settings={ inputSettings }
+				kind={ kind }
+				hasBackground={ hasBackground }
+			/>
+		);
 	}
 	if ( renderer === 'baseball' ) {
 		return (
@@ -265,10 +271,12 @@ export function ThemeOverlay( {
 	settings: inputSettings,
 	name,
 	clip,
+	isFirstClip = false,
 }: {
 	settings: CompositionSettings;
 	name: string;
 	clip?: CompositionClip;
+	isFirstClip?: boolean;
 } ) {
 	const frame = useCurrentFrame();
 	const { width, height, fps } = useVideoConfig();
@@ -278,7 +286,14 @@ export function ThemeOverlay( {
 	}
 	if ( ! isBuiltInRenderer( renderer ) ) {
 		const Overlay = getThemeRenderer( renderer )!.Overlay;
-		return <Overlay settings={ inputSettings } name={ name } clip={ clip } />;
+		return (
+			<Overlay
+				settings={ inputSettings }
+				name={ name }
+				clip={ clip }
+				isFirstClip={ isFirstClip }
+			/>
+		);
 	}
 	if ( renderer === 'baseball' ) {
 		return <BaseballOverlay settings={ inputSettings } clip={ clip } />;
