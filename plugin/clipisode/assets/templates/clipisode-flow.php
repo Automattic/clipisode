@@ -1547,6 +1547,17 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 		$rendered_content = do_blocks( $content );
 		if ( $st === 'name' ) {
 			$rendered_content = preg_replace_callback(
+				'#(<h[1-6]\b[^>]*class="[^"]*\bclipisode-name-heading\b[^"]*"[^>]*>)(.*?)(</h[1-6]>)#is',
+				function ( $m ) {
+					return $m[1] . str_replace(
+						'{pct}',
+						'<span data-wp-text="state.uploadPercent">0</span>',
+						$m[2]
+					) . $m[3];
+				},
+				$rendered_content
+			);
+			$rendered_content = preg_replace_callback(
 				'#(<div\b[^>]*\bclipisode-name-submit\b[^>]*>\s*)<a\b([^>]*)>#i',
 				function ( $m ) {
 					$a_attrs = $m[2];
