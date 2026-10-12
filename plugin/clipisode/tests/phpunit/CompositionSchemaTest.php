@@ -105,6 +105,38 @@ class CompositionSchemaTest extends TestCase {
 		}
 	}
 
+	public function test_nasa_showcase_theme_is_registered_with_its_asset_pack(): void {
+		global $test_filters;
+		$existing_filters = $test_filters ?? [];
+		try {
+			require dirname( __DIR__, 3 ) . '/clipisode-nasa-theme/clipisode-nasa-theme.php';
+			$themes = Clipisode_Composition::themes();
+			$this->assertIsArray( $themes );
+			$theme = current( array_filter( $themes, fn( $item ) => 'nasa-mission-control' === $item['id'] ) );
+			$this->assertSame( 'nasa-mission-control', $theme['renderer'] );
+			$this->assertSame( '1.0.0', $theme['version'] );
+			$this->assertSame( 'https://example.com/wp-content/plugins/clipisode-nasa-theme/renderer.js?ver=1.0.0', $theme['rendererUrl'] );
+			$this->assertFileExists( dirname( __DIR__, 3 ) . '/clipisode-nasa-theme/assets/contact-sheet.svg' );
+			$composition = CompositionTest::composition();
+			$composition['settings'] = $this->settings( $theme );
+			$composition['clips'][0]['values'] = [
+				'callsign' => 'ORBITER ONE',
+				'speakerRole' => 'Flight Director',
+				'locationLabel' => 'Houston',
+				'segmentLabel' => 'FIELD REPORT',
+				'lowerThirdOverride' => 'theme',
+				'transitionOverride' => 'theme',
+				'overlayCornerOverride' => 'theme',
+				'hideOverlay' => false,
+			];
+			$clean = Clipisode_Composition::sanitize( $composition );
+			$this->assertIsArray( $clean );
+			$this->assertSame( 'ORBITER ONE', $clean['clips'][0]['values']->callsign );
+		} finally {
+			$test_filters = $existing_filters;
+		}
+	}
+
 	public function test_baseball_team_pick_is_persisted_and_restricted_to_catalog_teams(): void {
 		$theme = $this->theme( 'baseball' );
 		$composition = CompositionTest::composition();
