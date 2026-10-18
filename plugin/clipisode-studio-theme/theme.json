@@ -1,0 +1,135 @@
+{
+  "id": "studio",
+  "version": "1.0.0",
+  "label": "Studio",
+  "description": "Example video theme with its own opening card and speaker overlay.",
+  "renderer": "studio",
+  "canvas": {
+    "backgroundField": "backgroundColor"
+  },
+  "timeline": {
+    "title": {
+      "label": "Opening card",
+      "enabledField": "showTitle",
+      "durationField": "titleDuration"
+    },
+    "ending": {
+      "label": "Ending card",
+      "enabledField": "showEnding",
+      "durationField": "endingDuration"
+    },
+    "mediaSlots": [
+      {
+        "id": "main",
+        "label": "Story clips",
+        "mode": "sequence"
+      }
+    ]
+  },
+  "tags": [],
+  "groups": [
+    {
+      "id": "appearance",
+      "label": "Appearance",
+      "scope": "composition",
+      "fields": [
+        {
+          "id": "videoFit",
+          "label": "Video fit",
+          "type": "select",
+          "default": "cover",
+          "options": [
+            {
+              "value": "cover",
+              "label": "Fill frame (crop)"
+            },
+            {
+              "value": "contain",
+              "label": "Fit entire video"
+            }
+          ]
+        },
+        {
+          "id": "backgroundColor",
+          "label": "Background",
+          "type": "color",
+          "default": "#142034"
+        },
+        {
+          "id": "accentColor",
+          "label": "Accent",
+          "type": "color",
+          "default": "#ffd166"
+        },
+        {
+          "id": "textColor",
+          "label": "Text",
+          "type": "color",
+          "default": "#ffffff"
+        },
+        {
+          "id": "showNames",
+          "label": "Show speaker names",
+          "type": "toggle",
+          "default": true
+        }
+      ]
+    },
+    {
+      "id": "opening",
+      "label": "Opening card",
+      "scope": "composition",
+      "card": "title",
+      "fields": [
+        {
+          "id": "showTitle",
+          "label": "Show opening card",
+          "type": "toggle",
+          "default": true
+        },
+        {
+          "id": "title",
+          "label": "Title",
+          "type": "text",
+          "default": "Our story"
+        },
+        {
+          "id": "titleDuration",
+          "label": "Duration",
+          "type": "number",
+          "default": 2,
+          "min": 0.1,
+          "max": 30
+        }
+      ]
+    },
+    {
+      "id": "ending",
+      "label": "Ending card",
+      "scope": "composition",
+      "card": "ending",
+      "fields": [
+        {
+          "id": "showEnding",
+          "label": "Show ending card",
+          "type": "toggle",
+          "default": false
+        },
+        {
+          "id": "endingText",
+          "label": "Ending text",
+          "type": "text",
+          "default": "Thank you"
+        },
+        {
+          "id": "endingDuration",
+          "label": "Duration",
+          "type": "number",
+          "default": 2,
+          "min": 0.1,
+          "max": 30
+        }
+      ]
+    }
+  ]
+}

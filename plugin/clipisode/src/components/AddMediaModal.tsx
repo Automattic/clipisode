@@ -6,6 +6,9 @@ import type { MediaItem } from '../types';
 interface AddMediaModalProps {
 	existingMediaIds: number[];
 	topicId?: number;
+	introMediaId?: number | null;
+	allowedRoles?: ( 'intro' | 'reply' )[];
+	maxSelection?: number;
 	onAdd: ( items: MediaItem[] ) => void;
 	onClose: () => void;
 }
@@ -34,6 +37,9 @@ function formatBytes( bytes: number | null ): string {
 export default function AddMediaModal( {
 	existingMediaIds,
 	topicId,
+	introMediaId,
+	allowedRoles,
+	maxSelection,
 	onAdd,
 	onClose,
 }: AddMediaModalProps ) {
@@ -48,6 +54,10 @@ export default function AddMediaModal( {
 	const existingSet = new Set( existingMediaIds );
 
 	const visibleItems = items.filter( ( item ) => {
+		const role = item.id === introMediaId ? 'intro' : 'reply';
+		if ( allowedRoles && ! allowedRoles.includes( role ) ) {
+			return false;
+		}
 		if ( existingSet.has( item.id ) ) {
 			return false;
 		}
@@ -90,7 +100,10 @@ export default function AddMediaModal( {
 			const next = new Set( prev );
 			if ( next.has( id ) ) {
 				next.delete( id );
-			} else {
+			} else if (
+				maxSelection === undefined ||
+				next.size < maxSelection
+			) {
 				next.add( id );
 			}
 			return next;
@@ -104,6 +117,12 @@ export default function AddMediaModal( {
 
 	return (
 		<Modal title="Add Media" onRequestClose={ onClose } size="large">
+			{ maxSelection !== undefined && (
+				<p>
+					Choose up to { maxSelection } video
+					{ maxSelection === 1 ? '' : 's' }.
+				</p>
+			) }
 			<div
 				style={ {
 					display: 'flex',
@@ -178,7 +197,13 @@ export default function AddMediaModal( {
 									<input
 										type="checkbox"
 										checked={ selectedIds.has( item.id ) }
-										disabled={ ! item.url }
+										disabled={
+											! item.url ||
+											( maxSelection !== undefined &&
+												selectedIds.size >=
+													maxSelection &&
+												! selectedIds.has( item.id ) )
+										}
 										onChange={ () =>
 											toggleSelection( item.id )
 										}

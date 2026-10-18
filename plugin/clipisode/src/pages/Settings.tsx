@@ -298,16 +298,16 @@ export default function Settings(): JSX.Element {
 							</Notice>
 						) }
 						<TextControl
-							label="Invitation URL Prefix"
+							label="Invitation URL Path"
 							value={ invitationPrefix }
 							onChange={ setInvitationPrefix }
 							help={
 								<>
-									{ `${ window.location.origin }/${
+									{ `${ window.clipisodeAdmin!.home_url }${
 										invitationPrefix || 'invitation'
 									}/{code}` }
 									<br />
-									Localized prefixes are supported (e.g. <code>invitasjon</code>, <code>邀請</code>). Saving rebuilds rewrite rules automatically.
+									Enter a path such as <code>clipisode/invitation</code>. Leave it as <code>invitation</code> for the default URL. Saving updates invitation links and rebuilds rewrite rules.
 								</>
 							}
 							__nextHasNoMarginBottom

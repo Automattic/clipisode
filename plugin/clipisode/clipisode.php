@@ -2,22 +2,26 @@
 /**
  * Plugin Name: Clipisode
  * Description: Collect, curate, and publish user-generated video content.
- * Version: 0.1.0
+ * Version: 0.4.2
  * Author: Clipisode
  * Text Domain: clipisode
- * Requires at least: 6.5
+ * Requires at least: 6.6
  * Requires PHP: 8.1
  */
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'CLIPISODE_VERSION', '0.1.0' );
+define( 'CLIPISODE_VERSION', '0.4.2' );
 define( 'CLIPISODE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CLIPISODE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-database.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-post-types.php';
+require_once CLIPISODE_PLUGIN_DIR . 'includes/class-invitation-styles.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-media.php';
+require_once CLIPISODE_PLUGIN_DIR . 'includes/class-composition.php';
+require_once CLIPISODE_PLUGIN_DIR . 'includes/class-renderer.php';
+require_once CLIPISODE_PLUGIN_DIR . 'includes/class-social-meta.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-admin.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-rest-api.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-invitation.php';
@@ -78,16 +82,13 @@ add_filter( 'block_editor_settings_all', [ Clipisode_Post_Types::class, 'filter_
 add_filter( 'render_block', [ Clipisode_Post_Types::class, 'filter_flow_block_directives' ], 10, 2 );
 
 add_filter( 'clipisode_themes', function ( array $themes ): array {
-	$themes['default'] = [
-		'label'     => 'Default',
-		'asset_url' => CLIPISODE_PLUGIN_URL . 'assets/themes/standard/',
-		'asset_dir' => CLIPISODE_PLUGIN_DIR . 'assets/themes/standard/',
-	];
-	$themes['wpvip'] = [
-		'label'     => 'WP VIP',
-		'asset_url' => CLIPISODE_PLUGIN_URL . 'assets/themes/wpvip/',
-		'asset_dir' => CLIPISODE_PLUGIN_DIR . 'assets/themes/wpvip/',
-	];
+	$catalog = Clipisode_Composition::themes();
+	if ( is_wp_error( $catalog ) ) {
+		throw new RuntimeException( $catalog->get_error_message() );
+	}
+	foreach ( $catalog as $theme ) {
+		$themes[ $theme['id'] ] = [ 'label' => $theme['label'] ];
+	}
 	return $themes;
 } );
 

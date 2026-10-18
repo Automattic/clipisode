@@ -12,8 +12,67 @@ class Clipisode_Invitation {
 	}
 
 	public static function sanitize_prefix( string $value ): string {
-		$value = sanitize_title( trim( $value, '/' ) );
-		return $value ?: 'invitation';
+		$segments = array_filter( array_map( 'sanitize_title', explode( '/', trim( $value, '/' ) ) ) );
+		return $segments ? implode( '/', $segments ) : 'invitation';
+	}
+
+	/**
+	 * Resolve the image set used by social crawlers for an invitation URL.
+	 * A link-level override wins; otherwise the topic's image is inherited.
+	 *
+	 * @return array{id: int, variants: array<string, array{id: int, url: string, width: int, height: int, type: string}>}|null
+	 */
+	public static function get_social_images( object $link, object $topic ): ?array {
+		$media_ids = array_unique( array_filter( [
+			(int) ( $link->social_image_media_id ?? 0 ),
+			(int) ( $topic->social_image_media_id ?? 0 ),
+		] ) );
+		foreach ( $media_ids as $media_id ) {
+			$variants = Clipisode_Media::get_social_image_variants( $media_id );
+			if ( ! empty( $variants ) ) {
+				return [
+					'id'       => $media_id,
+					'variants' => $variants,
+				];
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Resolve the primary wide image while preserving the v0.2 API shape.
+	 *
+	 * @return array{id: int, url: string}|null
+	 */
+	public static function get_social_image( object $link, object $topic ): ?array {
+		$images = self::get_social_images( $link, $topic );
+		if ( ! $images ) {
+			return null;
+		}
+		$variants = $images['variants'];
+		$primary  = $variants['wide'] ?? reset( $variants );
+		return $primary ? [ 'id' => $images['id'], 'url' => $primary['url'] ] : null;
+	}
+
+	public static function get_social_image_url( object $link, object $topic ): string {
+		$image = self::get_social_image( $link, $topic );
+		return $image['url'] ?? '';
+	}
+
+	public static function get_social_description( object $topic ): string {
+		$host = trim( (string) ( $topic->hosted_by ?? '' ) );
+		if ( $host !== '' ) {
+			return sprintf( 'Share a video reply with %s.', $host );
+		}
+		return 'Share a video reply.';
+	}
+
+	public static function get_share_url( string $slug, int $social_image_media_id = 0 ): string {
+		$url = home_url( self::get_prefix() . '/' . rawurlencode( $slug ) . '/' );
+		return $social_image_media_id > 0
+			? add_query_arg( 'v', (string) $social_image_media_id, $url )
+			: $url;
 	}
 
 	/**
@@ -46,11 +105,9 @@ class Clipisode_Invitation {
 	 *
 	 * One rule, one query var, one template. The URL prefix is
 	 * stored in the `clipisode_invitation_prefix` site option
-	 * (default "invitation") so non-English sites can serve the
-	 * flow at locale-appropriate paths (`/invitasjon/`, `/邀請/`,
-	 * etc.). Changing the option requires a rewrite-rules flush;
-	 * the Settings page does that automatically when the value
-	 * changes.
+	 * (default "invitation") so sites can serve the flow at paths
+	 * such as `/clipisode/invitation/`. Changing the option requires
+	 * a rewrite-rules flush; the Settings page does that automatically.
 	 *
 	 * Earlier versions of the plugin ran a parallel "v2" flow on a
 	 * hardcoded /clipisode-flow/ prefix while the new

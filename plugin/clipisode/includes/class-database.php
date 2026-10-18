@@ -14,8 +14,9 @@ class Clipisode_Database {
 	 * History:
 	 *   1  Initial seven-table schema.
 	 *   2  Query-path indexes on clipisode_replies and clipisode_topics.
+	 *   3  clipisode_outputs.composition for saved Remotion compositions.
 	 */
-	const DB_VERSION = '2';
+	const DB_VERSION = '3';
 
 	const VERSION_OPTION = 'clipisode_db_version';
 
@@ -233,6 +234,7 @@ topic_id BIGINT UNSIGNED NOT NULL,
 slug VARCHAR(20) NOT NULL,
 type VARCHAR(20) NOT NULL,
 status VARCHAR(20) NOT NULL DEFAULT 'open',
+social_image_media_id BIGINT UNSIGNED DEFAULT NULL,
 clicks BIGINT UNSIGNED NOT NULL DEFAULT 0,
 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 PRIMARY KEY  (id),
@@ -294,6 +296,7 @@ name VARCHAR(255) NOT NULL,
 slug VARCHAR(255) NOT NULL,
 upload_token VARCHAR(64) DEFAULT NULL,
 media_id BIGINT UNSIGNED DEFAULT NULL,
+composition LONGTEXT DEFAULT NULL,
 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 PRIMARY KEY  (id),
 UNIQUE KEY slug (slug),

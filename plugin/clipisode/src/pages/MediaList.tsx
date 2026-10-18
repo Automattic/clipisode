@@ -40,13 +40,17 @@ function UsedByCell( { item }: { item: MediaItem } ) {
 	}
 
 	const href =
-		usage.type === 'topic' || usage.type === 'output'
+		usage.type === 'topic' ||
+		usage.type === 'invitation' ||
+		usage.type === 'output'
 			? `admin.php?page=clipisode#${ usage.topic_id || usage.id }`
 			: `admin.php?page=clipisode-replies`;
 
 	const prefix = usage.type.charAt( 0 ).toUpperCase() + usage.type.slice( 1 );
 	const detail =
-		usage.type === 'output' || usage.type === 'reply'
+		usage.type === 'invitation' ||
+		usage.type === 'output' ||
+		usage.type === 'reply'
 			? ` (${ usage.topic_title || 'Unknown topic' })`
 			: '';
 
@@ -96,7 +100,7 @@ export default function MediaList() {
 		const mediaIds = items
 			.filter( ( i ) => selectedIds.has( i.id ) )
 			.map( ( i ) => i.id );
-		window.location.href = `admin.php?page=clipisode#/create-clipisode/${ mediaIds.join(
+		window.location.href = `admin.php?page=clipisode-clipisodes#/create-clipisode/${ mediaIds.join(
 			','
 		) }`;
 	};
@@ -422,7 +426,10 @@ export default function MediaList() {
 											size="compact"
 											isDestructive
 											isBusy={ deleting === item.id }
-											disabled={ deleting === item.id }
+											disabled={
+												deleting === item.id ||
+												Boolean( item.used_by )
+											}
 											onClick={ () => {
 												if (
 													window.confirm(

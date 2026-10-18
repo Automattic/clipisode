@@ -6,6 +6,7 @@ export interface Topic {
 	intro_video_filename: string | null;
 	social_image_media_id: number | null;
 	social_image_url: string | null;
+	social_image_variants: SocialImageVariants;
 	hosted_by: string;
 	brand_terms_id: number;
 	brand_terms_title: string | null;
@@ -28,6 +29,8 @@ export interface Topic {
 
 export interface Output {
 	id: number;
+	topic_id?: number | null;
+	has_composition?: boolean;
 	name: string;
 	slug: string;
 	upload_token?: string;
@@ -36,6 +39,26 @@ export interface Output {
 	clips_count: number;
 	file_size: number | null;
 	created_at: string;
+}
+
+export interface SavedCompositionOutput {
+	id: number;
+	name: string;
+	topic_id: number | null;
+	slug: string;
+	created_at: string;
+	url: string | null;
+	composition: import('./remotion/types').ClipisodeCompositionProps;
+	composition_hash: string | null;
+}
+
+export interface OutputRenderStatus {
+	id: string | null;
+	status: 'idle' | 'queued' | 'rendering' | 'uploading' | 'done' | 'error';
+	progress: number;
+	error: string | null;
+	url?: string | null;
+	external_available: boolean;
 }
 
 export interface Theme {
@@ -54,12 +77,39 @@ export interface VideoValue {
 	reused?: boolean;
 }
 
+export interface SocialImageVariant {
+	id: number;
+	url: string;
+	width: number;
+	height: number;
+	type: string;
+}
+
+export type SocialImageVariants = Partial<
+	Record< 'wide' | 'square' | 'portrait', SocialImageVariant >
+>;
+
+export interface SocialImageValue {
+	id: number;
+	url: string;
+	variants?: SocialImageVariants;
+}
+
 export interface InvitationLink {
 	id: number;
 	topic_id: number;
 	slug: string;
 	type: string;
 	status: string;
+	social_image_media_id: number | null;
+	social_image_url: string | null;
+	social_image_variants: SocialImageVariants;
+	topic_social_image_url: string | null;
+	topic_social_image_variants: SocialImageVariants;
+	effective_social_image_media_id: number | null;
+	effective_social_image_url: string | null;
+	effective_social_image_variants: SocialImageVariants;
+	share_url: string;
 	clicks: number;
 	replies_count: number;
 	created_at: string;
@@ -100,7 +150,7 @@ export interface Reply {
 }
 
 export interface MediaUsage {
-	type: 'topic' | 'output' | 'reply';
+	type: 'topic' | 'invitation' | 'output' | 'reply';
 	id: number;
 	label: string;
 	preview_url?: string | null;
@@ -156,20 +206,22 @@ export interface Host {
 
 declare global {
 	interface Window {
+		ClipisodeThemeAPI?: {
+			React: typeof import('react');
+			Remotion: typeof import('remotion');
+			registerRenderer: ( id: string, renderer: import('./remotion/theme-renderers').ThemeRenderer ) => void;
+		};
 		clipisodeAdmin?: {
 			page: string;
+			home_url: string;
 			rest_root: string;
 			nonce: string;
 			invitation_prefix: string;
 			preview_prefix: string;
 			debug_mode: boolean;
-			themes: Record<
-				string,
-				{
-					label: string;
-					assets: Record< string, { url: string; filename: string } >;
-				}
-			>;
+			remotion_license_key?: string | null;
+			remotion_is_production?: boolean;
+			composition_themes?: import('./remotion/types').ThemeDefinition[];
 		};
 	}
 }

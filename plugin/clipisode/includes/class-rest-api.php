@@ -221,6 +221,11 @@ class Clipisode_REST_API {
 		// Outputs.
 		register_rest_route( self::NAMESPACE, '/outputs', [
 			[
+				'methods'             => 'GET',
+				'callback'            => [ $this, 'list_outputs' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+			[
 				'methods'             => 'POST',
 				'callback'            => [ $this, 'create_output' ],
 				'permission_callback' => [ $this, 'check_permission' ],
@@ -229,8 +234,39 @@ class Clipisode_REST_API {
 
 		register_rest_route( self::NAMESPACE, '/outputs/(?P<id>\d+)', [
 			[
+				'methods'             => 'GET',
+				'callback'            => [ $this, 'get_output' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+			[
+				'methods'             => 'PUT',
+				'callback'            => [ $this, 'update_output' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+			[
 				'methods'             => 'DELETE',
 				'callback'            => [ $this, 'delete_output' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+		] );
+
+		register_rest_route( self::NAMESPACE, '/outputs/(?P<id>\d+)/render', [
+			[
+				'methods'             => 'POST',
+				'callback'            => [ $this, 'render_output' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+			[
+				'methods'             => 'GET',
+				'callback'            => [ $this, 'get_output_render' ],
+				'permission_callback' => [ $this, 'check_permission' ],
+			],
+		] );
+
+		register_rest_route( self::NAMESPACE, '/outputs/(?P<id>\d+)/browser-render', [
+			[
+				'methods'             => 'POST',
+				'callback'            => [ $this, 'upload_browser_output' ],
 				'permission_callback' => [ $this, 'check_permission' ],
 			],
 		] );
@@ -500,9 +536,10 @@ class Clipisode_REST_API {
 			? Clipisode_Media::get_filename( (int) $topic->intro_media_id )
 			: null;
 
-		$topic->social_image_url = ! empty( $topic->social_image_media_id )
-			? Clipisode_Media::get_url( (int) $topic->social_image_media_id )
-			: null;
+		$topic->social_image_variants = ! empty( $topic->social_image_media_id )
+			? Clipisode_Media::get_social_image_variants( (int) $topic->social_image_media_id )
+			: [];
+		$topic->social_image_url = $topic->social_image_variants['wide']['url'] ?? null;
 
 		if ( ! empty( $topic->invitation_id ) ) {
 			$inv_post = get_post( (int) $topic->invitation_id );
@@ -540,6 +577,11 @@ class Clipisode_REST_API {
 
 		$topic->outputs = array_map( function ( $o ) {
 			$preview_url = Clipisode_Preview::get_url( (int) $o->id, $o->media_id ? (int) $o->media_id : null, $o->slug );
+			$clips_count = (int) $o->clips_count;
+			if ( null !== $o->composition ) {
+				$composition = json_decode( $o->composition, true );
+				$clips_count = count( array_filter( $composition['clips'], fn( $clip ) => $clip['included'] ) );
+			}
 
 			return (object) [
 				'id'          => (int) $o->id,
@@ -547,9 +589,10 @@ class Clipisode_REST_API {
 				'slug'        => $o->slug,
 				'url'         => $o->media_id ? Clipisode_Media::get_url( (int) $o->media_id ) : null,
 				'preview_url' => $preview_url,
-				'clips_count' => (int) $o->clips_count,
+				'clips_count' => $clips_count,
 				'file_size'   => $o->file_size ? (int) $o->file_size : null,
 				'created_at'  => $o->created_at,
+				'has_composition' => null !== $o->composition,
 			];
 		}, $raw_outputs );
 
@@ -653,6 +696,8 @@ class Clipisode_REST_API {
 		global $wpdb;
 		$table = $wpdb->prefix . 'clipisode_topics';
 		$id    = (int) $request['id'];
+		$old_intro_media_id = 0;
+		$old_social_image_id = 0;
 
 		$fields = [];
 		foreach ( [ 'title', 'hosted_by', 'status' ] as $field ) {
@@ -665,15 +710,11 @@ class Clipisode_REST_API {
 			$new_media_id = $request->get_param( 'intro_media_id' );
 			$new_media_id = $new_media_id ? (int) $new_media_id : null;
 
-			$old_media_id = (int) $wpdb->get_var( $wpdb->prepare(
+			$old_intro_media_id = (int) $wpdb->get_var( $wpdb->prepare(
 				'SELECT intro_media_id FROM %i WHERE id = %d',
 				$table,
 				$id
 			) );
-
-			if ( $old_media_id && $old_media_id !== $new_media_id ) {
-				Clipisode_Media::delete( $old_media_id );
-			}
 
 			$fields['intro_media_id'] = $new_media_id;
 		}
@@ -681,15 +722,11 @@ class Clipisode_REST_API {
 			$new_si_id = $request->get_param( 'social_image_media_id' );
 			$new_si_id = $new_si_id ? (int) $new_si_id : null;
 
-			$old_si_id = (int) $wpdb->get_var( $wpdb->prepare(
+			$old_social_image_id = (int) $wpdb->get_var( $wpdb->prepare(
 				'SELECT social_image_media_id FROM %i WHERE id = %d',
 				$table,
 				$id
 			) );
-
-			if ( $old_si_id && $old_si_id !== $new_si_id ) {
-				Clipisode_Media::delete( $old_si_id );
-			}
 
 			$fields['social_image_media_id'] = $new_si_id;
 		}
@@ -702,7 +739,15 @@ class Clipisode_REST_API {
 			$fields['invitation_id'] = $invitation_id ? (int) $invitation_id : null;
 		}
 
-		$wpdb->update( $table, $fields, [ 'id' => $id ] );
+		$updated = $wpdb->update( $table, $fields, [ 'id' => $id ] );
+		if ( false === $updated ) {
+			return new WP_REST_Response( [ 'message' => 'The topic could not be updated.' ], 500 );
+		}
+		foreach ( [ $old_intro_media_id, $old_social_image_id ] as $old_media_id ) {
+			if ( $old_media_id && ! $this->media_is_referenced( $old_media_id ) ) {
+				Clipisode_Media::delete( $old_media_id );
+			}
+		}
 
 		if ( ! empty( $fields['hosted_by'] ) ) {
 			$this->ensure_host( $fields['hosted_by'] );
@@ -726,41 +771,78 @@ class Clipisode_REST_API {
 	public function delete_topic( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
 		$id = (int) $request['id'];
+		if ( false === $wpdb->query( 'START TRANSACTION' ) ) {
+			return new WP_REST_Response( [ 'message' => 'The topic could not be deleted.' ], 500 );
+		}
+		$output_ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$wpdb->prefix}clipisode_outputs WHERE topic_id = %d FOR UPDATE", $id ) );
+		foreach ( $output_ids as $output_id ) {
+			wp_cache_delete( 'clipisode_render_' . $output_id, 'options' );
+			if ( Clipisode_Renderer::is_active( (int) $output_id ) ) {
+				$wpdb->query( 'ROLLBACK' );
+				return new WP_REST_Response( [ 'message' => 'Wait for this topic’s active renders to finish before deleting it.' ], 409 );
+			}
+		}
+		$referenced = $wpdb->get_var( $wpdb->prepare(
+			"SELECT c.output_id FROM {$wpdb->prefix}clipisode_contents c
+			INNER JOIN {$wpdb->prefix}clipisode_outputs o ON o.id = c.output_id
+			WHERE o.composition IS NOT NULL AND (o.topic_id IS NULL OR o.topic_id != %d)
+			AND c.media_id IN (
+				SELECT intro_media_id FROM {$wpdb->prefix}clipisode_topics WHERE id = %d
+				UNION SELECT social_image_media_id FROM {$wpdb->prefix}clipisode_topics WHERE id = %d
+				UNION SELECT social_image_media_id FROM {$wpdb->prefix}clipisode_invitation_links WHERE topic_id = %d
+				UNION SELECT media_id FROM {$wpdb->prefix}clipisode_replies WHERE topic_id = %d
+				UNION SELECT media_id FROM {$wpdb->prefix}clipisode_outputs WHERE topic_id = %d
+			) LIMIT 1",
+			$id, $id, $id, $id, $id, $id
+		) );
+		if ( $referenced ) {
+			$wpdb->query( 'ROLLBACK' );
+			return new WP_REST_Response( [ 'message' => 'This topic contains a video used by another saved composition. Remove that video from the composition before deleting this topic.' ], 409 );
+		}
 
 		$topic_row = $wpdb->get_row( $wpdb->prepare(
 			"SELECT intro_media_id, social_image_media_id FROM {$wpdb->prefix}clipisode_topics WHERE id = %d",
 			$id
 		) );
-		if ( $topic_row ) {
-			if ( (int) $topic_row->intro_media_id ) {
-				Clipisode_Media::delete( (int) $topic_row->intro_media_id );
-			}
-			if ( (int) $topic_row->social_image_media_id ) {
-				Clipisode_Media::delete( (int) $topic_row->social_image_media_id );
-			}
-		}
+		$topic_media_ids = $topic_row ? [ $topic_row->intro_media_id, $topic_row->social_image_media_id ] : [];
+
+		$invitation_media_ids = $wpdb->get_col( $wpdb->prepare(
+			"SELECT social_image_media_id FROM {$wpdb->prefix}clipisode_invitation_links WHERE topic_id = %d AND social_image_media_id IS NOT NULL",
+			$id
+		) );
 
 		$output_media_ids = $wpdb->get_col( $wpdb->prepare(
 			"SELECT media_id FROM {$wpdb->prefix}clipisode_outputs WHERE topic_id = %d AND media_id IS NOT NULL",
 			$id
 		) );
-		foreach ( $output_media_ids as $media_id ) {
-			Clipisode_Media::delete( (int) $media_id );
-		}
 
 		$reply_media_ids = $wpdb->get_col( $wpdb->prepare(
 			"SELECT media_id FROM {$wpdb->prefix}clipisode_replies WHERE topic_id = %d AND media_id IS NOT NULL",
 			$id
 		) );
-		foreach ( $reply_media_ids as $media_id ) {
-			Clipisode_Media::delete( (int) $media_id );
+
+		$deleted = $wpdb->query( $wpdb->prepare(
+			"DELETE c FROM {$wpdb->prefix}clipisode_contents c INNER JOIN {$wpdb->prefix}clipisode_outputs o ON o.id = c.output_id WHERE o.topic_id = %d",
+			$id
+		) );
+		if ( false === $deleted
+			|| false === $wpdb->delete( $wpdb->prefix . 'clipisode_outputs', [ 'topic_id' => $id ] )
+			|| false === $wpdb->delete( $wpdb->prefix . 'clipisode_replies', [ 'topic_id' => $id ] )
+			|| false === $wpdb->delete( $wpdb->prefix . 'clipisode_invitation_links', [ 'topic_id' => $id ] )
+			|| false === $wpdb->delete( $wpdb->prefix . 'clipisode_topics', [ 'id' => $id ] )
+			|| false === $wpdb->query( 'COMMIT' ) ) {
+			$wpdb->query( 'ROLLBACK' );
+			return new WP_REST_Response( [ 'message' => 'The topic could not be deleted.' ], 500 );
 		}
-
-		$wpdb->delete( $wpdb->prefix . 'clipisode_outputs', [ 'topic_id' => $id ] );
-		$wpdb->delete( $wpdb->prefix . 'clipisode_replies', [ 'topic_id' => $id ] );
-		$wpdb->delete( $wpdb->prefix . 'clipisode_invitation_links', [ 'topic_id' => $id ] );
-		$wpdb->delete( $wpdb->prefix . 'clipisode_topics', [ 'id' => $id ] );
-
+		foreach ( $output_ids as $output_id ) {
+			Clipisode_Renderer::forget( (int) $output_id );
+		}
+		$media_ids = array_unique( array_filter( array_merge( $topic_media_ids, $invitation_media_ids, $output_media_ids, $reply_media_ids ) ) );
+		foreach ( $media_ids as $media_id ) {
+			if ( ! $this->media_is_referenced( (int) $media_id ) ) {
+				Clipisode_Media::delete( (int) $media_id );
+			}
+		}
 		return new WP_REST_Response( null, 204 );
 	}
 
@@ -797,92 +879,277 @@ class Clipisode_REST_API {
 		return $slug . '-' . $i;
 	}
 
-	public function create_output( WP_REST_Request $request ): WP_REST_Response {
+	public function list_outputs( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
-		$table = $wpdb->prefix . 'clipisode_outputs';
+		$rows = $wpdb->get_results(
+			"SELECT id, name, topic_id, slug, created_at, composition FROM {$wpdb->prefix}clipisode_outputs WHERE composition IS NOT NULL ORDER BY created_at DESC, id DESC"
+		);
+		$outputs = array_map( function ( $row ) {
+			$composition = json_decode( $row->composition, true );
+			return [
+				'id'              => (int) $row->id,
+				'name'            => $row->name,
+				'topic_id'        => $row->topic_id ? (int) $row->topic_id : null,
+				'slug'            => $row->slug,
+				'created_at'      => $row->created_at,
+				'clips_count'     => count( array_filter( $composition['clips'], fn( $clip ) => $clip['included'] ) ),
+				'has_composition' => true,
+			];
+		}, $rows );
+		return new WP_REST_Response( $outputs );
+	}
 
-		$name     = sanitize_text_field( $request->get_param( 'name' ) );
-		$topic_id = $request->get_param( 'topic_id' );
+	public function get_output( WP_REST_Request $request ): WP_REST_Response {
+		return $this->output_response( (int) $request['id'] );
+	}
 
-		if ( ! $name ) {
+	private function output_response( int $id, int $status = 200 ): WP_REST_Response {
+		global $wpdb;
+		$output = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}clipisode_outputs WHERE id = %d", $id ) );
+		if ( ! $output ) {
+			return new WP_REST_Response( [ 'message' => 'Output not found.' ], 404 );
+		}
+		$composition = null !== $output->composition ? Clipisode_Composition::resolve( $output->composition ) : null;
+		if ( is_wp_error( $composition ) ) {
+			return new WP_REST_Response( [ 'message' => $composition->get_error_message() ], 409 );
+		}
+		return new WP_REST_Response( [
+			'id'          => (int) $output->id,
+			'name'        => $output->name,
+			'topic_id'    => $output->topic_id ? (int) $output->topic_id : null,
+			'slug'        => $output->slug,
+			'created_at'  => $output->created_at,
+			'composition' => $composition,
+			'composition_hash' => null !== $output->composition ? hash( 'sha256', $output->composition ) : null,
+			'url'         => $output->media_id ? Clipisode_Media::get_url( (int) $output->media_id ) : null,
+		], $status );
+	}
+
+	public function create_output( WP_REST_Request $request ): WP_REST_Response {
+		return $this->save_composition( $request );
+	}
+
+	public function update_output( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
+		$id = (int) $request['id'];
+		$output = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}clipisode_outputs WHERE id = %d", $id ) );
+		if ( ! $output ) {
+			return new WP_REST_Response( [ 'message' => 'Output not found.' ], 404 );
+		}
+		if ( null === $output->composition ) {
+			return new WP_REST_Response( [ 'message' => 'This output does not have an editable composition.' ], 409 );
+		}
+		return $this->save_composition( $request, $id );
+	}
+
+	private function save_composition( WP_REST_Request $request, ?int $id = null ): WP_REST_Response {
+		global $wpdb;
+		$name = $request->get_param( 'name' );
+		if ( ! is_string( $name ) || ! trim( sanitize_text_field( $name ) ) ) {
 			return new WP_REST_Response( [ 'message' => 'Name is required.' ], 400 );
 		}
+		$name = sanitize_text_field( $name );
+		$topic_id = $request->get_param( 'topic_id' );
+		if ( null !== $topic_id && ( ! is_int( $topic_id ) || $topic_id <= 0 || ! $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$wpdb->prefix}clipisode_topics WHERE id = %d", $topic_id ) ) ) ) {
+			return new WP_REST_Response( [ 'message' => 'Topic not found.' ], 400 );
+		}
+		$composition = Clipisode_Composition::sanitize( $request->get_param( 'composition' ) );
+		if ( is_wp_error( $composition ) ) {
+			return new WP_REST_Response( [ 'message' => $composition->get_error_message() ], 400 );
+		}
+		$data = [
+			'name'        => $name,
+			'topic_id'    => $topic_id,
+			'composition' => wp_json_encode( $composition ),
+		];
+		$creating = null === $id;
+		if ( $creating ) {
+			$data['slug'] = $this->generate_unique_slug( $name );
+		}
 
-		$slug         = $this->generate_unique_slug( $name );
-		$upload_token = wp_generate_password( 32, false );
+		// The composition and its source references must change together.
+		if ( false === $wpdb->query( 'START TRANSACTION' ) ) {
+			return new WP_REST_Response( [ 'message' => 'The composition could not be saved.' ], 500 );
+		}
+		if ( ! $creating && ! $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM {$wpdb->prefix}clipisode_outputs WHERE id = %d FOR UPDATE", $id
+		) ) ) {
+			$wpdb->query( 'ROLLBACK' );
+			return new WP_REST_Response( [ 'message' => 'Output not found.' ], 404 );
+		}
+		if ( ! $creating && Clipisode_Renderer::is_active( $id ) ) {
+			$wpdb->query( 'ROLLBACK' );
+			return new WP_REST_Response( [ 'message' => 'Wait for the active render to finish before saving changes.' ], 409 );
+		}
+		$result = $creating
+			? $wpdb->insert( $wpdb->prefix . 'clipisode_outputs', $data )
+			: $wpdb->update( $wpdb->prefix . 'clipisode_outputs', $data, [ 'id' => $id ] );
+		if ( $creating ) {
+			$id = (int) $wpdb->insert_id;
+		}
+		if ( false === $result || ! $this->replace_composition_contents( $id, $composition['clips'] ) ) {
+			$wpdb->query( 'ROLLBACK' );
+			return new WP_REST_Response( [ 'message' => 'The composition could not be saved.' ], 500 );
+		}
+		if ( false === $wpdb->query( 'COMMIT' ) ) {
+			$wpdb->query( 'ROLLBACK' );
+			return new WP_REST_Response( [ 'message' => 'The composition could not be saved.' ], 500 );
+		}
+		return $this->output_response( $id, $creating ? 201 : 200 );
+	}
 
-		$wpdb->insert( $table, [
-			'topic_id'     => $topic_id ? (int) $topic_id : null,
-			'name'         => $name,
-			'slug'         => $slug,
-			'upload_token' => $upload_token,
-		] );
-
-		return new WP_REST_Response( [
-			'id'           => $wpdb->insert_id,
-			'name'         => $name,
-			'slug'         => $slug,
-			'upload_token' => $upload_token,
-		], 201 );
+	private function replace_composition_contents( int $output_id, array $clips ): bool {
+		global $wpdb;
+		$table = $wpdb->prefix . 'clipisode_contents';
+		if ( false === $wpdb->delete( $table, [ 'output_id' => $output_id ] ) ) {
+			return false;
+		}
+		foreach ( $clips as $position => $clip ) {
+			if ( false === $wpdb->insert( $table, [
+				'output_id'  => $output_id,
+				'media_id'   => $clip['mediaId'],
+				'position'   => $position,
+				'role'       => $clip['role'],
+				'trim_start' => $clip['trimStart'],
+				'trim_end'   => $clip['trimEnd'],
+				'duration'   => $clip['duration'],
+			] ) ) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	public function delete_output( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
 		$table = $wpdb->prefix . 'clipisode_outputs';
 		$id    = (int) $request['id'];
-
-		$output = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', $table, $id ) );
+		if ( false === $wpdb->query( 'START TRANSACTION' ) ) {
+			return new WP_REST_Response( [ 'message' => 'The Clipisode could not be deleted.' ], 500 );
+		}
+		$output = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d FOR UPDATE', $table, $id ) );
 		if ( ! $output ) {
+			$wpdb->query( 'ROLLBACK' );
 			return new WP_REST_Response( [ 'message' => 'Output not found.' ], 404 );
 		}
-
-		if ( $output->media_id ) {
+		wp_cache_delete( 'clipisode_render_' . $id, 'options' );
+		if ( Clipisode_Renderer::is_active( $id ) ) {
+			$wpdb->query( 'ROLLBACK' );
+			return new WP_REST_Response( [ 'message' => 'Wait for the active render to finish before deleting this Clipisode.' ], 409 );
+		}
+		if ( $output->media_id && $this->composition_uses_media( (int) $output->media_id ) ) {
+			$wpdb->query( 'ROLLBACK' );
+			return new WP_REST_Response( [ 'message' => 'This output is used by a saved composition. Remove it from the composition before deleting it.' ], 409 );
+		}
+		if ( false === $wpdb->delete( $wpdb->prefix . 'clipisode_contents', [ 'output_id' => $id ] ) || false === $wpdb->delete( $table, [ 'id' => $id ] ) || false === $wpdb->query( 'COMMIT' ) ) {
+			$wpdb->query( 'ROLLBACK' );
+			return new WP_REST_Response( [ 'message' => 'The Clipisode could not be deleted.' ], 500 );
+		}
+		Clipisode_Renderer::forget( $id );
+		if ( $output->media_id && ! $this->media_is_referenced( (int) $output->media_id ) ) {
 			Clipisode_Media::delete( (int) $output->media_id );
 		}
-
-		$wpdb->delete( $table, [ 'id' => $id ] );
-
 		return new WP_REST_Response( null, 204 );
 	}
 
+	public function render_output( WP_REST_Request $request ): WP_REST_Response {
+		return Clipisode_Renderer::start( (int) $request['id'] );
+	}
+
+	public function get_output_render( WP_REST_Request $request ): WP_REST_Response {
+		return Clipisode_Renderer::status( (int) $request['id'] );
+	}
+
 	public function upload_output( WP_REST_Request $request ): WP_REST_Response {
+		return $this->receive_render_upload( $request, false );
+	}
+
+	public function upload_browser_output( WP_REST_Request $request ): WP_REST_Response {
+		return $this->receive_render_upload( $request, true );
+	}
+
+	private function receive_render_upload( WP_REST_Request $request, bool $browser ): WP_REST_Response {
 		global $wpdb;
 		$table = $wpdb->prefix . 'clipisode_outputs';
 		$id    = (int) $request['id'];
-		$token = sanitize_text_field( $request->get_param( 'token' ) );
-
-		$output = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', $table, $id ) );
+		if ( false === $wpdb->query( 'START TRANSACTION' ) ) {
+			return new WP_REST_Response( [ 'message' => 'The render upload could not be saved.' ], 500 );
+		}
+		$output = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d FOR UPDATE', $table, $id ) );
 		if ( ! $output ) {
+			$wpdb->query( 'ROLLBACK' );
 			return new WP_REST_Response( [ 'message' => 'Output not found.' ], 404 );
 		}
-
-		if ( ! $token || ! $output->upload_token || ! hash_equals( $output->upload_token, $token ) ) {
-			return new WP_REST_Response( [ 'message' => 'Invalid upload token.' ], 403 );
+		wp_cache_delete( 'clipisode_render_' . $id, 'options' );
+		if ( $browser ) {
+			$hash = $request->get_param( 'composition_hash' );
+			if ( ! is_string( $hash ) || ! preg_match( '/^[a-f0-9]{64}$/', $hash ) ) {
+				$wpdb->query( 'ROLLBACK' );
+				return new WP_REST_Response( [ 'message' => 'A saved composition hash is required.' ], 400 );
+			}
+			$hash = sanitize_text_field( $hash );
+			if ( Clipisode_Renderer::is_active( $id ) ) {
+				$wpdb->query( 'ROLLBACK' );
+				return new WP_REST_Response( [ 'message' => 'Wait for the active server render to finish before uploading a browser export.' ], 409 );
+			}
+			if ( null === $output->composition || ! hash_equals( hash( 'sha256', $output->composition ), $hash ) ) {
+				$wpdb->query( 'ROLLBACK' );
+				return new WP_REST_Response( [ 'message' => 'The saved composition changed during export. Export the saved composition again.' ], 409 );
+			}
+		} else {
+			$token = sanitize_text_field( $request->get_param( 'token' ) );
+			if ( ! $token || ! $output->upload_token || ! hash_equals( $output->upload_token, $token ) ) {
+				$wpdb->query( 'ROLLBACK' );
+				return new WP_REST_Response( [ 'message' => 'Invalid upload token.' ], 403 );
+			}
+			$error = Clipisode_Renderer::validate_upload( $output );
+			if ( is_wp_error( $error ) ) {
+				$wpdb->query( 'ROLLBACK' );
+				return new WP_REST_Response( [ 'message' => $error->get_error_message() ], 409 );
+			}
 		}
-
 		$files = $request->get_file_params();
 		if ( empty( $files['video'] ) ) {
+			$wpdb->query( 'ROLLBACK' );
 			return new WP_REST_Response( [ 'message' => 'No video file provided.' ], 400 );
 		}
-
-		if ( $output->media_id ) {
-			Clipisode_Media::delete( (int) $output->media_id );
-		}
-
 		$result = Clipisode_Media::create( 'video', 'clipisode' );
 		if ( is_wp_error( $result ) ) {
+			$wpdb->query( 'ROLLBACK' );
 			return new WP_REST_Response( [ 'message' => $result->get_error_message() ], 400 );
 		}
-
-		$wpdb->update( $table, [
+		$saved = $wpdb->update( $table, [
 			'media_id'     => $result['id'],
 			'upload_token' => null,
 		], [ 'id' => $id ] );
+		if ( false === $saved || ! ( $browser ? Clipisode_Renderer::complete_browser( $id, $hash ) : Clipisode_Renderer::complete( $id ) ) ) {
+			Clipisode_Media::delete( (int) $result['id'] );
+			$wpdb->query( 'ROLLBACK' );
+			wp_cache_delete( 'clipisode_render_' . $id, 'options' );
+			return new WP_REST_Response( [ 'message' => 'The rendered video could not be saved.' ], 500 );
+		}
+		if ( false === $wpdb->query( 'COMMIT' ) ) {
+			Clipisode_Media::delete( (int) $result['id'] );
+			$wpdb->query( 'ROLLBACK' );
+			wp_cache_delete( 'clipisode_render_' . $id, 'options' );
+			return new WP_REST_Response( [ 'message' => 'The rendered video could not be saved.' ], 500 );
+		}
+		if ( $output->media_id && ! $this->media_is_referenced( (int) $output->media_id ) ) {
+			Clipisode_Media::delete( (int) $output->media_id );
+		}
+		return new WP_REST_Response( [ 'id' => $result['id'], 'url' => $result['url'] ] );
+	}
 
-		return new WP_REST_Response( [
-			'id'  => $result['id'],
-			'url' => $result['url'],
-		] );
+	private function media_is_referenced( int $media_id ): bool {
+		global $wpdb;
+		return (bool) $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM {$wpdb->prefix}clipisode_outputs WHERE media_id = %d
+			UNION SELECT id FROM {$wpdb->prefix}clipisode_contents WHERE media_id = %d
+			UNION SELECT id FROM {$wpdb->prefix}clipisode_replies WHERE media_id = %d
+			UNION SELECT id FROM {$wpdb->prefix}clipisode_topics WHERE intro_media_id = %d OR social_image_media_id = %d
+			UNION SELECT id FROM {$wpdb->prefix}clipisode_invitation_links WHERE social_image_media_id = %d LIMIT 1",
+			$media_id, $media_id, $media_id, $media_id, $media_id, $media_id
+		) );
 	}
 
 	// --- Output Contents ---
@@ -903,6 +1170,11 @@ class Clipisode_REST_API {
 		global $wpdb;
 		$table = $wpdb->prefix . 'clipisode_contents';
 		$id    = (int) $request['id'];
+		if ( $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM {$wpdb->prefix}clipisode_outputs WHERE id = %d AND composition IS NOT NULL", $id
+		) ) ) {
+			return new WP_REST_Response( [ 'message' => 'Save the composition to update its source clips.' ], 409 );
+		}
 
 		$contents = $request->get_param( 'contents' );
 		if ( ! is_array( $contents ) || empty( $contents ) ) {
@@ -926,24 +1198,58 @@ class Clipisode_REST_API {
 
 	// --- Invitation Links ---
 
+	private function enrich_invitation_link( object $link ): object {
+		$link->social_image_media_id = ! empty( $link->social_image_media_id )
+			? (int) $link->social_image_media_id
+			: null;
+		$link->social_image_variants = $link->social_image_media_id
+			? Clipisode_Media::get_social_image_variants( $link->social_image_media_id )
+			: [];
+		$link->social_image_url = $link->social_image_variants['wide']['url'] ?? null;
+		$topic_social_image_id = ! empty( $link->topic_social_image_media_id )
+			? (int) $link->topic_social_image_media_id
+			: null;
+		$link->topic_social_image_variants = $topic_social_image_id
+			? Clipisode_Media::get_social_image_variants( $topic_social_image_id )
+			: [];
+		$link->topic_social_image_url = $link->topic_social_image_variants['wide']['url'] ?? null;
+		$link->effective_social_image_url = $link->social_image_url ?: $link->topic_social_image_url;
+		$link->effective_social_image_variants = $link->social_image_url
+			? $link->social_image_variants
+			: $link->topic_social_image_variants;
+		$link->effective_social_image_media_id = $link->social_image_url
+			? $link->social_image_media_id
+			: ( $link->topic_social_image_url ? $topic_social_image_id : null );
+		$link->share_url = Clipisode_Invitation::get_share_url(
+			$link->slug,
+			(int) $link->effective_social_image_media_id
+		);
+		unset( $link->topic_social_image_media_id );
+		return $link;
+	}
+
 	public function list_invitation_links( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
-		$table     = $wpdb->prefix . 'clipisode_invitation_links';
+		$table       = $wpdb->prefix . 'clipisode_invitation_links';
 		$replies_tbl = $wpdb->prefix . 'clipisode_replies';
-		$topic_id  = (int) $request['topic_id'];
+		$topics_tbl  = $wpdb->prefix . 'clipisode_topics';
+		$topic_id    = (int) $request['topic_id'];
 
 		$links = $wpdb->get_results( $wpdb->prepare(
-			'SELECT l.*, COALESCE(cl.replies_count, 0) AS replies_count
+			'SELECT l.*, t.social_image_media_id AS topic_social_image_media_id,
+				COALESCE(cl.replies_count, 0) AS replies_count
 			FROM %i l
+			INNER JOIN %i t ON t.id = l.topic_id
 			LEFT JOIN (SELECT invitation_link_id, COUNT(*) AS replies_count FROM %i GROUP BY invitation_link_id) cl ON cl.invitation_link_id = l.id
 			WHERE l.topic_id = %d
 			ORDER BY l.created_at DESC',
 			$table,
+			$topics_tbl,
 			$replies_tbl,
 			$topic_id
 		) );
 
-		return new WP_REST_Response( $links );
+		return new WP_REST_Response( array_map( [ $this, 'enrich_invitation_link' ], $links ) );
 	}
 
 	public function create_invitation_link( WP_REST_Request $request ): WP_REST_Response {
@@ -970,15 +1276,25 @@ class Clipisode_REST_API {
 			return new WP_REST_Response( [ 'message' => 'Failed to generate a unique slug.' ], 500 );
 		}
 
-		$link = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', $table, $wpdb->insert_id ) );
+		$link = $wpdb->get_row( $wpdb->prepare(
+			'SELECT l.*, t.social_image_media_id AS topic_social_image_media_id
+			 FROM %i l
+			 INNER JOIN %i t ON t.id = l.topic_id
+			 WHERE l.id = %d',
+			$table,
+			$wpdb->prefix . 'clipisode_topics',
+			$wpdb->insert_id
+		) );
 		$link->replies_count = 0;
-		return new WP_REST_Response( $link, 201 );
+		return new WP_REST_Response( $this->enrich_invitation_link( $link ), 201 );
 	}
 
 	public function update_invitation_link( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
 		$table = $wpdb->prefix . 'clipisode_invitation_links';
 		$id    = (int) $request['id'];
+		$old_social_image_id = 0;
+		$new_social_image_id = 0;
 
 		$fields = [];
 		if ( $request->get_param( 'status' ) !== null ) {
@@ -999,27 +1315,67 @@ class Clipisode_REST_API {
 			$fields['slug'] = $new_slug;
 		}
 
+		if ( $request->has_param( 'social_image_media_id' ) ) {
+			$new_social_image_id = (int) $request->get_param( 'social_image_media_id' );
+			if ( $new_social_image_id ) {
+				$is_image = $wpdb->get_var( $wpdb->prepare(
+					"SELECT id FROM {$wpdb->prefix}clipisode_media WHERE id = %d AND type = 'photo'",
+					$new_social_image_id
+				) );
+				if ( ! $is_image ) {
+					return new WP_REST_Response( [ 'message' => 'The social image must be a Clipisode-managed image.' ], 400 );
+				}
+			}
+			$old_social_image_id = (int) $wpdb->get_var( $wpdb->prepare(
+				"SELECT social_image_media_id FROM $table WHERE id = %d",
+				$id
+			) );
+			$fields['social_image_media_id'] = $new_social_image_id ?: null;
+		}
+
 		if ( ! empty( $fields ) ) {
-			$wpdb->update( $table, $fields, [ 'id' => $id ] );
+			$updated = $wpdb->update( $table, $fields, [ 'id' => $id ] );
+			if ( false === $updated ) {
+				return new WP_REST_Response( [ 'message' => 'The invitation link could not be updated.' ], 500 );
+			}
+		}
+		if ( $old_social_image_id && $old_social_image_id !== $new_social_image_id && ! $this->media_is_referenced( $old_social_image_id ) ) {
+			Clipisode_Media::delete( $old_social_image_id );
 		}
 
 		$replies_tbl = $wpdb->prefix . 'clipisode_replies';
 		$link = $wpdb->get_row( $wpdb->prepare(
-			'SELECT l.*, COALESCE(cl.replies_count, 0) AS replies_count
+			'SELECT l.*, t.social_image_media_id AS topic_social_image_media_id,
+				COALESCE(cl.replies_count, 0) AS replies_count
 			 FROM %i l
+			 INNER JOIN %i t ON t.id = l.topic_id
 			 LEFT JOIN (SELECT invitation_link_id, COUNT(*) AS replies_count FROM %i GROUP BY invitation_link_id) cl ON cl.invitation_link_id = l.id
 			 WHERE l.id = %d',
 			$table,
+			$wpdb->prefix . 'clipisode_topics',
 			$replies_tbl,
 			$id
 		) );
-		return new WP_REST_Response( $link );
+		if ( ! $link ) {
+			return new WP_REST_Response( [ 'message' => 'Invitation link not found.' ], 404 );
+		}
+		return new WP_REST_Response( $this->enrich_invitation_link( $link ) );
 	}
 
 	public function delete_invitation_link( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
 		$id = (int) $request['id'];
-		$wpdb->delete( $wpdb->prefix . 'clipisode_invitation_links', [ 'id' => $id ] );
+		$social_image_id = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT social_image_media_id FROM {$wpdb->prefix}clipisode_invitation_links WHERE id = %d",
+			$id
+		) );
+		$deleted = $wpdb->delete( $wpdb->prefix . 'clipisode_invitation_links', [ 'id' => $id ] );
+		if ( false === $deleted ) {
+			return new WP_REST_Response( [ 'message' => 'The invitation link could not be deleted.' ], 500 );
+		}
+		if ( $social_image_id && ! $this->media_is_referenced( $social_image_id ) ) {
+			Clipisode_Media::delete( $social_image_id );
+		}
 		return new WP_REST_Response( null, 204 );
 	}
 
@@ -1190,6 +1546,9 @@ class Clipisode_REST_API {
 	public function delete_video( WP_REST_Request $request ): WP_REST_Response {
 		global $wpdb;
 		$id = (int) $request['id'];
+		if ( $this->composition_uses_media( $id ) ) {
+			return new WP_REST_Response( [ 'message' => 'This video is used by a saved composition. Remove it from the composition before deleting it.' ], 409 );
+		}
 
 		$exists = $wpdb->get_var( $wpdb->prepare(
 			"SELECT id FROM {$wpdb->prefix}clipisode_media WHERE id = %d", $id
@@ -1265,6 +1624,7 @@ class Clipisode_REST_API {
 	}
 
 	public function upload_media_asset( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
 		$files = $request->get_file_params();
 		if ( empty( $files['file'] ) ) {
 			return new WP_REST_Response( [ 'message' => 'No file provided.' ], 400 );
@@ -1290,7 +1650,31 @@ class Clipisode_REST_API {
 			return new WP_REST_Response( [ 'message' => 'Unsupported file type.' ], 400 );
 		}
 
-		$result = Clipisode_Media::create( $type, 'asset', 'file' );
+		$label = sanitize_key( (string) $request->get_param( 'label' ) );
+		$label = $label ?: 'asset';
+		$allowed_labels = [ 'asset', 'social-wide', 'social-square', 'social-portrait' ];
+		if ( ! in_array( $label, $allowed_labels, true ) ) {
+			return new WP_REST_Response( [ 'message' => 'Unsupported media label.' ], 400 );
+		}
+		if ( 'photo' !== $type && 'asset' !== $label ) {
+			return new WP_REST_Response( [ 'message' => 'Social preview variants must be images.' ], 400 );
+		}
+
+		$parent_id = (int) $request->get_param( 'parent_id' );
+		$is_child  = in_array( $label, [ 'social-square', 'social-portrait' ], true );
+		if ( $is_child ) {
+			$parent = $wpdb->get_var( $wpdb->prepare(
+				"SELECT id FROM {$wpdb->prefix}clipisode_media WHERE id = %d AND type = 'photo' AND label = 'social-wide' AND parent_id IS NULL",
+				$parent_id
+			) );
+			if ( ! $parent ) {
+				return new WP_REST_Response( [ 'message' => 'A valid social-image root is required.' ], 400 );
+			}
+		} elseif ( $parent_id ) {
+			return new WP_REST_Response( [ 'message' => 'Only social-image variants can have a parent.' ], 400 );
+		}
+
+		$result = Clipisode_Media::create( $type, $label, 'file', $parent_id ?: null );
 		if ( is_wp_error( $result ) ) {
 			return new WP_REST_Response( [ 'message' => $result->get_error_message() ], 400 );
 		}
@@ -1302,19 +1686,30 @@ class Clipisode_REST_API {
 		global $wpdb;
 		$id    = (int) $request['id'];
 		$table = $wpdb->prefix . 'clipisode_media';
+		if ( $this->media_is_referenced( $id ) ) {
+			return new WP_REST_Response( [ 'message' => 'This media is in use. Remove it from the topic, invitation, reply, or composition before deleting it.' ], 409 );
+		}
 
 		$media = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', $table, $id ) );
 		if ( ! $media ) {
 			return new WP_REST_Response( [ 'message' => 'Media not found.' ], 404 );
 		}
 
-		if ( $media->label !== 'asset' ) {
-			return new WP_REST_Response( [ 'message' => 'Only manually uploaded assets can be deleted from this page.' ], 403 );
+		if ( ! in_array( $media->label, [ 'asset', 'social-wide' ], true ) ) {
+			return new WP_REST_Response( [ 'message' => 'Only standalone assets and social-image sets can be deleted directly.' ], 403 );
 		}
 
 		Clipisode_Media::delete( $id );
 
 		return new WP_REST_Response( null, 204 );
+	}
+
+	private function composition_uses_media( int $media_id ): bool {
+		global $wpdb;
+		return (bool) $wpdb->get_var( $wpdb->prepare(
+			"SELECT c.output_id FROM {$wpdb->prefix}clipisode_contents c INNER JOIN {$wpdb->prefix}clipisode_outputs o ON o.id = c.output_id WHERE c.media_id = %d AND o.composition IS NOT NULL LIMIT 1",
+			$media_id
+		) );
 	}
 
 	private function resolve_media_usage( int $media_id ): ?array {
@@ -1330,6 +1725,24 @@ class Clipisode_REST_API {
 				'id'    => (int) $topic->id,
 				'label' => $topic->title,
 				'page'  => 'clipisode',
+			];
+		}
+
+		$invitation = $wpdb->get_row( $wpdb->prepare(
+			"SELECT l.id, l.slug, l.topic_id, t.title AS topic_title
+			 FROM {$wpdb->prefix}clipisode_invitation_links l
+			 LEFT JOIN {$wpdb->prefix}clipisode_topics t ON t.id = l.topic_id
+			 WHERE l.social_image_media_id = %d",
+			$media_id
+		) );
+		if ( $invitation ) {
+			return [
+				'type'        => 'invitation',
+				'id'          => (int) $invitation->id,
+				'label'       => $invitation->slug,
+				'topic_id'    => (int) $invitation->topic_id,
+				'topic_title' => $invitation->topic_title,
+				'page'        => 'clipisode',
 			];
 		}
 

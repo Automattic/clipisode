@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from '@wordpress/element';
+import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
 import { Button, Modal, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import ReplyModal from '../components/ReplyModal';
-import type { Topic, InvitationLink, Reply } from '../types';
+import SocialImagePicker from '../components/SocialImagePicker';
+import type { Topic, InvitationLink, Reply, SocialImageValue } from '../types';
 
 function formatBytes( bytes: number | null ): string {
 	if ( ! bytes ) {
@@ -20,6 +21,14 @@ function formatBytes( bytes: number | null ): string {
 interface TopicDetailProps {
 	id: string;
 	navigate: ( path: string | number ) => void;
+}
+
+function invitationUrl( link: InvitationLink ): string {
+	if ( link.share_url ) {
+		return link.share_url;
+	}
+	const { home_url, invitation_prefix } = window.clipisodeAdmin!;
+	return new URL( `${ invitation_prefix }/${ link.slug }/`, home_url ).href;
 }
 
 export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
@@ -41,6 +50,9 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const [ selectedReply, setSelectedReply ] = useState< Reply | null >(
 		null
 	);
+	const [ socialImageLink, setSocialImageLink ] =
+		useState< InvitationLink | null >( null );
+	const socialImageVideoRef = useRef< HTMLVideoElement >( null );
 	const [ selectedReplyIds, setSelectedReplyIds ] = useState< Set< number > >(
 		new Set()
 	);
@@ -52,7 +64,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	const deleteOutput = ( outputId: number, name: string ) => {
 		if (
 			! window.confirm(
-				`Delete "${ name }"? The video will be permanently removed.`
+				`Delete "${ name }"? The clipisode and any rendered video will be permanently removed.`
 			)
 		) {
 			return;
@@ -126,6 +138,21 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 		} );
 	};
 
+	const updateLinkSocialImage = async (
+		link: InvitationLink,
+		image: SocialImageValue | null
+	) => {
+		const updated = await apiFetch< InvitationLink >( {
+			path: `/clipisode/v1/invitation-links/${ link.id }`,
+			method: 'PUT',
+			data: { social_image_media_id: image?.id || null },
+		} );
+		setLinks( ( prev ) =>
+			prev.map( ( item ) => ( item.id === updated.id ? updated : item ) )
+		);
+		setSocialImageLink( updated );
+	};
+
 	const saveSlug = async ( link: InvitationLink ) => {
 		const newSlug = editingSlug[ link.id ];
 		if ( ! newSlug || newSlug === link.slug ) {
@@ -169,9 +196,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	};
 
 	const copyLinkUrl = ( link: InvitationLink ) => {
-		const prefix = window.clipisodeAdmin?.invitation_prefix || 'invitation';
-		const url = `${ window.location.origin }/${ prefix }/${ link.slug }`;
-		navigator.clipboard.writeText( url );
+		navigator.clipboard.writeText( invitationUrl( link ) );
 		setCopiedId( link.id );
 		setTimeout(
 			() => setCopiedId( ( prev ) => ( prev === link.id ? null : prev ) ),
@@ -309,6 +334,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 									<tr>
 										<th>Slug</th>
 										<th>Status</th>
+										<th>Preview</th>
 										<th>Clicks</th>
 										<th>Replies</th>
 										<th>Created</th>
@@ -476,6 +502,19 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 												</span>
 											</td>
 											<td>
+												{ link.effective_social_image_url ? (
+													<img
+														className="clipisode-social-image-thumb"
+														src={
+															link.effective_social_image_url
+														}
+														alt=""
+													/>
+												) : (
+													'—'
+												) }
+											</td>
+											<td>
 												{ Number(
 													link.clicks
 												).toLocaleString() }
@@ -495,19 +534,35 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 													variant="tertiary"
 													size="compact"
 													onClick={ () =>
+														setSocialImageLink(
+															link
+														)
+													}
+												>
+													Social Image
+												</Button>
+												<Button
+													variant="tertiary"
+													size="compact"
+													onClick={ () =>
 														copyLinkUrl( link )
 													}
-													title={ `${
-														window.location.origin
-													}/${
-														window.clipisodeAdmin
-															?.invitation_prefix ||
-														'invitation'
-													}/${ link.slug }` }
+													title={ invitationUrl(
+														link
+													) }
 												>
 													{ copiedId === link.id
 														? 'Copied!'
 														: 'Copy URL' }
+												</Button>
+												<Button
+													variant="tertiary"
+													size="compact"
+													href={ invitationUrl(
+														link
+													) }
+												>
+													Open
 												</Button>
 												<Button
 													variant="tertiary"
@@ -668,11 +723,9 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 														topic.intro_media_id
 													);
 												}
-												navigate(
-													`create-clipisode/${ id }/${ mediaIds.join(
-														','
-													) }`
-												);
+												window.location.href = `admin.php?page=clipisode-clipisodes#/create-clipisode/${ id }/${ mediaIds.join(
+													','
+												) }`;
 											} }
 										>
 											Create Clipisode (
@@ -743,6 +796,15 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 												).toLocaleDateString() }
 											</td>
 											<td className="clipisode-link-actions">
+												{ o.has_composition && (
+													<Button
+														variant="tertiary"
+														size="compact"
+														href={ `admin.php?page=clipisode-clipisodes#/compose/${ o.id }` }
+													>
+														Edit preview
+													</Button>
+												) }
 												{ o.preview_url && (
 													<a
 														className="components-button is-tertiary is-compact"
@@ -873,6 +935,45 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 					onClose={ () => setSelectedReply( null ) }
 					onUpdated={ onReplyUpdated }
 				/>
+			) }
+			{ socialImageLink && (
+				<Modal
+					title={ `Social image · ${ socialImageLink.slug }` }
+					className="clipisode-social-image-override-modal"
+					onRequestClose={ () => setSocialImageLink( null ) }
+				>
+					<SocialImagePicker
+						value={
+							socialImageLink.social_image_media_id &&
+							socialImageLink.social_image_url
+								? {
+										id: socialImageLink.social_image_media_id,
+										url: socialImageLink.social_image_url,
+										variants:
+											socialImageLink.social_image_variants,
+								  }
+								: null
+						}
+						inheritedValue={
+							socialImageLink.topic_social_image_url
+								? {
+										url: socialImageLink.topic_social_image_url,
+										variants:
+											socialImageLink.topic_social_image_variants,
+								  }
+								: null
+						}
+						videoRef={ socialImageVideoRef }
+						hasVideo={ false }
+						label="Invitation Override"
+						themeId={ topic.invitation_renderer_theme || 'default' }
+						title={ topic.title }
+						hostedBy={ topic.hosted_by }
+						onChange={ ( image ) =>
+							updateLinkSocialImage( socialImageLink, image )
+						}
+					/>
+				</Modal>
 			) }
 
 			{ previewOutput && (

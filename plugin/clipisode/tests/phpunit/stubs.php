@@ -36,7 +36,29 @@ if ( ! function_exists( 'register_rest_route' ) ) {
 
 if ( ! function_exists( 'add_filter' ) ) {
 	function add_filter( string $hook, callable $callback, int $priority = 10, int $args = 1 ): bool {
+		global $test_filters;
+		$test_filters[ $hook ][ $priority ][] = $callback;
 		return true;
+	}
+}
+
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( string $hook, mixed $value ): mixed {
+		global $test_filters;
+		$callbacks = $test_filters[ $hook ] ?? [];
+		ksort( $callbacks );
+		foreach ( $callbacks as $group ) {
+			foreach ( $group as $callback ) {
+				$value = $callback( $value );
+			}
+		}
+		return $value;
+	}
+}
+
+if ( ! function_exists( 'plugins_url' ) ) {
+	function plugins_url( string $path, string $plugin ): string {
+		return 'https://example.com/wp-content/plugins/' . basename( dirname( $plugin ) ) . '/' . $path;
 	}
 }
 
@@ -117,6 +139,9 @@ if ( ! function_exists( 'add_option' ) ) {
 if ( ! function_exists( 'update_option' ) ) {
 	function update_option( string $option, $value, $autoload = null ): bool {
 		global $clipisode_test_options;
+		if ( array_key_exists( $option, $clipisode_test_options ) && $clipisode_test_options[ $option ] === $value ) {
+			return false;
+		}
 		$clipisode_test_options[ $option ] = $value;
 		return true;
 	}
@@ -207,3 +232,158 @@ if ( ! class_exists( 'WP_Post_Type' ) ) {
 	}
 }
 
+
+class WP_Error {
+	public function __construct( private string $code, private string $message ) {}
+	public function get_error_code(): string {
+		return $this->code;
+	}
+	public function get_error_message(): string {
+		return $this->message;
+	}
+}
+
+function is_wp_error( mixed $value ): bool {
+	return $value instanceof WP_Error;
+}
+
+class WP_REST_Request implements ArrayAccess {
+	private array $params = [];
+	private array $files = [];
+	public function set_file_params( array $files ): void {
+		$this->files = $files;
+	}
+	public function get_file_params(): array {
+		return $this->files;
+	}
+	public function set_param( string $key, mixed $value ): void {
+		$this->params[ $key ] = $value;
+	}
+	public function get_param( string $key ): mixed {
+		return $this->params[ $key ] ?? null;
+	}
+	public function offsetExists( mixed $offset ): bool {
+		return isset( $this->params[ $offset ] );
+	}
+	public function offsetGet( mixed $offset ): mixed {
+		return $this->get_param( $offset );
+	}
+	public function offsetSet( mixed $offset, mixed $value ): void {
+		$this->params[ $offset ] = $value;
+	}
+	public function offsetUnset( mixed $offset ): void {
+		unset( $this->params[ $offset ] );
+	}
+}
+
+class WP_REST_Response {
+	public function __construct( private mixed $data = null, private int $status = 200 ) {}
+	public function get_data(): mixed {
+		return $this->data;
+	}
+	public function get_status(): int {
+		return $this->status;
+	}
+}
+
+function sanitize_text_field( mixed $value ): string {
+	return trim( preg_replace( '/[\r\n\t ]+/', ' ', strip_tags( (string) $value ) ) );
+}
+
+function sanitize_key( string $value ): string {
+	return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( $value ) );
+}
+
+function wp_unslash( string $value ): string {
+	return stripslashes( $value );
+}
+
+function nocache_headers(): void {}
+
+function sanitize_textarea_field( string $value ): string {
+	return trim( strip_tags( $value ) );
+}
+
+function sanitize_title( string $value ): string {
+	return trim( preg_replace( '/[^a-z0-9]+/', '-', strtolower( $value ) ), '-' );
+}
+
+function esc_url_raw( string $value, array $protocols = [ 'http', 'https' ] ): string {
+	return in_array( strtolower( (string) parse_url( $value, PHP_URL_SCHEME ) ), $protocols, true ) ? $value : '';
+}
+
+function wp_parse_url( string $url, int $component = -1 ): mixed {
+	return parse_url( $url, $component );
+}
+
+function wp_json_encode( mixed $value ): string|false {
+	return json_encode( $value );
+}
+
+function wp_get_attachment_url( int $id ): string|false {
+	global $test_attachment_urls;
+	return $test_attachment_urls[ $id ] ?? false;
+}
+
+function wp_cache_delete( string $key, string $group = '' ): bool {
+	return true;
+}
+function wp_generate_password( int $length = 12, bool $special = true ): string {
+	return substr( bin2hex( random_bytes( $length ) ), 0, $length );
+}
+function rest_url( string $path = '' ): string {
+	return 'https://example.com/wp-json/' . $path;
+}
+function home_url( string $path = '' ): string {
+	return 'https://example.com/site/' . ltrim( $path, '/' );
+}
+function add_query_arg( string $key, string $value, string $url ): string {
+	return $url . '?' . http_build_query( [ $key => $value ] );
+}
+function wp_remote_request( string $url, array $args ): array|WP_Error {
+	global $test_http_response, $test_http_requests;
+	$test_http_requests[] = [ 'url' => $url, 'args' => $args ];
+	return is_callable( $test_http_response ) ? $test_http_response( $url, $args ) : $test_http_response;
+}
+function wp_remote_retrieve_response_code( array $response ): int {
+	return $response['response']['code'];
+}
+function wp_remote_retrieve_body( array $response ): string {
+	return $response['body'];
+}
+function media_handle_upload( string $key, int $post_id ): int|WP_Error {
+	global $test_upload_result;
+	return $test_upload_result;
+}
+function update_post_meta( int $id, string $key, mixed $value ): bool {
+	return true;
+}
+function get_post_meta( int $id, string $key, bool $single = false ): string {
+	return '2026/10/render.mp4';
+}
+function get_post( int $id ): object {
+	return (object) [ 'post_mime_type' => 'video/mp4' ];
+}
+function get_attached_file( int $id ): string|false {
+	return false;
+}
+function wp_delete_attachment( int $id, bool $force = false ): bool {
+	global $test_deleted_attachments;
+	$test_deleted_attachments[] = $id;
+	return true;
+}
+
+function wp_enqueue_script( string $handle, string $src, array $dependencies, string $version, bool $in_footer ): void {}
+function wp_enqueue_style( string $handle, string $src, array $dependencies, string $version ): void {}
+function wp_add_inline_script( string $handle, string $script, string $position = 'after' ): bool {
+	global $test_inline_scripts;
+	$test_inline_scripts[] = [ 'handle' => $handle, 'script' => $script, 'position' => $position ];
+	return true;
+}
+function wp_get_environment_type(): string {
+	global $test_environment_type;
+	return $test_environment_type ?? 'production';
+}
+function wp_create_nonce( string $action ): string {
+	return 'test-rest-nonce';
+}
