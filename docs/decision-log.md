@@ -9,6 +9,108 @@ Status legend: **Decided** (agreed, not built) · **In progress** · **Done** ·
 
 ---
 
+## 2026-10-19 — Brian's VIP-readiness work and Max's Remotion work merged
+
+### Two lines of work, one codebase again
+
+**Done.** After the July handoff the project split. Brian's Aug 7 readiness work
+(everything in the two entries below) was committed locally but never pushed.
+Max, starting from the July handoff, shipped twelve releases between Oct 6 and
+Oct 12 (v0.1.0 → v0.4.2). Neither line contained the other. They are now
+merged, with nothing from either side lost. Every line of Brian's work either
+survived as written or was combined deliberately with Max's version of the same
+code.
+
+What Max's October releases added:
+
+- **In-browser video rendering.** The Remotion composer replaces the macOS app
+  as the plugin's render path. An editor arranges approved replies with title
+  and ending cards, previews them in wp-admin, and renders an MP4 in the browser
+  tab, which uploads back to WordPress. An optional local Node render service
+  does the same job off the browser.
+- **Video themes as plugins.** The look of a rendered clipisode comes from a
+  JSON theme schema plus React renderers. Built-ins are Clipisode, Editorial,
+  Baseball (with MLB team logos) and No theme. Separate theme plugins can add
+  more (Community, Studio, and a showcase NASA theme).
+- **Social preview images.** Wide, square and portrait variants for invitation
+  links and preview pages, chosen per platform.
+- **Invitation pages inherit the site's styles.** Fonts, headings, buttons and
+  links come from the site's `theme.json` / Global Styles, with six
+  Clipisode-specific tokens a brand can override.
+- **Release plumbing.** A one-click WordPress Playground demo, an installable
+  zip, and GitHub Actions that cut versioned releases.
+
+### Invitation themes are built in the Block Editor
+
+**Unchanged by the merge, worth stating plainly for anyone new.** Each invitation
+theme is a set of ten screens (mobile intro, desktop intro, name, email,
+success, closed, and four warning screens). Each screen is its own post, edited
+in the standard WordPress Block Editor. Brands restyle the guest experience with
+the same tools they already use for pages: typography, colors, images, buttons,
+Cover backgrounds. They don't need a config file or a developer. The editor shows
+a phone-shaped canvas with realistic sample copy in place of the placeholders.
+The screens are seeded from starter markup and locked where a block must not be
+deleted. All ten screens load as one page, and the visible one swaps in place, so
+a guest's video keeps uploading while they type their name. The flow does not
+navigate between URLs.
+
+### How the overlaps were settled
+
+- **Schema upgrades: Brian's mechanism, Max's column.** Both sides had
+  independently added a "schema version" check. Brian's was kept because it
+  has the upgrade lock and the multisite hook. Max's new `composition` column
+  becomes schema version 3. Verified by upgrading a site running v0.4.2 in
+  place: it moved to version 3 and gained the new indexes on first request.
+- **Max's root-cause fix replaces a workaround.** Brian's July code carried a
+  workaround for a WordPress hydration race. Max removed the unused piece of
+  WordPress that caused the race, so the workaround is gone. This is the
+  outcome the coding standards ask for.
+- **Max's new database queries adopted Brian's safer placeholders**, and his
+  social-preview tags kept Brian's escape-at-output pattern.
+- **Pageviews still aren't counted in the database.** Max's line still had the
+  per-view counter. The merge keeps it removed (verified: page views no longer
+  change the count).
+
+### Multisite: works, three housekeeping gaps
+
+**Required — confirmed working, with gaps tracked.** Clipisode will run on
+multisite (a network for brands VIP doesn't host). Tested
+on a network-activated install with a second site added afterwards:
+
+- The new site gets its own seven tables at the current schema version the
+  moment it is created.
+- Its invitation page, upload and reply all stay inside that site. The upload
+  lands in its own uploads folder, the reply in its own table, and nothing is
+  visible from the main site.
+- Its default invitation theme, screens, terms and preview layout are created
+  the first time anyone uses Clipisode's admin there.
+
+**Gaps (Decided — fix before multisite customers):**
+
+1. The default host is seeded only on the site Clipisode was activated from.
+   Other sites get one when their first topic is saved.
+2. Deleting a site leaves its Clipisode tables behind. Nothing hooks site
+   deletion.
+3. There is no uninstall routine on single site or multisite.
+
+### Still open after the merge
+
+- **PHPCS regressed from 0 to 33** (4 errors, 29 warnings), all in code new in
+  October that predates the VIP lint setup (renderer, composition, social meta).
+  Nothing from the Aug 7 cleanup was undone. Return to zero.
+- **Revisit: the macOS app.** The Aug 7 entry below re-confirmed local Mac
+  rendering (iOS emoji fidelity, newsroom workflows). Max's October work
+  disconnected the plugin from it in favour of browser rendering. That reverses
+  a recorded decision without a recorded reason, so it needs an explicit call.
+- **Remotion licensing.** Remotion is not open source in the GPL sense, and
+  company use needs a paid license. That affects both the wp.org listing and
+  VIP pricing. Needs a legal and business decision.
+- **Housekeeping.** Sites that ran Max's v0.4.x keep an unused
+  `clipisode_database_version` option, which is harmless. The README Playground
+  button installs a stale zip (v0.1.1).
+
+---
+
 ## 2026-08-07 — PHPCS cleanup: 569 → 0
 
 Worked the VIP-readiness lint baseline down by 304 violations. Everything that
