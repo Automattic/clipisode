@@ -42,7 +42,9 @@ Reasons and decisions live in `docs/decision-log.md`.
 - [ ] **Short invitation URLs** (`docs/specs/planned/short-invitation-urls.md`). *(E, ❓ others)*
 - [ ] **Keep site scripts out of the reply flow.** Invitation pages run the site's full `wp_head()`/`wp_footer()`, so a publisher's ads, paywall, consent banner and trackers load on the reply screens. Add an allow-list. *(All, matters most on E)*
 - [ ] **Custom reply subdomains: not needed for VIP.** Replies go straight to private storage, so `brand.com/clipisode/i/slug` is fine. A subdomain stays an optional vanity URL. On the multisite for select partners, each partner's subsite (`reply.brand.com`) already is the reply site. *(E, optional)*
-- [ ] **Marketing and docs site, WP Admin cleanup, onboarding, theme overhaul:** the master-plan deliverables, each to be broken into specs.
+- [ ] **Marketing and docs site at `clipisode.com`.** It explains what Clipisode does, what the free plugin does on any WordPress site, what VideoPress adds, and how Clipisode runs at scale, brand-safe, for VIP customers. `clipisode.com` and `clipisode.net` are both on Automattic DNS and currently redirect to the 2022 shutdown post. *(All)*
+- [ ] **Domains for testing and demos.** Use the VIP convenience domain for testing for as long as it works, with basic auth and IP restrictions off when testing from phones or social crawlers. When a real domain is needed, use `demo.clipisode.com` or a subdomain of `clipisode.net`. *(E)*
+- [ ] **WP Admin cleanup, onboarding, theme overhaul:** the remaining master-plan deliverables, each to be broken into specs.
 
 ## Multisite (required)
 
