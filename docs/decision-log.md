@@ -9,6 +9,146 @@ Status legend: **Decided** (agreed, not built) · **In progress** · **Done** ·
 
 ---
 
+## 2026-10-19 — Answers to the discovery questions
+
+Brian's answers to the open questions from the October discovery brief. Action
+items are in `docs/backlog.md`.
+
+### Decided
+
+- **The macOS app is archived.** Rendering is Remotion in the browser, which
+  is plenty for now; no server rendering yet. This replaces the Aug 7 "Local Mac
+  rendering stays" decision below.
+- **Remotion moves to a separate add-on.** The core plugin ships without it,
+  so Clipisode stays fully GPL. Rendering is available through VideoPress and
+  VIP. VIP buys the company licence. Remotion's licence FAQ
+  says Player previews don't count as renders; only finished outputs do.
+- **Buyers:** social media and editorial video teams at large publishers,
+  brands and sports teams.
+- **The point of the product:** generate more video to fill a brand's channels
+  (TikTok, Instagram, Facebook, YouTube, X, LinkedIn). Publishing replies on
+  the brand's own site is secondary (a news publisher might).
+- **Consent is handled.** The opening reply screen links to Terms written by
+  Clipisode's lawyers, and brands can add custom Terms (for example, a
+  sweepstakes).
+- **Remove the success screen's Share button.** Anyone who wants to share will
+  copy the link.
+- **Onboarding checks the host's upload limit.** On most hosts it will be low,
+  so onboarding warns that big replies will fail and suggests VideoPress.
+- **Ownership:** WordPress VIP owns the Clipisode brand and technology.
+  Automattic owns VideoPress.
+- **Process:** a living master plan with specs sized for Cursor/Grok, and one
+  shared design brief, as proposed.
+
+### Invitation modes
+
+**Decided (names still settling).** The kind of invitation largely determines
+what gets made from the replies, so the patterns are organised by invitation
+mode. Invitations can be private or public. Anyone can repost a private link,
+so "private" means intended audience, not access control.
+
+| Mode | Candidate names | Who's invited | Audience | Typical output |
+|---|---|---|---|---|
+| **Collab** | Collab / Interview | One guest, individually | Private, one-to-one | A conversation between one host and one guest |
+| **AMA** | Duo / AMA | A group of many people | Public, or semi-public (a private Facebook group) | The host answering or reacting to the best questions and replies |
+| **Roundup** | Roundup / Panel / Experts | Important, busy people (stars, not fans), each invited privately | Private | One question, many notable answers, edited together. *A music magazine asks 10 famous guitarists, gets 6 replies, publishes one video and tags them, and they share it.* |
+| **Highlights** | Highlights | Anyone: everyone at a ballgame, all Instagram followers | Public | A highlight reel. *A baseball team: "share your videos from last night's game; if we use you in our highlight reel, you'll get an upgraded seat."* |
+
+Each mode needs:
+
+- A name and a one-line explanation in onboarding, so a new user picks the
+  right mode up front.
+- A place in the UI. Choosing a mode when creating a topic should set
+  sensible defaults: link type, video theme, and how replies are reviewed.
+
+Notes from the code:
+
+- `clipisode_invitation_links` already supports several links per topic and
+  has a `type` column (always `public` today).
+- Collab and Roundup need a link per invitee, with the invitee's name on it.
+  That makes "6 of 10 replied" trackable, and lets a one-to-one link close
+  after one reply.
+- Highlights and AMA use one shared link, which is exactly where the
+  edge-caching, rate-limiting and moderation-at-scale work matters most.
+
+### Still open
+
+- **Staging:** VIP customers all have staging environments. Brian will set up
+  one for development once the needs are listed.
+- **One brand kit** for invitation pages and video themes: proposal requested.
+  The Block Editor is weak at animation, so video themes may stay code-driven
+  while reading shared tokens.
+- **Custom subdomains: not needed for VIP (decided).** Once uploads go
+  straight to private signed storage, guest video never touches the brand's
+  domain. So `brand.com/clipisode/i/slug` is fine, and a subdomain is only an
+  optional vanity URL. On the multisite for select partners, each
+  partner's subsite (`reply.brand.com`) is already the reply site. The one related fix:
+  invitation pages currently run the site's full `wp_head()`, so publisher ad
+  and paywall scripts would load on the reply screens. That goes on the
+  backlog.
+
+---
+
+## 2026-10-19 — Product shape: one open-source plugin, optional hosted services
+
+**Decided.** WordPress VIP owns Clipisode. This work brings it back as WordPress
+software:
+
+- **Clipisode**, the open-source plugin. It is the product: topics, invitation
+  links, the guest recording and upload flow, moderation, and the invitation
+  screens, running entirely on the site's own WordPress, on any host.
+- **Optional hosted services** for things a WordPress host can't do on its
+  own, because they need cloud infrastructure that costs money to run: large
+  resumable uploads, private video storage, transcoding, transcription and
+  rendering. They come through **VideoPress** for consumers and small
+  businesses, and through **WordPress VIP** for enterprise brands and
+  publishers, along with VIP's support and enterprise controls. VIP and
+  VideoPress may share one backend.
+
+**Priority:** it must work for everyone, but the primary focus is buttoning it
+up for enterprise.
+
+### What the code says about this
+
+Notes from the codebase as of the 2026-10-19 merge:
+
+- **The upload limit is a real UX problem today.** The plugin caps uploads at
+  80 MB but never checks the host's own PHP upload limit, which on cheap hosts
+  is often far lower (2–64 MB is common). Nothing checks the file when the
+  guest picks it. An oversized video uploads in full and fails at the end, and
+  "Try again" re-sends the same oversized file. Three fixes, best first:
+  1. Tell guests the limit before they record, as a time ("up to 60
+     seconds"), on the intro screen.
+  2. Check the file the moment it's chosen, before any upload, and say
+     plainly what to do (record a shorter take).
+  3. Upload in small chunks, so the host's PHP limit stops mattering and the
+     only limit is the one Clipisode chooses.
+- **Privacy improves for every site.** Unapproved reply videos are currently
+  listed by WordPress's public media API (verified 2026-10-18). Hiding them
+  from that and from attachment pages is cheap and belongs in the plugin
+  itself. Hosted private storage takes it further, so a video is never on a
+  public URL at all.
+- **Rendering ships as a separate add-on for licensing reasons.** Clipisode is
+  GPL, and Remotion, the video renderer, is not GPL-compatible. It has its own
+  commercial license. Keeping Remotion out of the core plugin keeps Clipisode
+  fully GPL and listable on wp.org.
+- **Block Editor themes are the invitation flow.** Every invitation page
+  renders from the theme's ten Block Editor screens.
+- **Hosted services plug into open extension points.** The plugin needs these
+  hooks, and any provider can implement them:
+  - **Storage.** Media rows already have a `storage` column, but only local
+    WordPress uploads exist. A pluggable storage backend lets VideoPress, S3
+    or anything else hold reply videos.
+  - **Ingest.** A hook after each upload, where a service can transcode,
+    transcribe, strip metadata and make poster frames before a reply reaches
+    moderation.
+  - **Rendering.** A pluggable render backend.
+  - **Theme editing.** A capability or filter for theme editing tools.
+
+  Designing these hooks is the first technical task.
+
+---
+
 ## 2026-10-19 — Brian's VIP-readiness work and Max's Remotion work merged
 
 ### Two lines of work, one codebase again
@@ -74,7 +214,7 @@ navigate between URLs.
 ### Multisite: works, three housekeeping gaps
 
 **Required — confirmed working, with gaps tracked.** Clipisode will run on
-multisite (a network for brands VIP doesn't host). Tested
+multisite (for select partners that VIP doesn't host). Tested
 on a network-activated install with a second site added afterwards:
 
 - The new site gets its own seven tables at the current schema version the
@@ -105,6 +245,17 @@ on a network-activated install with a second site added afterwards:
 - **Remotion licensing.** Remotion is not open source in the GPL sense, and
   company use needs a paid license. That affects both the wp.org listing and
   VIP pricing. Needs a legal and business decision.
+- **Revisit if we hit it: the Android back button.** Each invitation's screens
+  are one page with no per-screen URLs, so Android's back button (or a back
+  swipe) leaves the whole flow instead of going back one screen. A guest on the
+  Name screen could lose their place and the video they just recorded. The
+  WordPress-native fix is the Interactivity API router
+  (`@wordpress/interactivity-router`), giving each screen its own history
+  entry. Max removed it in October because it was loaded but never used, and
+  it caused a hydration race whose only workaround used WordPress's private
+  APIs. Bring it back and route with it once WordPress fixes that race. Until
+  then, a small `history.pushState` / `popstate` handler in the existing store
+  would fix the back button. Test on the Android 13/14 phones.
 - **Housekeeping.** Sites that ran Max's v0.4.x keep an unused
   `clipisode_database_version` option, which is harmless. The README Playground
   button installs a stale zip (v0.1.1).
@@ -338,7 +489,7 @@ one chokepoint where abuse controls and presigned-S3 minting live — neither of
 which exists today. Both public endpoints are currently
 `permission_callback => '__return_true'` with no throttling of any kind.
 
-### Guest video must leave the WordPress Media Library (VIP tier)
+### Guest video must leave the WordPress Media Library (hosted storage)
 
 **Decided.** This is the brand-safety requirement, not an optimization. If a brand
 collects 500 replies and 6 are offensive, none of those 6 may ever be reachable —
@@ -372,8 +523,8 @@ Target design:
 - Admin review streams from a **neutral domain** with short-lived signed URLs,
   never the brand's domain.
 
-Base/open-source plugin keeps the Media Library path and its 80MB cap. That's an
-acceptable limitation for that tier.
+The plugin's own Media Library path, with its 80MB cap, stays the default.
+It needs no extra infrastructure and works on any host.
 
 ### Every upload gets transcoded on ingest
 
