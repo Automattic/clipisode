@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from '@wordpress/element';
-import { Button, Modal, Spinner } from '@wordpress/components';
+import { Button, Modal, Spinner, Notice } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
+import useOnboarding from '../hooks/useOnboarding';
+import OnboardingGuide from '../components/OnboardingGuide';
+import TopicNextStep from '../components/TopicNextStep';
 import ReplyModal from '../components/ReplyModal';
 import SocialImagePicker from '../components/SocialImagePicker';
 import type { Topic, InvitationLink, Reply, SocialImageValue } from '../types';
@@ -32,6 +35,12 @@ function invitationUrl( link: InvitationLink ): string {
 }
 
 export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
+	const guide = useOnboarding();
+	const refreshGuide = guide.refresh;
+	const [ error, setError ] = useState( '' );
+	const [ refreshing, setRefreshing ] = useState( false );
+	const [ creatingLink, setCreatingLink ] = useState( false );
+	const selectionTopic = useRef< string | null >( null );
 	const [ topic, setTopic ] = useState< Topic | null >( null );
 	const [ links, setLinks ] = useState< InvitationLink[] >( [] );
 	const [ replies, setReplies ] = useState< Reply[] >( [] );
@@ -86,6 +95,8 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	};
 
 	const load = useCallback( () => {
+		setRefreshing( true );
+		setError( '' );
 		Promise.all( [
 			apiFetch< Topic >( { path: `/clipisode/v1/topics/${ id }` } ),
 			apiFetch< InvitationLink[] >( {
@@ -99,30 +110,56 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 				setTopic( t );
 				setLinks( l );
 				setReplies( cl );
+				const eligible = cl
+					.filter( ( r ) => r.status === 'approved' && r.media_id )
+					.map( ( r ) => r.id );
+				const initial = selectionTopic.current !== id;
+				selectionTopic.current = id;
 				setSelectedReplyIds(
-					new Set(
-						cl
-							.filter(
-								( r ) => r.status === 'approved' && r.media_id
-							)
-							.map( ( r ) => r.id )
-					)
+					( prev ) =>
+						new Set(
+							initial
+								? eligible
+								: eligible.filter( ( replyId ) =>
+										prev.has( replyId )
+								  )
+						)
 				);
+				refreshGuide();
 			} )
-			.finally( () => setLoading( false ) );
-	}, [ id ] );
+			.catch( () =>
+				setError( 'Unable to load this topic. Please try again.' )
+			)
+			.finally( () => {
+				setLoading( false );
+				setRefreshing( false );
+			} );
+	}, [ id, refreshGuide ] );
 
 	useEffect( () => {
 		load();
 	}, [ load ] );
 
+	useEffect( () => {
+		const onFocus = () => load();
+		window.addEventListener( 'focus', onFocus );
+		return () => window.removeEventListener( 'focus', onFocus );
+	}, [ load ] );
+
 	const createLink = () => {
+		if ( creatingLink ) {
+			return;
+		}
+		setCreatingLink( true );
 		apiFetch< InvitationLink >( {
 			path: `/clipisode/v1/topics/${ id }/invitation-links`,
 			method: 'POST',
-		} ).then( ( newLink ) => {
-			setLinks( ( prev ) => [ newLink, ...prev ] );
-		} );
+		} )
+			.then( ( newLink ) => {
+				setLinks( ( prev ) => [ newLink, ...prev ] );
+			} )
+			.catch( () => setError( 'Unable to create an invitation link.' ) )
+			.finally( () => setCreatingLink( false ) );
 	};
 
 	const toggleLinkStatus = ( link: InvitationLink ) => {
@@ -195,8 +232,15 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 		}
 	};
 
-	const copyLinkUrl = ( link: InvitationLink ) => {
-		navigator.clipboard.writeText( invitationUrl( link ) );
+	const copyLinkUrl = async ( link: InvitationLink ) => {
+		try {
+			await navigator.clipboard.writeText( invitationUrl( link ) );
+		} catch {
+			setError(
+				'Could not copy the invitation URL. Open the invitation to copy its address.'
+			);
+			return;
+		}
 		setCopiedId( link.id );
 		setTimeout(
 			() => setCopiedId( ( prev ) => ( prev === link.id ? null : prev ) ),
@@ -222,6 +266,16 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 		setReplies( ( prev ) =>
 			prev.map( ( r ) => ( r.id === updatedReply.id ? updatedReply : r ) )
 		);
+		setSelectedReplyIds( ( prev ) => {
+			const next = new Set( prev );
+			if ( updatedReply.status === 'approved' && updatedReply.media_id ) {
+				next.add( updatedReply.id );
+			} else {
+				next.delete( updatedReply.id );
+			}
+			return next;
+		} );
+		refreshGuide();
 		setSelectedReply( null );
 	};
 
@@ -234,8 +288,33 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	}
 
 	if ( ! topic ) {
-		return <div className="clipisode-empty">Topic not found.</div>;
+		return (
+			<Notice status="error" isDismissible={ false }>
+				<p>{ error || 'Topic not found.' }</p>
+				<Button onClick={ load }>Try again</Button>
+			</Notice>
+		);
 	}
+
+	const compose = () => {
+		const mediaIds = replies
+			.filter(
+				( reply ) =>
+					reply.status === 'approved' &&
+					reply.media_id &&
+					selectedReplyIds.has( reply.id )
+			)
+			.map( ( reply ) => reply.media_id );
+		if ( ! mediaIds.length ) {
+			return;
+		}
+		if ( topic.intro_media_id ) {
+			mediaIds.unshift( topic.intro_media_id );
+		}
+		window.location.href = `admin.php?page=clipisode-clipisodes#/create-clipisode/${ id }/${ mediaIds.join(
+			','
+		) }`;
+	};
 
 	const approvedCount = replies.filter(
 		( r ) => r.status === 'approved'
@@ -244,17 +323,18 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 	return (
 		<>
 			<div className="clipisode-detail-header">
-				<a
+				<Button
+					variant="tertiary"
 					className="clipisode-back-link"
 					onClick={ () => navigate( '' ) }
 				>
-					← All Topics
-				</a>
+					← Home
+				</Button>
 				<div className="clipisode-detail-header-row">
 					<h1>{ topic.title }</h1>
 					<div className="clipisode-detail-header-actions">
 						<Button
-							variant="primary"
+							variant="secondary"
 							onClick={ () => navigate( `${ id }/edit` ) }
 						>
 							Edit Topic
@@ -274,6 +354,27 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 				</div>
 			</div>
 
+			{ error && (
+				<Notice status="error" isDismissible={ false }>
+					<p>{ error }</p>
+					<Button onClick={ load }>Try again</Button>
+				</Notice>
+			) }
+			{ guide.state?.topic_id === Number( id ) && (
+				<OnboardingGuide compact />
+			) }
+			<TopicNextStep
+				topicId={ Number( id ) }
+				outputs={ topic.outputs }
+				replies={ replies }
+				links={ links }
+				selectedIds={ selectedReplyIds }
+				review={ setSelectedReply }
+				compose={ compose }
+				refresh={ load }
+				createLink={ createLink }
+				busy={ refreshing || creatingLink }
+			/>
 			<div className="clipisode-detail-grid">
 				<div className="clipisode-detail-main">
 					<div className="clipisode-stats-row">
@@ -309,9 +410,10 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 						</div>
 					</div>
 
-					<div className="clipisode-section">
+					<details className="clipisode-section clipisode-disclosure">
+						<summary>Manage invitation links</summary>
 						<div className="clipisode-section-header">
-							<h2>Invitation Links</h2>
+							<h2>Invitation links</h2>
 							<Button
 								variant="secondary"
 								size="compact"
@@ -584,7 +686,7 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 								</tbody>
 							</table>
 						) }
-					</div>
+					</details>
 
 					<div className="clipisode-section">
 						<div className="clipisode-section-header">
@@ -620,113 +722,101 @@ export default function TopicDetail( { id, navigate }: TopicDetailProps ) {
 										</tr>
 									</thead>
 									<tbody>
-										{ replies
-											.slice( 0, 10 )
-											.map( ( reply ) => (
-												<tr
-													key={ reply.id }
-													className="clickable"
-													onClick={ () =>
-														setSelectedReply(
-															reply
-														)
+										{ replies.map( ( reply ) => (
+											<tr
+												key={ reply.id }
+												className="clickable"
+												onClick={ () =>
+													setSelectedReply( reply )
+												}
+											>
+												<td
+													onClick={ ( e ) =>
+														e.stopPropagation()
 													}
 												>
-													<td
-														onClick={ ( e ) =>
-															e.stopPropagation()
-														}
-													>
-														{ reply.status ===
-															'approved' &&
-															reply.media_id && (
-																<input
-																	type="checkbox"
-																	checked={ selectedReplyIds.has(
-																		reply.id
-																	) }
-																	onChange={ () => {
-																		setSelectedReplyIds(
-																			(
-																				prev
-																			) => {
-																				const next =
-																					new Set(
-																						prev
-																					);
-																				if (
-																					next.has(
-																						reply.id
-																					)
-																				) {
-																					next.delete(
-																						reply.id
-																					);
-																				} else {
-																					next.add(
-																						reply.id
-																					);
-																				}
-																				return next;
+													{ reply.status ===
+														'approved' &&
+														reply.media_id && (
+															<input
+																type="checkbox"
+																aria-label={ `Include reply from ${ reply.name }` }
+																checked={ selectedReplyIds.has(
+																	reply.id
+																) }
+																onChange={ () => {
+																	setSelectedReplyIds(
+																		(
+																			prev
+																		) => {
+																			const next =
+																				new Set(
+																					prev
+																				);
+																			if (
+																				next.has(
+																					reply.id
+																				)
+																			) {
+																				next.delete(
+																					reply.id
+																				);
+																			} else {
+																				next.add(
+																					reply.id
+																				);
 																			}
-																		);
-																	} }
-																/>
-															) }
-													</td>
-													<td className="clipisode-reply-name">
-														{ reply.name }
-													</td>
-													<td>
-														{ reply.tag || '—' }
-													</td>
-													<td>
-														<span
-															className={ `clipisode-status-badge ${ reply.status }` }
-														>
-															{ reply.status.replace(
-																'_',
-																' '
-															) }
-														</span>
-													</td>
-													<td>
-														<div className="clipisode-transcript-preview">
-															{ reply.transcript ||
-																'—' }
-														</div>
-													</td>
-													<td>
-														{ new Date(
-															reply.created_at
-														).toLocaleDateString() }
-													</td>
-												</tr>
-											) ) }
+																			return next;
+																		}
+																	);
+																} }
+															/>
+														) }
+												</td>
+												<td className="clipisode-reply-name">
+													<Button
+														variant="link"
+														onClick={ ( event ) => {
+															event.stopPropagation();
+															setSelectedReply(
+																reply
+															);
+														} }
+													>
+														Review { reply.name }
+													</Button>
+												</td>
+												<td>{ reply.tag || '—' }</td>
+												<td>
+													<span
+														className={ `clipisode-status-badge ${ reply.status }` }
+													>
+														{ reply.status.replace(
+															'_',
+															' '
+														) }
+													</span>
+												</td>
+												<td>
+													<div className="clipisode-transcript-preview">
+														{ reply.transcript ||
+															'—' }
+													</div>
+												</td>
+												<td>
+													{ new Date(
+														reply.created_at
+													).toLocaleDateString() }
+												</td>
+											</tr>
+										) ) }
 									</tbody>
 								</table>
 								{ selectedReplyIds.size > 0 && (
 									<div style={ { marginTop: 12 } }>
 										<Button
 											variant="primary"
-											onClick={ () => {
-												const mediaIds = replies
-													.filter(
-														( r ) =>
-															selectedReplyIds.has(
-																r.id
-															) && r.media_id
-													)
-													.map( ( r ) => r.media_id );
-												if ( topic?.intro_media_id ) {
-													mediaIds.unshift(
-														topic.intro_media_id
-													);
-												}
-												window.location.href = `admin.php?page=clipisode-clipisodes#/create-clipisode/${ id }/${ mediaIds.join(
-													','
-												) }`;
-											} }
+											onClick={ compose }
 										>
 											Create Clipisode (
 											{ selectedReplyIds.size } clip

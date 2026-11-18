@@ -387,3 +387,7 @@ function wp_get_environment_type(): string {
 function wp_create_nonce( string $action ): string {
 	return 'test-rest-nonce';
 }
+
+if ( ! function_exists( 'admin_url' ) ) {
+	function admin_url( string $path = '' ): string { return 'https://example.com/wp-admin/' . $path; }
+}

@@ -1681,7 +1681,7 @@ $close_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width=
 					. '</div>';
 			} else {
 				$video_html = '<div class="clipisode-introd-video-fallback">'
-					. esc_html__( 'No intro video for this topic.', 'clipisode' )
+					. esc_html__( 'Add your voice to the conversation.', 'clipisode' )
 					. '</div>';
 			}
 

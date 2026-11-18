@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from '@wordpress/element';
-import { Modal, Button, TextControl } from '@wordpress/components';
+import { useState } from '@wordpress/element';
+import { Modal, Button, TextControl, Notice } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import type { Reply } from '../types';
 
@@ -16,32 +16,37 @@ export default function ReplyModal( {
 }: ReplyModalProps ) {
 	const [ tag, setTag ] = useState< string >( reply.tag || '' );
 	const [ saving, setSaving ] = useState< boolean >( false );
-	const videoRef = useRef< HTMLVideoElement >( null );
-
-	useEffect( () => {
-		videoRef.current?.play();
-	}, [] );
+	const [ error, setError ] = useState( '' );
 
 	const updateStatus = ( status: string ) => {
 		setSaving( true );
+		setError( '' );
 		apiFetch( {
 			path: `/clipisode/v1/replies/${ reply.id }`,
 			method: 'PUT',
 			data: { status, tag },
 		} )
 			.then( onUpdated )
+			.catch( () =>
+				setError( 'Unable to save this review. Please try again.' )
+			)
 			.finally( () => setSaving( false ) );
 	};
 
 	return (
 		<Modal title={ reply.name } onRequestClose={ onClose } size="large">
+			{ error && (
+				<Notice status="error" isDismissible={ false }>
+					{ error }
+				</Notice>
+			) }
 			<div className="clipisode-modal-body">
 				{ reply.video_url && (
 					<div className="clipisode-modal-video">
 						<video
-							ref={ videoRef }
 							src={ reply.video_url }
 							controls
+							autoPlay
 							playsInline
 						/>
 					</div>

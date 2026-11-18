@@ -1,3 +1,5 @@
+import useOnboarding from '../hooks/useOnboarding';
+import OnboardingGuide from '../components/OnboardingGuide';
 import { useState, useEffect, useRef } from '@wordpress/element';
 import {
 	Button,
@@ -96,6 +98,7 @@ export default function CreateClipisode( {
 	outputId,
 	navigate,
 }: Props ) {
+	const guide = useOnboarding();
 	const [ topic, setTopic ] = useState< Topic | null >( null );
 	const [ currentTopicId, setCurrentTopicId ] = useState< number | null >(
 		topicId ?? null
@@ -129,6 +132,7 @@ export default function CreateClipisode( {
 		'theme' | 'clip' | 'export'
 	>( 'theme' );
 	const allowUnload = useRef( false );
+	const resumedOutput = useRef< number | null >( null );
 	const mediaKey = mediaIds?.join( ',' ) || '';
 	const snapshot = JSON.stringify( { name, clips, settings } );
 	const latestSnapshot = useRef( snapshot );
@@ -136,6 +140,20 @@ export default function CreateClipisode( {
 	const latestSettings = useRef( settings );
 	latestSettings.current = settings;
 	const dirty = ! loading && snapshot !== savedSnapshot;
+	useEffect( () => {
+		if (
+			! loading &&
+			outputId &&
+			guide.state?.output_id === outputId &&
+			guide.state.topic_id === currentTopicId &&
+			! guide.state.dismissed &&
+			guide.state.stage >= 4 &&
+			resumedOutput.current !== outputId
+		) {
+			resumedOutput.current = outputId;
+			setInspectorTab( 'export' );
+		}
+	}, [ loading, outputId, currentTopicId, guide.state ] );
 
 	useEffect( () => {
 		let active = true;
@@ -503,7 +521,7 @@ export default function CreateClipisode( {
 			);
 		}
 	};
-	const save = async (): Promise< boolean > => {
+	const save = async ( continueToExport = false ): Promise< boolean > => {
 		if ( validationErrors.length ) {
 			return false;
 		}
@@ -535,6 +553,22 @@ export default function CreateClipisode( {
 			}
 			// Keep the editor mounted while giving the saved preview a reloadable URL.
 			window.history.replaceState( null, '', `#/compose/${ result.id }` );
+			if ( continueToExport && latestSnapshot.current === snapshot ) {
+				setInspectorTab( 'export' );
+				requestAnimationFrame(
+					() =>
+						document
+							.getElementById( 'inspector-tab-export' )
+							?.focus()
+				);
+			}
+			if ( guide.state?.topic_id === currentTopicId ) {
+				await guide.update( {
+					action: 'select',
+					topic_id: currentTopicId,
+					output_id: result.id,
+				} );
+			}
 			return true;
 		} catch ( caught ) {
 			setError( ( caught as Error ).message );
@@ -598,8 +632,25 @@ export default function CreateClipisode( {
 			</>
 		);
 	}
+	let guideStage = savedId ? 4 : 3;
+	if ( guide.state?.stage === 5 && ! dirty ) {
+		guideStage = 5;
+	}
+	const guideHelp =
+		guideStage === 5
+			? 'Your video is ready. Download the MP4 or share its watch page from Export.'
+			: 'Preview your video. Reorder or trim clips if you like—your title and theme are ready. Save and continue when you’re ready to create the MP4.';
 	return (
 		<div className="clipisode-studio">
+			{ guide.state?.topic_id === currentTopicId &&
+				! guide.state.dismissed && (
+					<>
+						<OnboardingGuide stage={ guideStage } compact />
+						<p className="clipisode-studio-guide-help">
+							{ guideHelp }
+						</p>
+					</>
+				) }
 			<header className="clipisode-studio-header">
 				<Button
 					variant="tertiary"
@@ -624,12 +675,19 @@ export default function CreateClipisode( {
 							: 'Preview saved. You can reopen it from Clipisodes.' }
 					</span>
 					<Button
-						variant="primary"
-						onClick={ save }
+						variant="secondary"
+						onClick={ () => save() }
 						isBusy={ saving }
 						disabled={ cannotSave }
 					>
 						{ saving ? 'Saving…' : 'Save preview' }
+					</Button>
+					<Button
+						variant="primary"
+						disabled={ cannotSave }
+						onClick={ () => save( true ) }
+					>
+						Save and continue →
 					</Button>
 				</div>
 			</header>

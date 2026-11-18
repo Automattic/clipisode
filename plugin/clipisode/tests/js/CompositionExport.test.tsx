@@ -65,7 +65,7 @@ describe( 'CompositionExport', () => {
 		);
 		expect( mockApi ).not.toHaveBeenCalled();
 		expect(
-			screen.getByRole( 'button', { name: 'Render in browser' } )
+			screen.getByRole( 'button', { name: 'Create MP4 in browser' } )
 		).toBeDisabled();
 		rerender(
 			<CompositionExport
@@ -152,7 +152,11 @@ describe( 'CompositionExport', () => {
 		).toHaveAttribute( 'href', 'https://example.com/render.mp4' );
 		expect( onRenderingChange ).toHaveBeenLastCalledWith( false );
 		await tick();
-		expect( mockApi ).toHaveBeenCalledTimes( 5 );
+		expect(
+			mockApi.mock.calls.filter(
+				( [ options ] ) => options.path?.endsWith( '/render' )
+			)
+		).toHaveLength( 5 );
 	} );
 
 	it( 'resumes an active job after reload and cancels polling on unmount', async () => {
@@ -387,7 +391,7 @@ describe( 'Browser MP4 export', () => {
 			screen.queryByRole( 'button', { name: 'Render with service' } )
 		).not.toBeInTheDocument();
 		fireEvent.click(
-			screen.getByRole( 'button', { name: 'Render in browser' } )
+			screen.getByRole( 'button', { name: 'Create MP4 in browser' } )
 		);
 		await flush();
 		expect( getBrowserRenderSupport ).toHaveBeenCalledWith(
@@ -456,7 +460,7 @@ describe( 'Browser MP4 export', () => {
 		);
 		await flush();
 		fireEvent.click(
-			screen.getByRole( 'button', { name: 'Render in browser' } )
+			screen.getByRole( 'button', { name: 'Create MP4 in browser' } )
 		);
 		await flush();
 		expect(
@@ -474,7 +478,7 @@ describe( 'Browser MP4 export', () => {
 			)
 		).toBe( true );
 		expect(
-			screen.getByRole( 'button', { name: 'Render in browser' } )
+			screen.getByRole( 'button', { name: 'Create MP4 in browser' } )
 		).toBeEnabled();
 	} );
 
@@ -498,7 +502,7 @@ describe( 'Browser MP4 export', () => {
 		);
 		await flush();
 		fireEvent.click(
-			screen.getByRole( 'button', { name: 'Render in browser' } )
+			screen.getByRole( 'button', { name: 'Create MP4 in browser' } )
 		);
 		await flush();
 		fireEvent.click(
@@ -557,7 +561,7 @@ describe( 'Browser MP4 export', () => {
 		);
 		await flush();
 		fireEvent.click(
-			screen.getByRole( 'button', { name: 'Render in browser' } )
+			screen.getByRole( 'button', { name: 'Create MP4 in browser' } )
 		);
 		await flush();
 		expect(
@@ -572,7 +576,7 @@ describe( 'Browser MP4 export', () => {
 			screen.getByRole( 'link', { name: 'Download MP4' } )
 		).toHaveAttribute( 'href', 'blob:rendered-mp4' );
 		expect(
-			screen.getByRole( 'button', { name: 'Render in browser' } )
+			screen.getByRole( 'button', { name: 'Create MP4 in browser' } )
 		).toBeDisabled();
 		fireEvent.click(
 			screen.getByRole( 'button', { name: 'Retry upload' } )
@@ -607,7 +611,7 @@ describe( 'Browser MP4 export', () => {
 		);
 		await flush();
 		fireEvent.click(
-			screen.getByRole( 'button', { name: 'Render in browser' } )
+			screen.getByRole( 'button', { name: 'Create MP4 in browser' } )
 		);
 		await flush();
 		unmount();

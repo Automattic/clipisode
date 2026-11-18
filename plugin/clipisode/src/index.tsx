@@ -1,6 +1,7 @@
 import { createRoot } from '@wordpress/element';
 import App from './App';
 import './index.scss';
+import './onboarding.scss';
 
 const root = document.getElementById( 'clipisode-root' );
 if ( root ) {

@@ -26,6 +26,7 @@ require_once CLIPISODE_PLUGIN_DIR . 'includes/class-admin.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-rest-api.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-invitation.php';
 require_once CLIPISODE_PLUGIN_DIR . 'includes/class-preview.php';
+require_once CLIPISODE_PLUGIN_DIR . 'includes/class-onboarding.php';
 
 register_activation_hook( __FILE__, [ Clipisode_Database::class, 'activate' ] );
 register_activation_hook( __FILE__, [ Clipisode_Post_Types::class, 'ensure_default_logo_attachment' ] );
@@ -76,6 +77,8 @@ add_action( 'init', [ Clipisode_Post_Types::class, 'register' ] );
 add_action( 'init', [ new Clipisode_Media(), 'register_hooks' ] );
 add_action( 'admin_menu', [ new Clipisode_Admin(), 'register_menus' ] );
 add_action( 'rest_api_init', [ new Clipisode_REST_API(), 'register_routes' ] );
+add_action( 'rest_api_init', [ new Clipisode_Onboarding(), 'register_routes' ] );
+add_action( 'wp_dashboard_setup', [ new Clipisode_Onboarding(), 'register_widget' ] );
 add_action( 'enqueue_block_assets', [ Clipisode_Post_Types::class, 'enqueue_screen_editor_canvas_styles' ] );
 add_action( 'enqueue_block_editor_assets', [ Clipisode_Post_Types::class, 'enqueue_block_editor_extensions' ] );
 add_filter( 'block_editor_settings_all', [ Clipisode_Post_Types::class, 'filter_screen_editor_font_settings' ], 10, 2 );

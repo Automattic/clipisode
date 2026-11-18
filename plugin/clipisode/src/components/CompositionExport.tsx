@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from '@wordpress/element';
+import useOnboarding from '../hooks/useOnboarding';
 import { Button, Notice, Spinner } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import {
@@ -41,6 +42,13 @@ export default function CompositionExport( {
 	disabled,
 	onRenderingChange,
 }: Props ) {
+	const { refresh: refreshGuide } = useOnboarding();
+	const [ exported, setExported ] = useState< SavedCompositionOutput | null >(
+		null
+	);
+	const [ shareStatus, setShareStatus ] = useState( '' );
+	const [ shareError, setShareError ] = useState( '' );
+	const [ shareRevision, setShareRevision ] = useState( 0 );
 	const [ job, setJob ] = useState< OutputRenderStatus | null >( null );
 	const [ checking, setChecking ] = useState( Boolean( outputId ) );
 	const [ starting, setStarting ] = useState( false );
@@ -147,6 +155,42 @@ export default function CompositionExport( {
 			controller.abort();
 		};
 	}, [ outputId, checkRevision ] );
+
+	useEffect( () => {
+		let active = true;
+		setExported( null );
+		setShareStatus( '' );
+		setShareError( '' );
+		if ( outputId && job?.url && ! dirty && ! browserBusy ) {
+			apiFetch< SavedCompositionOutput >( {
+				path: `/clipisode/v1/outputs/${ outputId }`,
+			} )
+				.then( ( result ) => {
+					if ( active ) {
+						setExported( result );
+						refreshGuide();
+					}
+				} )
+				.catch( () => {
+					if ( active ) {
+						setShareError(
+							'Your MP4 is saved, but its sharing details could not be loaded.'
+						);
+					}
+				} );
+		}
+		return () => {
+			active = false;
+		};
+	}, [
+		outputId,
+		job?.url,
+		job?.status,
+		dirty,
+		browserBusy,
+		shareRevision,
+		refreshGuide,
+	] );
 
 	const cannotStart =
 		! outputId ||
@@ -337,17 +381,17 @@ export default function CompositionExport( {
 
 	return (
 		<section className="clipisode-section" aria-label="MP4 export">
-			<h2>MP4 export</h2>
+			<h2>Export and share</h2>
 			<p>
-				Render the saved preview as an MP4. You can keep editing while
-				it renders; save those changes after the render finishes.
+				Create an MP4 from your saved video. Keep this tab open until it
+				has been saved to WordPress.
 			</p>
 			<Button
 				variant="primary"
 				onClick={ startBrowser }
 				disabled={ cannotStart }
 			>
-				Render in browser
+				Create MP4 in browser
 			</Button>
 			{ job?.external_available && (
 				<Button
@@ -455,6 +499,66 @@ export default function CompositionExport( {
 						Discard browser export
 					</Button>
 				</p>
+			) }
+			{ exported?.export_current && exported.preview_url && (
+				<div className="clipisode-export-success">
+					<h3>Your Clipisode is ready.</h3>
+					<p>
+						The MP4 is saved to your site. Download it below or
+						share its public watch page.
+					</p>
+					<label htmlFor="clipisode-video-link">Video link</label>
+					<input
+						id="clipisode-video-link"
+						readOnly
+						value={ exported.preview_url }
+						onFocus={ ( event ) => event.target.select() }
+					/>
+					<div className="clipisode-action-row">
+						<Button
+							variant="secondary"
+							onClick={ async () => {
+								try {
+									await navigator.clipboard.writeText(
+										exported.preview_url
+									);
+									setShareStatus( 'Video link copied.' );
+								} catch {
+									setShareStatus(
+										'Could not copy. Select and copy the video link above.'
+									);
+								}
+							} }
+						>
+							Copy video link
+						</Button>
+						<Button
+							variant="secondary"
+							href={ exported.preview_url }
+							target="_blank"
+							rel="noreferrer"
+						>
+							Watch video ↗
+						</Button>
+						<Button
+							variant="tertiary"
+							href="admin.php?page=clipisode"
+						>
+							Back to Home
+						</Button>
+					</div>
+					<p role="status">{ shareStatus }</p>
+				</div>
+			) }
+			{ shareError && (
+				<Notice status="warning" isDismissible={ false }>
+					<p>{ shareError }</p>
+					<Button
+						onClick={ () => setShareRevision( shareRevision + 1 ) }
+					>
+						Retry sharing details
+					</Button>
+				</Notice>
 			) }
 			{ downloadUrl && ! browserVideo && (
 				<p role="status">
