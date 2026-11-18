@@ -48,9 +48,35 @@ export interface SavedCompositionOutput {
 	slug: string;
 	created_at: string;
 	url: string | null;
+	preview_url?: string | null;
+	export_current?: boolean;
 	composition: import('./remotion/types').ClipisodeCompositionProps;
 	composition_hash: string | null;
 }
+
+export interface OnboardingState {
+	dismissed: boolean;
+	topic_id: number | null;
+	output_id: number | null;
+	topic_title: string;
+	stage: number;
+	reply_count: number;
+	approved_count: number;
+	missing_topic: boolean;
+	missing_output: boolean;
+	watch_url: string | null;
+	video_url: string | null;
+	next_url: string;
+}
+
+export type OnboardingAction =
+	| { action: 'start' | 'dismiss' | 'resume' }
+	| {
+			action: 'select';
+			topic_id: number;
+			output_id?: number | null;
+			show_guide?: boolean;
+	  };
 
 export interface OutputRenderStatus {
 	id: string | null;
@@ -209,7 +235,10 @@ declare global {
 		ClipisodeThemeAPI?: {
 			React: typeof import('react');
 			Remotion: typeof import('remotion');
-			registerRenderer: ( id: string, renderer: import('./remotion/theme-renderers').ThemeRenderer ) => void;
+			registerRenderer: (
+				id: string,
+				renderer: import('./remotion/theme-renderers').ThemeRenderer
+			) => void;
 		};
 		clipisodeAdmin?: {
 			page: string;

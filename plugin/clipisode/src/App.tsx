@@ -9,10 +9,20 @@ import CreateClipisode from './pages/CreateClipisode';
 import ThemeList from './pages/ThemeList';
 import Settings from './pages/Settings';
 import useHashRoute from './hooks/useHashRoute';
+import Home from './pages/Home';
+import { OnboardingProvider } from './hooks/useOnboarding';
 
-export default function App() {
+function RoutedApp() {
 	const page = window.clipisodeAdmin?.page || 'clipisode';
 	const { route, navigate } = useHashRoute();
+	useEffect( () => {
+		const heading =
+			document.querySelector< HTMLElement >( '#clipisode-root h1' );
+		if ( heading ) {
+			heading.tabIndex = -1;
+			heading.focus();
+		}
+	}, [ page, route ] );
 	const compositionMatch = route.match( /^compose\/(\d+)$/ );
 	const createClipisodeWithTopicMatch = route.match(
 		/^create-clipisode\/(\d+)\/([\d,]+)$/
@@ -81,6 +91,10 @@ export default function App() {
 	}
 
 	// Topics routing.
+	if ( route === 'get-started' ) {
+		return <TopicForm guided navigate={ navigate } />;
+	}
+
 	if ( route === 'new' ) {
 		return <TopicForm navigate={ navigate } />;
 	}
@@ -95,5 +109,16 @@ export default function App() {
 		return <TopicDetail id={ detailMatch[ 1 ] } navigate={ navigate } />;
 	}
 
-	return <TopicList navigate={ navigate } />;
+	if ( page === 'clipisode-topics' || route === 'topics' ) {
+		return <TopicList navigate={ navigate } />;
+	}
+	return <Home navigate={ navigate } />;
+}
+
+export default function App() {
+	return (
+		<OnboardingProvider>
+			<RoutedApp />
+		</OnboardingProvider>
+	);
 }

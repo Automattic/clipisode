@@ -553,11 +553,11 @@ describe( 'Clipisode editor', () => {
 		fireEvent.click( screen.getByRole( 'tab', { name: 'Export' } ) );
 		await waitFor( () =>
 			expect(
-				screen.getByRole( 'button', { name: 'Render in browser' } )
+				screen.getByRole( 'button', { name: 'Create MP4 in browser' } )
 			).toBeEnabled()
 		);
 		fireEvent.click(
-			screen.getByRole( 'button', { name: 'Render in browser' } )
+			screen.getByRole( 'button', { name: 'Create MP4 in browser' } )
 		);
 		await screen.findByText( 'Rendering in browser · 0%' );
 		expect(
@@ -617,7 +617,7 @@ describe( 'Clipisode editor', () => {
 		);
 		expect( screen.getByText( 'Unsaved changes' ) ).toBeInTheDocument();
 		expect(
-			screen.getByRole( 'button', { name: 'Render in browser' } )
+			screen.getByRole( 'button', { name: 'Create MP4 in browser' } )
 		).toBeDisabled();
 	} );
 	it( 'builds clip fields from the selected theme and keeps edits isolated to each clip', async () => {
@@ -860,5 +860,53 @@ describe( 'Clipisode editor', () => {
 		} finally {
 			menu.remove();
 		}
+	} );
+	it( 'save and continue opens export only after a successful save', async () => {
+		mockEditorApi( async ( options ) =>
+			options.path === '/clipisode/v1/topics/7'
+				? ( { id: 7, intro_media_id: 1, hosted_by: 'Host' } as never )
+				: ( savedOutput() as never )
+		);
+		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
+		await screen.findByDisplayValue( 'Community stories' );
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Save and continue →' } )
+		);
+		await waitFor( () =>
+			expect(
+				screen.getByRole( 'tab', { name: 'Export' } )
+			).toHaveAttribute( 'aria-selected', 'true' )
+		);
+		expect(
+			mockApi.mock.calls.filter(
+				( [ options ] ) => options.method === 'PUT'
+			)
+		).toHaveLength( 1 );
+	} );
+	it( 'save and continue retains unsaved edits and does not advance after a failed save', async () => {
+		mockEditorApi( async ( options ) => {
+			if ( options.method === 'PUT' ) {
+				throw new Error( 'Save unavailable' );
+			}
+			return options.path === '/clipisode/v1/topics/7'
+				? ( { id: 7, intro_media_id: 1, hosted_by: 'Host' } as never )
+				: ( savedOutput() as never );
+		} );
+		render( <CreateClipisode outputId={ 42 } navigate={ jest.fn() } /> );
+		await screen.findByDisplayValue( 'Community stories' );
+		fireEvent.change( screen.getByLabelText( 'Clipisode name' ), {
+			target: { value: 'My new title' },
+		} );
+		fireEvent.click(
+			screen.getByRole( 'button', { name: 'Save and continue →' } )
+		);
+		await screen.findByText( 'Save unavailable' );
+		expect(
+			screen.getByDisplayValue( 'My new title' )
+		).toBeInTheDocument();
+		expect( screen.getByRole( 'tab', { name: 'Export' } ) ).toHaveAttribute(
+			'aria-selected',
+			'false'
+		);
 	} );
 } );

@@ -183,6 +183,11 @@ class Clipisode_Renderer {
 		], false );
 	}
 
+	public static function has_current_export( object $output ): bool {
+		$job = get_option( 'clipisode_render_' . (int) $output->id );
+		return $output->media_id && null !== $output->composition && is_array( $job ) && 'done' === $job['status'] && hash_equals( $job['composition_hash'], hash( 'sha256', $output->composition ) );
+	}
+
 	private static function public_status( ?array $job, object $output ): array {
 		return [
 			'id'       => $job ? $job['id'] : null,

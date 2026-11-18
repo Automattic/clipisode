@@ -509,6 +509,7 @@ class Clipisode_REST_API {
 
 	private function enrich_topic( object $topic ): object {
 		global $wpdb;
+		$topic->id = (int) $topic->id;
 
 		if ( ! empty( $topic->brand_terms_id ) ) {
 			$brand_post = get_post( (int) $topic->brand_terms_id );
@@ -922,6 +923,8 @@ class Clipisode_REST_API {
 			'composition' => $composition,
 			'composition_hash' => null !== $output->composition ? hash( 'sha256', $output->composition ) : null,
 			'url'         => $output->media_id ? Clipisode_Media::get_url( (int) $output->media_id ) : null,
+			'export_current' => Clipisode_Renderer::has_current_export( $output ),
+			'preview_url' => Clipisode_Preview::get_url( (int) $output->id, $output->media_id ? (int) $output->media_id : null, $output->slug ),
 		], $status );
 	}
 

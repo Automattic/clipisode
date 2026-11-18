@@ -1,5 +1,5 @@
-import { useState, useEffect } from '@wordpress/element';
-import { Button, Spinner } from '@wordpress/components';
+import { useState, useEffect, useCallback } from '@wordpress/element';
+import { Button, Spinner, Notice } from '@wordpress/components';
 import apiFetch from '@wordpress/api-fetch';
 import type { Topic } from '../types';
 
@@ -10,12 +10,16 @@ interface TopicListProps {
 export default function TopicList( { navigate }: TopicListProps ) {
 	const [ topics, setTopics ] = useState< Topic[] >( [] );
 	const [ loading, setLoading ] = useState< boolean >( true );
+	const [ error, setError ] = useState( '' );
 
-	useEffect( () => {
+	const load = useCallback( () => {
+		setError( '' );
 		apiFetch( { path: '/clipisode/v1/topics' } )
 			.then( setTopics )
+			.catch( () => setError( 'Unable to load topics.' ) )
 			.finally( () => setLoading( false ) );
 	}, [] );
+	useEffect( load, [ load ] );
 
 	if ( loading ) {
 		return (
@@ -25,6 +29,14 @@ export default function TopicList( { navigate }: TopicListProps ) {
 		);
 	}
 
+	if ( error ) {
+		return (
+			<Notice status="error" isDismissible={ false }>
+				<p>{ error }</p>
+				<Button onClick={ load }>Try again</Button>
+			</Notice>
+		);
+	}
 	return (
 		<>
 			<div className="clipisode-page-header">
@@ -57,11 +69,12 @@ export default function TopicList( { navigate }: TopicListProps ) {
 					<tbody>
 						{ topics.map( ( topic ) => (
 							<tr key={ topic.id }>
-								<td
-									className="clickable"
-									onClick={ () => navigate( topic.id ) }
-								>
-									{ topic.title }
+								<td>
+									<a
+										href={ `admin.php?page=clipisode#/${ topic.id }` }
+									>
+										{ topic.title }
+									</a>
 								</td>
 								<td>{ topic.hosted_by || '—' }</td>
 								<td>
